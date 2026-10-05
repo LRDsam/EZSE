@@ -1,12 +1,16 @@
-#include "EZSE/Core/Assert.h"
 #include "EZSE/Core/Log.h"
+#include "EZSE/Platform/Window.h"
 
 int main() {
-    ezse::LogInfo("Hello from EZSE Core");
+    auto window = ezse::Window::Create({.title = "EZSE Sandbox"});
+    if (!window) {
+        return 1;
+    }
 
-    int lightCount = 4;
-    EZSE_ASSERT(lightCount <= 8, "Too many lights");
+    while (!window->ShouldClose()) {
+        window->PollEvents();
+    }
 
-    ezse::LogInfo("Light count is valid: {}", lightCount);
+    ezse::LogInfo("Sandbox closed");
     return 0;
 }
