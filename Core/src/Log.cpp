@@ -19,7 +19,7 @@ std::string_view LevelName(LogLevel level) {
 } // namespace
 
 void LogMessage(LogLevel level, std::string_view message) {
-    std::cout << std::format("[{}] {}\n", LevelName(level), message);
+    std::cout << std::format("{:<7} {}\n", std::format("[{}]", LevelName(level)), message);
 }
 
 } // namespace ezse
