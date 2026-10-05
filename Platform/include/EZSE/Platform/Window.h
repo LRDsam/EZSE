@@ -22,6 +22,7 @@ public:
     Window& operator=(const Window&) = delete;
 
     void PollEvents();
+    void SwapBuffers();
     bool ShouldClose() const;
 
 private:

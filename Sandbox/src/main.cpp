@@ -9,6 +9,7 @@ int main() {
 
     while (!window->ShouldClose()) {
         window->PollEvents();
+        window->SwapBuffers();
     }
 
     ezse::LogInfo("Sandbox closed");
