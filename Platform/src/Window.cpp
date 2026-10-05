@@ -65,4 +65,8 @@ bool Window::ShouldClose() const {
     return glfwWindowShouldClose(m_handle) != 0;
 }
 
+Window::GLLoadFunction Window::GetGLLoadFunction() const {
+    return glfwGetProcAddress;
+}
+
 } // namespace ezse

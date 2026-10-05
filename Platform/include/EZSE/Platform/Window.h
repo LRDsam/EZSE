@@ -21,9 +21,14 @@ public:
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
+    using GLProc = void (*)();
+    using GLLoadFunction = GLProc (*)(const char* name);
+
     void PollEvents();
     void SwapBuffers();
     bool ShouldClose() const;
+
+    GLLoadFunction GetGLLoadFunction() const;
 
 private:
     explicit Window(GLFWwindow* handle);
