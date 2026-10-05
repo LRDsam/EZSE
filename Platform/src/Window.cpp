@@ -26,6 +26,9 @@ std::unique_ptr<Window> Window::Create(const WindowDesc& desc) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#if defined(EZSE_DEBUG)
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
 
     GLFWwindow* handle =
         glfwCreateWindow(desc.width, desc.height, desc.title.c_str(), nullptr, nullptr);
