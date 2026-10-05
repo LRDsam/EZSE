@@ -1,9 +1,12 @@
+#include "EZSE/Core/Assert.h"
 #include "EZSE/Core/Log.h"
 
 int main() {
-    ezse::LogTrace("Starting Sandbox");
     ezse::LogInfo("Hello from EZSE Core");
-    ezse::LogWarn("This is a warning with a value: {}", 42);
-    ezse::LogError("This is an error with two values: {} and {}", 3.14f, "text");
+
+    int lightCount = 4;
+    EZSE_ASSERT(lightCount <= 8, "Too many lights");
+
+    ezse::LogInfo("Light count is valid: {}", lightCount);
     return 0;
 }
