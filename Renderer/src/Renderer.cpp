@@ -12,18 +12,23 @@ namespace {
 const char* vertShaderSource = R"(#version 460 core
 
 layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+
+out vec3 color;
 
 void main() {
     gl_Position = vec4(a_position, 1.0);
+    color = a_color;
 }
 )";
 
 const char* fragShaderSource = R"(#version 460 core
 
-out vec4 color;
+in  vec3 color;
+out vec4 fragColor;
 
 void main() {
-    color = vec4(0.2, 0.4, 0.3, 1.0);
+    fragColor = vec4(color, 1.0);
 }
 )";
 
@@ -83,9 +88,9 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
 
     std::unique_ptr<Renderer> renderer(new Renderer());
     const float triangle[] = {
-        0.0f,    0.5f,    0.0f,
-       -0.5f,   -0.5f,    0.0f,
-        0.5f,   -0.5f,    0.0f,
+        0.0f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,
+       -0.5f, -0.5f,  0.0f,  0.0f,  1.0f,  0.0f,
+        0.5f, -0.5f,  0.0f,  0.0f,  0.0f,  1.0f
     };
 
     glCreateBuffers(1, &renderer->m_vertexBuffer);
@@ -93,10 +98,13 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     LogInfo("OpenGL: Vertex buffer {} created", renderer->m_vertexBuffer);
 
     glCreateVertexArrays(1, &renderer->m_vao);
-    glVertexArrayVertexBuffer(renderer->m_vao, 0, renderer->m_vertexBuffer, 0, 3 * sizeof(float));
+    glVertexArrayVertexBuffer(renderer->m_vao, 0, renderer->m_vertexBuffer, 0, 6 * sizeof(float));
     glVertexArrayAttribFormat(renderer->m_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribFormat(renderer->m_vao, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
     glEnableVertexArrayAttrib(renderer->m_vao, 0);
+    glEnableVertexArrayAttrib(renderer->m_vao, 1);
     glVertexArrayAttribBinding(renderer->m_vao, 0, 0);
+    glVertexArrayAttribBinding(renderer->m_vao, 1, 0);
     LogInfo("OpenGL: Vertex Array {} created", renderer->m_vao);
 
     auto vertShader = CompileShader(GL_VERTEX_SHADER,vertShaderSource);
