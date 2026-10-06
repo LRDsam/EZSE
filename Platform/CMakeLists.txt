@@ -1,4 +1,7 @@
-add_library(EZSEPlatform STATIC src/Window.cpp)
+add_library(EZSEPlatform STATIC
+    include/EZSE/Platform/Window.h
+    src/Window.cpp
+)
 add_library(EZSE::Platform ALIAS EZSEPlatform)
 
 target_include_directories(EZSEPlatform PUBLIC include)
