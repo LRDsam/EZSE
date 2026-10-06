@@ -16,6 +16,7 @@ int main() {
     while (!window->ShouldClose()) {
         window->PollEvents();
         renderer->Clear(0.1f, 0.2f, 0.3f);
+        renderer->DrawTriangle();
         window->SwapBuffers();
     }
 
