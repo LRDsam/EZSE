@@ -10,3 +10,5 @@ add_subdirectory(Core)
 add_subdirectory(Platform)
 add_subdirectory(Renderer)
 add_subdirectory(Sandbox)
+
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Sandbox)
