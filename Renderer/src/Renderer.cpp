@@ -71,8 +71,13 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     return renderer;
 }
 
-MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices) {
+MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices) {
     EZSE_ASSERT(!vertices.empty(), "CreateMesh needs at least one vertex");
+    EZSE_ASSERT(!indices.empty(), "CreateMesh needs at least one index");
+    EZSE_ASSERT(indices.size() % 3 == 0, "CreateMesh needs indices to be a multiple of 3");
+    for(const std::uint32_t index : indices) {
+        EZSE_ASSERT(index < vertices.size(), "CreateMesh got an index that points past the last vertex");
+    }
 
     MeshData meshData;
     glCreateBuffers(1, &meshData.vertexBufferObj);
@@ -88,7 +93,13 @@ MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices) {
     glVertexArrayAttribBinding(meshData.vertexArrayObj, 0, 0);
     glVertexArrayAttribBinding(meshData.vertexArrayObj, 1, 0);
     LogInfo("OpenGL: Vertex Array {} created", meshData.vertexArrayObj);
-    meshData.vertexCount = static_cast<unsigned int>(vertices.size());
+
+    glCreateBuffers(1, &meshData.indexBufferObj);
+    glNamedBufferStorage(meshData.indexBufferObj, indices.size_bytes(), indices.data(), 0);
+    glVertexArrayElementBuffer(meshData.vertexArrayObj, meshData.indexBufferObj);
+    LogInfo("OpenGL: Index buffer {} created", meshData.indexBufferObj);
+
+    meshData.indexCount = static_cast<unsigned int>(indices.size());
     m_meshData.push_back(meshData);
     return MeshHandle{ static_cast<std::uint32_t>(m_meshData.size()) };
 }
@@ -97,7 +108,9 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     MeshData& meshData = GetMeshData(mesh);
 
     glDeleteBuffers(1, &meshData.vertexBufferObj);
+    glDeleteBuffers(1, &meshData.indexBufferObj);
     glDeleteVertexArrays(1, &meshData.vertexArrayObj);
+
     meshData = MeshData{};
 }
 
@@ -107,7 +120,7 @@ void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader) {
 
     glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
-    glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
+    glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
 ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_view fragmentSource) {
@@ -174,6 +187,7 @@ void Renderer::Clear(float red, float green, float blue) {
 Renderer::~Renderer() {
     for (auto& meshData : m_meshData) {
         glDeleteBuffers(1, &meshData.vertexBufferObj);
+        glDeleteBuffers(1, &meshData.indexBufferObj);
         glDeleteVertexArrays(1, &meshData.vertexArrayObj);
     }
     

@@ -15,15 +15,12 @@ int main() {
     }
 
     const ezse::Vertex triangle[] = {
-        {{ 0.0f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
         {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
         {{ 0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.5f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{-0.5f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
     };
-    const ezse::Vertex triangle2[] = {
-       {{-0.5f,  0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-       {{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-       {{ 0.5f,  0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    };
+    const std::uint32_t indices[] = { 0, 1, 2, 0, 2, 3};
 
     const char* vertShaderSource = R"(#version 460 core
 
@@ -48,8 +45,7 @@ void main() {
 }
 )";
 
-    ezse::MeshHandle mesh = renderer->CreateMesh(triangle);
-    ezse::MeshHandle mesh2 = renderer->CreateMesh(triangle2);
+    ezse::MeshHandle mesh = renderer->CreateMesh(triangle, indices);
     ezse::ShaderHandle shader = renderer->CreateShader(vertShaderSource, fragShaderSource);
 
    
@@ -57,7 +53,6 @@ void main() {
         window->PollEvents();
         renderer->Clear(0.1f, 0.2f, 0.3f);
         renderer->DrawMesh(mesh, shader);
-        renderer->DrawMesh(mesh2, shader);
         window->SwapBuffers();
     }
 

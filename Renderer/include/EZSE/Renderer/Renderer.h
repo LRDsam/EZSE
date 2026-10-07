@@ -18,7 +18,7 @@ class Renderer {
 public:
     static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
 
-    MeshHandle CreateMesh(std::span<const Vertex> vertices);
+    MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
     void DrawMesh(MeshHandle mesh, ShaderHandle shader);
     void DestroyMesh(MeshHandle mesh);
 
@@ -37,7 +37,8 @@ private:
     struct MeshData {
         unsigned int vertexBufferObj = 0;
         unsigned int vertexArrayObj = 0;
-        unsigned int vertexCount = 0;
+        unsigned int indexBufferObj = 0;
+        unsigned int indexCount = 0;
     };
 
     struct ShaderData {

@@ -33,7 +33,7 @@ code en commitberichten zijn Engels.
   starten doet de gebruiker zelf, omdat het een venster opent dat blijft staan. Zeg eerlijk
   wat wel en niet gecontroleerd is.
 - **Commits:** één per afgeronde stap. Stel het bericht voor en commit pas na akkoord.
-  Voeg alleen de bestanden van die stap toe.
+  Voeg alleen de bestanden van die stap toe. Geen `Co-Authored-By`-regel in het bericht.
 - **Visual Studio:** de gebruiker werkt in `build/EZSE.sln`. Bestanden die Claude wijzigt
   terwijl ze daar open staan, kunnen bij herladen overschreven worden. Vraag de gebruiker
   eerst alles op te slaan (Ctrl+Shift+S) en meld welke bestanden zijn aangepast.
@@ -53,8 +53,10 @@ cmake --build build
 ```
 
 Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
-In Visual Studio: open `build/EZSE.sln` en maak Sandbox het startproject (rechtsklik,
-*Set as Startup Project*).
+In Visual Studio: open `build/EZSE.sln`. Bij een nieuw gegenereerde `build/` is Sandbox al
+het startproject (`VS_STARTUP_PROJECT`). In een map die al een `.vs/` heeft stel je dat
+eenmalig met de hand in (rechtsklik op Sandbox, *Set as Startup Project*); anders geeft F5
+"Unable to start program ... ALL_BUILD, toegang geweigerd".
 
 ## Architectuur
 
@@ -128,17 +130,19 @@ Regels die de Renderer herbruikbaar houden:
 | 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing |
 | 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
 | 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
+| 25 | Indices | altijd verplicht, 32 bits (`std::uint32_t`); `CreateMesh` controleert met asserts dat het aantal een veelvoud van drie is en dat elke index naar een bestaand hoekpunt wijst |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
-Stappen 1 tot en met 11 zijn af en gecommit. Sandbox tekent twee driehoeken met één shader.
+Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
+en zes indices, met één shader.
 
 Publieke interface van `Renderer`:
 
 ```cpp
 static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
-MeshHandle   CreateMesh(std::span<const Vertex> vertices);
+MeshHandle   CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
 void         DestroyMesh(MeshHandle mesh);
 ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
 void         DestroyShader(ShaderHandle shader);
@@ -155,30 +159,20 @@ Bekende beperkingen, bewust zo gelaten:
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 
-## Volgende stap: 12, index buffers
+## Volgende stap: 13, transformaties
 
-De opdracht is al uitgelegd; de gebruiker was er nog niet aan begonnen. Voorgesteld en niet
-tegengesproken: indices zijn altijd verplicht, en een index is 32 bits.
+Het doel is een 3D-kubus. Nog niets besproken of besloten; begin met de eerste keuze.
 
-1. `CreateMesh` krijgt een tweede parameter: `std::span<const std::uint32_t> indices`.
-2. `MeshData` krijgt een nummer voor de index buffer en het aantal indices.
-3. In `CreateMesh`: een tweede buffer aanmaken en vullen (`glCreateBuffers`,
-   `glNamedBufferStorage`) en koppelen met `glVertexArrayElementBuffer(vao, buffer)`.
-   Asserts op de indices (niet leeg; een veelvoud van drie).
-4. De index buffer opruimen in `DestroyMesh` en de destructor.
-5. In `DrawMesh`: `glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, nullptr)`.
-6. In Sandbox: een vierkant met vier hoekpunten en zes indices (`0, 1, 2, 0, 2, 3`).
+1. **Math-library:** glm of zelf schrijven. Die keuze raakt alle modules, dus eerst de
+   opties en gevolgen bespreken.
+2. **Uniforms:** waarden (een matrix) doorgeven aan een shader. Dit vraagt een uitbreiding
+   van de publieke interface van `Renderer`; de vorm daarvan is nog een open keuze.
 
-Denkvragen die nog openstaan: komt een kubus met effen gekleurde vlakken uit met 8
-hoekpunten, en wat gebeurt er bij een index die groter is dan het aantal hoekpunten?
+Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
 
 ## Daarna
 
-De gebruiker wil na stap 12 naar een 3D-kubus. Dat vraagt, in deze volgorde:
-
-1. **Transformaties:** waarden doorgeven aan een shader (uniforms) en de keuze voor een
-   math-library (bijvoorbeeld glm of zelf schrijven). Die keuze raakt alle modules.
-2. **Camera en perspectief**, en de dieptebuffer.
+**Camera en perspectief**, en de dieptebuffer. Daarmee is de 3D-kubus compleet.
 
 Verder op de lijst, zonder vaste volgorde: texturen (met het vrije vertex-formaat), het
 event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
