@@ -1,4 +1,5 @@
 add_library(EZSERenderer STATIC
+    include/EZSE/Renderer/Mesh.h
     include/EZSE/Renderer/Renderer.h
     src/Renderer.cpp
 )

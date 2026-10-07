@@ -5,6 +5,9 @@
 
 #include <glad/gl.h>
 
+#include <cstddef>
+
+
 namespace ezse {
 
 namespace {
@@ -49,20 +52,20 @@ void GLAD_API_PTR OnDebugMessage(GLenum, GLenum, GLuint, GLenum severity, GLsize
 }
 
 GLuint CompileShader(GLenum type, const char* source) {
-    GLuint m_shader = glCreateShader(type);
-    glShaderSource(m_shader, 1, &source, nullptr);
-    glCompileShader(m_shader);
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, nullptr);
+    glCompileShader(shader);
 
     GLint status = 0;
-    glGetShaderiv(m_shader, GL_COMPILE_STATUS, &status);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
     if (status != GL_TRUE) {
         char error[512];
-        glGetShaderInfoLog(m_shader, sizeof(error), nullptr, error);
+        glGetShaderInfoLog(shader, sizeof(error), nullptr, error);
         LogError("OpenGL: Error while compiling {}: {}", type, error);
-        glDeleteShader(m_shader);
+        glDeleteShader(shader);
         return 0;
     }
-    return m_shader;
+    return shader;
 }
 
 } // namespace
@@ -87,25 +90,6 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     LogInfo("Driver: {}", GetString(GL_VERSION));
 
     std::unique_ptr<Renderer> renderer(new Renderer());
-    const float triangle[] = {
-        0.0f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,
-       -0.5f, -0.5f,  0.0f,  0.0f,  1.0f,  0.0f,
-        0.5f, -0.5f,  0.0f,  0.0f,  0.0f,  1.0f
-    };
-
-    glCreateBuffers(1, &renderer->m_vertexBuffer);
-    glNamedBufferStorage(renderer->m_vertexBuffer, sizeof(triangle), triangle,0);
-    LogInfo("OpenGL: Vertex buffer {} created", renderer->m_vertexBuffer);
-
-    glCreateVertexArrays(1, &renderer->m_vao);
-    glVertexArrayVertexBuffer(renderer->m_vao, 0, renderer->m_vertexBuffer, 0, 6 * sizeof(float));
-    glVertexArrayAttribFormat(renderer->m_vao, 0, 3, GL_FLOAT, GL_FALSE, 0);
-    glVertexArrayAttribFormat(renderer->m_vao, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float));
-    glEnableVertexArrayAttrib(renderer->m_vao, 0);
-    glEnableVertexArrayAttrib(renderer->m_vao, 1);
-    glVertexArrayAttribBinding(renderer->m_vao, 0, 0);
-    glVertexArrayAttribBinding(renderer->m_vao, 1, 0);
-    LogInfo("OpenGL: Vertex Array {} created", renderer->m_vao);
 
     auto vertShader = CompileShader(GL_VERTEX_SHADER,vertShaderSource);
     if (vertShader == 0) {
@@ -121,7 +105,7 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glAttachShader(renderer->m_shader, fragShader);
     glLinkProgram(renderer->m_shader);
     glDeleteShader(vertShader);
-    glDeleteShader(fragShader);
+    glDeleteShader(fragShader); 
     GLint status = 0;
     glGetProgramiv(renderer->m_shader, GL_LINK_STATUS, &status);
     if (status != GL_TRUE) {
@@ -131,17 +115,54 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
         return nullptr;
     }
 
-
-
     return renderer;
 }
 
-void Renderer::DrawTriangle() {
-    glUseProgram(m_shader);
-    glBindVertexArray(m_vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices) {
+    EZSE_ASSERT(!vertices.empty(), "CreateMesh needs at least one vertex");
+
+    MeshData meshData;
+    glCreateBuffers(1, &meshData.vertexBufferObj);
+    glNamedBufferStorage(meshData.vertexBufferObj, vertices.size_bytes(), vertices.data(), 0);
+    LogInfo("OpenGL: Vertex buffer {} created", meshData.vertexBufferObj);
+
+    glCreateVertexArrays(1, &meshData.vertexArrayObj);
+    glVertexArrayVertexBuffer(meshData.vertexArrayObj, 0, meshData.vertexBufferObj, 0,sizeof(Vertex));
+    glVertexArrayAttribFormat(meshData.vertexArrayObj, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribFormat(meshData.vertexArrayObj, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex,color));
+    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 0);
+    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 1);
+    glVertexArrayAttribBinding(meshData.vertexArrayObj, 0, 0);
+    glVertexArrayAttribBinding(meshData.vertexArrayObj, 1, 0);
+    LogInfo("OpenGL: Vertex Array {} created", meshData.vertexArrayObj);
+    meshData.vertexCount = static_cast<unsigned int>(vertices.size());
+    m_meshData.push_back(meshData);
+    return MeshHandle{ static_cast<std::uint32_t>(m_meshData.size()) };
 }
 
+void Renderer::DestroyMesh(MeshHandle mesh) {
+    MeshData& meshData = GetMeshData(mesh);
+
+    glDeleteBuffers(1, &meshData.vertexBufferObj);
+    glDeleteVertexArrays(1, &meshData.vertexArrayObj);
+    meshData = MeshData{};
+}
+
+void Renderer::DrawMesh(MeshHandle mesh) {
+    const MeshData& meshData = GetMeshData(mesh);
+
+    glUseProgram(m_shader);
+    glBindVertexArray(meshData.vertexArrayObj);
+    glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
+}
+
+Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
+    EZSE_ASSERT(mesh.id > 0 && mesh.id <= m_meshData.size(), "Mesh handle is out of range");
+
+    MeshData& meshData = m_meshData[mesh.id - 1];
+    EZSE_ASSERT(meshData.vertexArrayObj != 0, "Mesh handle refers to a destroyed mesh");
+    return meshData;
+}
 
 void Renderer::Clear(float red, float green, float blue) {
     glClearColor(red, green, blue, 1.0f);
@@ -149,8 +170,11 @@ void Renderer::Clear(float red, float green, float blue) {
 }
 
 Renderer::~Renderer() {
-    glDeleteBuffers(1, &m_vertexBuffer);
-    glDeleteVertexArrays(1, &m_vao);
+    for (auto& meshData : m_meshData) {
+        glDeleteBuffers(1, &meshData.vertexBufferObj);
+        glDeleteVertexArrays(1, &meshData.vertexArrayObj);
+    }
+    
     glDeleteProgram(m_shader);
 }
 
