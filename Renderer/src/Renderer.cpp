@@ -12,31 +12,6 @@ namespace ezse {
 
 namespace {
 
-const char* vertShaderSource = R"(#version 460 core
-
-layout(location = 0) in vec3 a_position;
-layout(location = 1) in vec3 a_color;
-
-out vec3 color;
-
-void main() {
-    gl_Position = vec4(a_position, 1.0);
-    color = a_color;
-}
-)";
-
-const char* fragShaderSource = R"(#version 460 core
-
-in  vec3 color;
-out vec4 fragColor;
-
-void main() {
-    fragColor = vec4(color, 1.0);
-}
-)";
-
-
-
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
 }
@@ -51,9 +26,12 @@ void GLAD_API_PTR OnDebugMessage(GLenum, GLenum, GLuint, GLenum severity, GLsize
     }
 }
 
-GLuint CompileShader(GLenum type, const char* source) {
+GLuint CompileShader(GLenum type, std::string_view source) {
+    const char* sourceText = source.data();
+    const GLint sourceLength = static_cast<GLint>(source.size());
+
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &source, nullptr);
+    glShaderSource(shader, 1, &sourceText, &sourceLength);
     glCompileShader(shader);
 
     GLint status = 0;
@@ -90,31 +68,6 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     LogInfo("Driver: {}", GetString(GL_VERSION));
 
     std::unique_ptr<Renderer> renderer(new Renderer());
-
-    auto vertShader = CompileShader(GL_VERTEX_SHADER,vertShaderSource);
-    if (vertShader == 0) {
-        return nullptr;
-    }
-    auto fragShader = CompileShader(GL_FRAGMENT_SHADER, fragShaderSource);
-    if (fragShader == 0) {
-        glDeleteShader(vertShader);
-        return nullptr;
-    }
-    renderer->m_shader = glCreateProgram();
-    glAttachShader(renderer->m_shader, vertShader);
-    glAttachShader(renderer->m_shader, fragShader);
-    glLinkProgram(renderer->m_shader);
-    glDeleteShader(vertShader);
-    glDeleteShader(fragShader); 
-    GLint status = 0;
-    glGetProgramiv(renderer->m_shader, GL_LINK_STATUS, &status);
-    if (status != GL_TRUE) {
-        char error[512];
-        glGetProgramInfoLog(renderer->m_shader, sizeof(error), nullptr, error);
-        LogError("OpenGL: Error while linking shader program: {}", error);
-        return nullptr;
-    }
-
     return renderer;
 }
 
@@ -148,12 +101,52 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     meshData = MeshData{};
 }
 
-void Renderer::DrawMesh(MeshHandle mesh) {
+void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader) {
     const MeshData& meshData = GetMeshData(mesh);
+    const ShaderData& shaderData = GetShaderData(shader);
 
-    glUseProgram(m_shader);
+    glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
     glDrawArrays(GL_TRIANGLES, 0, meshData.vertexCount);
+}
+
+ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_view fragmentSource) {
+    auto vertShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
+    if (vertShader == 0) {
+        return {};
+    }
+    auto fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
+    if (fragShader == 0) {
+        glDeleteShader(vertShader);
+        return {};
+    }
+    ShaderData shaderData;
+    shaderData.shaderProgram = glCreateProgram();
+    glAttachShader(shaderData.shaderProgram, vertShader);
+    glAttachShader(shaderData.shaderProgram, fragShader);
+    glLinkProgram(shaderData.shaderProgram);
+    glDeleteShader(vertShader);
+    glDeleteShader(fragShader);
+    GLint status = 0;
+    glGetProgramiv(shaderData.shaderProgram, GL_LINK_STATUS, &status);
+    if (status != GL_TRUE) {
+        char error[512];
+        glGetProgramInfoLog(shaderData.shaderProgram, sizeof(error), nullptr, error);
+        LogError("OpenGL: Error while linking shader program: {}", error);
+        glDeleteProgram(shaderData.shaderProgram);
+        return {};
+    }
+
+    m_shaderData.push_back(shaderData);
+    return ShaderHandle{ static_cast<std::uint32_t>(m_shaderData.size()) };
+    
+}
+
+void Renderer::DestroyShader(ShaderHandle shader) {
+    ShaderData& shaderData = GetShaderData(shader);
+    glDeleteProgram(shaderData.shaderProgram);
+    shaderData = ShaderData{};
+
 }
 
 Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
@@ -163,6 +156,15 @@ Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
     EZSE_ASSERT(meshData.vertexArrayObj != 0, "Mesh handle refers to a destroyed mesh");
     return meshData;
 }
+
+Renderer::ShaderData& Renderer::GetShaderData(ShaderHandle shader) {
+    EZSE_ASSERT(shader.id > 0 && shader.id <= m_shaderData.size(), "Shader handle is out of range");
+
+    ShaderData& shaderData = m_shaderData[shader.id - 1];
+    EZSE_ASSERT(shaderData.shaderProgram != 0, "Shader handle refers to a destroyed shader");
+    return shaderData;
+}
+
 
 void Renderer::Clear(float red, float green, float blue) {
     glClearColor(red, green, blue, 1.0f);
@@ -175,7 +177,10 @@ Renderer::~Renderer() {
         glDeleteVertexArrays(1, &meshData.vertexArrayObj);
     }
     
-    glDeleteProgram(m_shader);
+    for (auto& shaderData : m_shaderData) {
+        glDeleteProgram(shaderData.shaderProgram);
+        
+    }
 }
 
 } // namespace ezse
