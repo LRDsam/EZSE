@@ -1,0 +1,185 @@
+# EZSE
+
+Een eigen game- en rendering-engine in C++20 met OpenGL 4.6, gebouwd als **leerproject**.
+Het doel is leren hoe een engine in elkaar zit en de onderdelen zo opzetten dat ze los
+herbruikbaar zijn (bijvoorbeeld alleen de Renderer in een ander project). Snelheid van
+opleveren is geen doel.
+
+Dit bestand is de overdracht tussen sessies en machines. Werk de secties **Huidige stand**
+en **Volgende stap** bij aan het eind van elke afgeronde stap.
+
+## Werkwijze (belangrijk)
+
+De gebruiker schrijft in het Nederlands; antwoord in het Nederlands. Code, commentaar in
+code en commitberichten zijn Engels.
+
+- **Elke keuze wordt eerst besproken.** Ook kleine (een naam, een versie, waar een bestand
+  staat). Leg de opties voor met de gevolgen en een advies; de gebruiker beslist. Kies nooit
+  stilzwijgend een standaard.
+- **Eén klein onderwerp per stap.** Wacht op de gebruiker voordat je doorgaat. Nooit meerdere
+  modules of bestanden in één keer opzetten.
+- **Niets toevoegen zonder concrete aanleiding.** Elke toevoeging moet een probleem oplossen
+  dat er nu is. Tijdelijke workarounds worden liever overgeslagen dan ingebouwd.
+- **Rendering- en OpenGL-code schrijft de gebruiker zelf.** Geef de opdracht, de
+  functiesignaturen met uitleg van de parameters, de achtergrond en eventueel denkvragen,
+  maar niet de uitwerking. Geef een hint als de gebruiker vastloopt. Loop de code na als
+  daarom gevraagd wordt: lees de bestanden, bouw, en benoem wat goed is, wat fout is en wat
+  beter kan, bij voorkeur met een vraag in plaats van de oplossing.
+- **Routinewerk mag Claude doen als de gebruiker erom vraagt** (een nieuwe header met een
+  handle-struct, CMake-regels, een hulpfunctie). Laat daarna zien wat er is aangemaakt.
+- **Infrastructuur** (CMake, logging, venster): eerst de volledige code met uitleg tonen,
+  na akkoord aanmaken en bouwen.
+- **Controleren:** Claude bouwt (Debug en Release) en meldt het resultaat. Het programma
+  starten doet de gebruiker zelf, omdat het een venster opent dat blijft staan. Zeg eerlijk
+  wat wel en niet gecontroleerd is.
+- **Commits:** één per afgeronde stap. Stel het bericht voor en commit pas na akkoord.
+  Voeg alleen de bestanden van die stap toe.
+- **Visual Studio:** de gebruiker werkt in `build/EZSE.sln`. Bestanden die Claude wijzigt
+  terwijl ze daar open staan, kunnen bij herladen overschreven worden. Vraag de gebruiker
+  eerst alles op te slaan (Ctrl+Shift+S) en meld welke bestanden zijn aangepast.
+
+De gebruiker heeft enige ervaring met C++; de basis van de taal hoeft niet uitgelegd, maar
+minder gangbare onderdelen wel (templates, `std::span`, macro's, linkage en dergelijke).
+
+## Bouwen en starten
+
+Nodig: Visual Studio 2022 met de C++-workload, CMake 3.24 of nieuwer, git, en een videokaart
+met driver die OpenGL 4.6 ondersteunt. De eerste keer genereren downloadt GLFW 3.4 van GitHub.
+
+```bash
+cmake -S . -B build
+cmake --build build
+./build/Sandbox/Debug/Sandbox.exe
+```
+
+Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
+In Visual Studio: open `build/EZSE.sln` en maak Sandbox het startproject (rechtsklik,
+*Set as Startup Project*).
+
+## Architectuur
+
+Aparte statische libraries met afhankelijkheden in één richting. De build dwingt de grenzen af.
+
+```
+              Sandbox
+             /   |    \
+      Platform   |    Renderer
+        |   \    |    /    |
+      GLFW    Core       glad
+```
+
+| Module | Bevat | Hangt af van |
+|---|---|---|
+| `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
+| `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
+| `Renderer` | OpenGL laden, meshes, shaders, tekenen | Core, glad (PRIVATE) |
+| `Sandbox` | testprogramma dat de modules verbindt | alle drie |
+| `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/` | |
+
+Regels die de Renderer herbruikbaar houden:
+
+1. **Alle OpenGL-aanroepen blijven binnen `Renderer`.** Geen enkele publieke header include
+   glad of gebruikt `GL`-types (in headers `unsigned int` in plaats van `GLuint`).
+2. **Renderer en Platform kennen elkaar niet.** Sandbox geeft de laadfunctie van het venster
+   door aan `Renderer::Create`. Beide modules declareren zelf het type `GLLoadFunction`.
+3. **De Renderer kent geen bestanden, entities of scenes.** Hij krijgt ruwe gegevens en geeft
+   handles terug.
+4. **Over modulegrenzen gaan handles, geen pointers.** De Renderer slaat de GPU-objecten op
+   en verwijdert ze op verzoek (`Destroy...`) en bij afsluiten. Wie `Create...` aanroept
+   beslist over de levensduur; later wordt dat een resource manager in de Engine-module,
+   en ECS-componenten bevatten alleen handles.
+
+## Conventies
+
+- Namespace `ezse`; macro's met voorvoegsel `EZSE_`; CMake-targets `EZSECore` met alias
+  `EZSE::Core`; bestandsnamen met hoofdletter (`Window.h`).
+- Per module `include/EZSE/<Module>/` (publiek) en `src/` (intern). Includes met het volledige
+  pad: `#include "EZSE/Core/Log.h"`. Eigen headers boven standaardheaders.
+- `#pragma once`. Membervariabelen met `m_`.
+- Hulpfuncties die alleen in één `.cpp` nodig zijn staan in een naamloze namespace.
+- Een macro alleen als een functie het niet kan (asserts, platform-schakelaars).
+- Iets dat kan mislukken krijgt een `Create`-functie die een lege `unique_ptr` of een handle
+  met id `0` teruggeeft en de oorzaak logt. Geen exceptions.
+- Asserts zijn voor programmeerfouten; situaties die bij een gebruiker kunnen voorkomen
+  (ontbrekend bestand, shader met typfout) krijgen gewone foutafhandeling.
+- Elke nieuwe header of `.cpp` wordt bijgeschreven in de `CMakeLists.txt` van de module.
+- OpenGL in Direct State Access-stijl (`glCreate...`, `glNamed...`, `glVertexArray...`).
+  Bij uitleg ook de klassieke vorm tonen, omdat tutorials die gebruiken.
+- Handles: een struct per soort met een `std::uint32_t id`, `0` is ongeldig. Opslag in een
+  `std::vector`, id is de index plus één. Verwijderde plekken blijven leeg en worden niet
+  hergebruikt.
+
+## Genomen besluiten
+
+| # | Onderwerp | Besluit |
+|---|---|---|
+| 1–3 | Taal en build | C++20, CMake, MSVC |
+| 4 | Indeling | elke module een eigen map en library; `include/` en `src/` gescheiden |
+| 5 | Versiebeheer | git, branch `main`, één commit per stap |
+| 6 | Soort library | statisch |
+| 7 | Logging | zelf geschreven: niveaus en `std::format`; functies, geen macro's; alles naar `std::cout` |
+| 8–11 | Venster | GLFW 3.4 via FetchContent in `ThirdParty/`; `GLFWwindow` vooraf gedeclareerd in `Window.h` |
+| 12 | Foutafhandeling | `Create`-functies, geen exceptions |
+| 13 | OpenGL-versie | 4.6 core profile |
+| 14–15 | Loader | glad 2, één keer gegenereerd op gen.glad.sh (gl 4.6 core, geen extensies, alle opties uit) en vastgelegd in git |
+| 16 | Laden van OpenGL | de opvraagfunctie wordt aan de Renderer aangereikt |
+| 17 | Debug-uitvoer | debug context en callback alleen in Debug-builds (`EZSE_DEBUG`); alleen loggen, niet pauzeren |
+| 19 | Stijl | Direct State Access |
+| 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing |
+| 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
+| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
+| – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
+
+## Huidige stand
+
+Stappen 1 tot en met 11 zijn af en gecommit. Sandbox tekent twee driehoeken met één shader.
+
+Publieke interface van `Renderer`:
+
+```cpp
+static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
+MeshHandle   CreateMesh(std::span<const Vertex> vertices);
+void         DestroyMesh(MeshHandle mesh);
+ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
+void         DestroyShader(ShaderHandle shader);
+void         DrawMesh(MeshHandle mesh, ShaderHandle shader);
+void         Clear(float red, float green, float blue);
+```
+
+Bekende beperkingen, bewust zo gelaten:
+
+- Het tekengebied volgt de grootte van het venster niet (besluit 20).
+- Eén venster tegelijk: GLFW wordt gestart in `Window::Create` en afgesloten in de destructor.
+- De attribuutnummers in `CreateMesh` en de `location`-nummers in de shader zijn een
+  afspraak die nergens wordt afgedwongen.
+- `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
+- Sandbox controleert de handle van `CreateShader` niet (testcode).
+
+## Volgende stap: 12, index buffers
+
+De opdracht is al uitgelegd; de gebruiker was er nog niet aan begonnen. Voorgesteld en niet
+tegengesproken: indices zijn altijd verplicht, en een index is 32 bits.
+
+1. `CreateMesh` krijgt een tweede parameter: `std::span<const std::uint32_t> indices`.
+2. `MeshData` krijgt een nummer voor de index buffer en het aantal indices.
+3. In `CreateMesh`: een tweede buffer aanmaken en vullen (`glCreateBuffers`,
+   `glNamedBufferStorage`) en koppelen met `glVertexArrayElementBuffer(vao, buffer)`.
+   Asserts op de indices (niet leeg; een veelvoud van drie).
+4. De index buffer opruimen in `DestroyMesh` en de destructor.
+5. In `DrawMesh`: `glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, nullptr)`.
+6. In Sandbox: een vierkant met vier hoekpunten en zes indices (`0, 1, 2, 0, 2, 3`).
+
+Denkvragen die nog openstaan: komt een kubus met effen gekleurde vlakken uit met 8
+hoekpunten, en wat gebeurt er bij een index die groter is dan het aantal hoekpunten?
+
+## Daarna
+
+De gebruiker wil na stap 12 naar een 3D-kubus. Dat vraagt, in deze volgorde:
+
+1. **Transformaties:** waarden doorgeven aan een shader (uniforms) en de keuze voor een
+   math-library (bijvoorbeeld glm of zelf schrijven). Die keuze raakt alle modules.
+2. **Camera en perspectief**, en de dieptebuffer.
+
+Verder op de lijst, zonder vaste volgorde: texturen (met het vrije vertex-formaat), het
+event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
+en de Engine-module met een Entity Component System en een resource manager.
