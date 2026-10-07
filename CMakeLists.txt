@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(ThirdParty)
 add_subdirectory(Core)
+add_subdirectory(Math)
 add_subdirectory(Platform)
 add_subdirectory(Renderer)
 add_subdirectory(Sandbox)
