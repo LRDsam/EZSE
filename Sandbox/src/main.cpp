@@ -1,7 +1,11 @@
 #include "EZSE/Core/Log.h"
+
 #include "EZSE/Platform/Window.h"
+
 #include "EZSE/Renderer/Renderer.h"
 #include "EZSE/Renderer/Mesh.h"
+
+#include "EZSE/Math/Transform.h"
 
 int main() {
     auto window = ezse::Window::Create({.title = "EZSE Sandbox"});
@@ -15,10 +19,10 @@ int main() {
     }
 
     const ezse::Vertex triangle[] = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{ 0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{ 0.5f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{-0.5f,  0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{-0.25f, -0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.25f, -0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.25f,  0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{-0.25f,  0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
     };
     const std::uint32_t indices[] = { 0, 1, 2, 0, 2, 3};
 
@@ -26,11 +30,12 @@ int main() {
 
 layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_color;
+uniform mat4 u_transform;
 
 out vec3 color;
 
 void main() {
-    gl_Position = vec4(a_position, 1.0);
+    gl_Position = u_transform * vec4(a_position, 1.0);
     color = a_color;
 }
 )";
@@ -52,7 +57,10 @@ void main() {
     while (!window->ShouldClose()) {
         window->PollEvents();
         renderer->Clear(0.1f, 0.2f, 0.3f);
-        renderer->DrawMesh(mesh, shader);
+        renderer->DrawMesh(
+            mesh, 
+            shader, 
+            ezse::Translation(ezse::Vec3{0.5f,0.5f,0.0f}));
         window->SwapBuffers();
     }
 

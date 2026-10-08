@@ -114,12 +114,18 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     meshData = MeshData{};
 }
 
-void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader) {
+void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform) {
     const MeshData& meshData = GetMeshData(mesh);
     const ShaderData& shaderData = GetShaderData(shader);
 
     glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
+    glProgramUniformMatrix4fv(
+        shaderData.shaderProgram,
+        shaderData.transformLocation,
+        1,
+        GL_FALSE,
+        &transform.m[0][0]);
     glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
@@ -148,6 +154,11 @@ ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_v
         LogError("OpenGL: Error while linking shader program: {}", error);
         glDeleteProgram(shaderData.shaderProgram);
         return {};
+    }
+
+    shaderData.transformLocation = glGetUniformLocation(shaderData.shaderProgram, "u_transform");
+    if (shaderData.transformLocation < 0) {
+        LogWarn("Uniform for transform not found in shader!");
     }
 
     m_shaderData.push_back(shaderData);

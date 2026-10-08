@@ -75,11 +75,11 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 ```
               Sandbox
              /   |    \
-      Platform   |    Renderer
+      Platform   |    Renderer ───► Math ◄── MathTests
         |   \    |    /    |
       GLFW    Core       glad
 
-      Math ◄── MathTests   (Math wordt nog niet door de engine gelinkt)
+      (Sandbox linkt ook Math, voor `Translation`)
 ```
 
 | Module | Bevat | Hangt af van |
@@ -87,8 +87,8 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*`, `Vec3`, `Translation` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
-| `Renderer` | OpenGL laden, meshes, shaders, tekenen | Core, glad (PRIVATE) |
-| `Sandbox` | testprogramma dat de modules verbindt | alle drie |
+| `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
+| `Sandbox` | testprogramma dat de modules verbindt | alle vier |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/` | |
 
 Regels die de Renderer herbruikbaar houden:
@@ -156,14 +156,19 @@ Regels die de Renderer herbruikbaar houden:
 | 35 | `Vec3` | struct met de members `x`, `y`, `z` (elk `float`, default value `0.0f`), in een eigen header `Vec3.h`. Geen array, geen `union` met `r`, `g`, `b` |
 | 36 | Transformatie-functions | maken een nieuwe matrix en combineren niets: `Mat4 Translation(const Vec3& offset)`. Combineren doet de aanroeper met `operator*`, zodat de volgorde zichtbaar is. Namen zijn zelfstandige naamwoorden (`Translation`, straks `Scale`, `Rotation...`) |
 | 37 | Plek van die functions | `Transform.h` en `Transform.cpp`, zodat `Mat4.h` klein blijft en niet van `Vec3` afhangt |
+| 38 | Matrix naar de shader | een matrix per aanroep: `DrawMesh(mesh, shader, const Mat4& transform)`. Geen aparte function om een uniform te zetten |
+| 39 | Renderer en `Math` | de Renderer kent `Mat4` en linkt `EZSE::Math` als `PUBLIC`, omdat `Mat4` in de publieke header staat |
+| 40 | Uniform vinden | op naam: `u_transform`. `CreateShader` zoekt de locatie één keer op en bewaart hem in `ShaderData`; ontbreekt de uniform, dan volgt een `LogWarn` en tekent de shader zonder transformatie |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Van stap 13 zijn 13a, 13b en 13c af: de module `Math` bevat de
+en zes indices, met één shader. Van stap 13 zijn 13a tot en met 13d af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met twaalf controles (allemaal `[PASS]`). Verder zijn er `Vec3` en `Translation`. `Math` wordt nog niet door de engine gelinkt.
+alles met twaalf controles (allemaal `[PASS]`). Verder zijn er `Vec3` en `Translation`.
+`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox verschuift het vierkant
+daarmee naar rechtsboven.
 
 Publieke interface van `Renderer`:
 
@@ -173,7 +178,7 @@ MeshHandle   CreateMesh(std::span<const Vertex> vertices, std::span<const std::u
 void         DestroyMesh(MeshHandle mesh);
 ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
 void         DestroyShader(ShaderHandle shader);
-void         DrawMesh(MeshHandle mesh, ShaderHandle shader);
+void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform);
 void         Clear(float red, float green, float blue);
 ```
 
@@ -183,31 +188,23 @@ Bekende beperkingen, bewust zo gelaten:
 - Eén venster tegelijk: GLFW wordt gestart in `Window::Create` en afgesloten in de destructor.
 - De attribuutnummers in `CreateMesh` en de `location`-nummers in de shader zijn een
   afspraak die nergens wordt afgedwongen.
+- Hetzelfde geldt voor de naam `u_transform`: de Renderer en de shader moeten hem allebei
+  zo noemen.
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 
 ## Volgende stap: 13, transformaties
 
-Het doel is een 3D-kubus. De besluiten over de wiskunde staan in de tabel (26 tot en met 37).
-Stap 13 gaat in kleine delen. 13a (de struct `Mat4`), 13b (`operator*`) en 13c (`Vec3` en `Translation`) zijn af.
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 40).
+Stap 13 gaat in kleine delen. 13a (de struct `Mat4`), 13b (`operator*`), 13c (`Vec3` en
+`Translation`) en 13d (de matrix als uniform naar de shader) zijn af.
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
 gekanteld staat ten opzichte van de schrijfwijze op papier. Voor de eenheidsmatrix maakt dat
 niets uit; voor een verplaatsing wel (`tx`, `ty`, `tz` staan in `m[3]`).
 
-### 13d: uniforms, de matrix doorgeven aan een shader (eerstvolgende, nog te bespreken)
-
-De gebruiker koos ervoor om eerst naar het scherm te gaan en daarna de wiskunde af te maken.
-Het doel is dat het vierkant zichtbaar verschuift met `Translation`. Open keuzes die eerst
-aan de gebruiker moeten worden voorgelegd:
-
-- de uitbreiding van de publieke interface van `Renderer` (een matrix per `DrawMesh`, of een
-  aparte function om een uniform te zetten);
-- of de Renderer `Mat4` kent (en dus van `Math` afhangt) of ruwe floats aanneemt;
-- hoe de uniform in de shader wordt gevonden (op naam, of met een vaste `location`).
-
-### Daarna binnen stap 13 (alleen de volgorde)
+### Nog te doen binnen stap 13 (alleen de volgorde, nog te bespreken)
 
 1. **`Scale` en de draaiingen** in `Transform.h`, elk met controles in `MathTests`. De
    helpers `MakeTranslation` en `MakeScale` in de tests blijven met de hand opgebouwd.

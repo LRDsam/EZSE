@@ -2,6 +2,7 @@
 
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Shader.h"
+#include "EZSE/Math/Transform.h"
 
 #include <memory>
 #include <span>
@@ -19,7 +20,7 @@ public:
     static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
-    void DrawMesh(MeshHandle mesh, ShaderHandle shader);
+    void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform);
     void DestroyMesh(MeshHandle mesh);
 
     ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
@@ -43,6 +44,7 @@ private:
 
     struct ShaderData {
         unsigned int shaderProgram = 0;
+        int transformLocation = -1;
     };
 
     MeshData& GetMeshData(MeshHandle mesh);
