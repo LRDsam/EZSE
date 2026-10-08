@@ -75,7 +75,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` (nog leeg), later `Vec3` | niets |
+| `Math` | `Mat4` (alleen de struct), later `Vec3` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle drie |
@@ -138,13 +138,16 @@ Regels die de Renderer herbruikbaar houden:
 | 27 | Module `Math` | eigen statische library `EZSE::Math` met `.cpp`-bestanden (niet header-only); hangt van niets af, `Core` komt erbij bij de eerste `EZSE_ASSERT` |
 | 28 | Namen in `Math` | `Mat4` en `Vec3`, zoals in GLSL. Begonnen met `Mat4`; `Vec3` komt zodra een functie hem nodig heeft |
 | 29 | Indeling `Mat4` | kolom voor kolom (column-major), zoals OpenGL en glm; lid `float m[4][4]` met index `[kolom][rij]`. De verplaatsing staat in `m[3]` |
+| 30 | Beginwaarde `Mat4` | de eenheidsmatrix, als beginwaarde van het lid in de struct zelf; een `Mat4` is daardoor nooit ongeldig |
+| 31 | `Vec4` | nog niet. `Mat4` blijft `float m[4][4]` en wordt niet uit vier `Vec4`-kolommen opgebouwd. Opnieuw bekijken bij de eerste functie die een punt transformeert (matrix maal vector van vier); overstappen verandert de indeling in het geheugen niet |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Van stap 13 staat alleen de lege module `Math` er
-(`Mat4.h` en `Mat4.cpp` met een lege `namespace ezse`).
+en zes indices, met één shader. Van stap 13 is 13a af: de module `Math` bevat de struct
+`Mat4` met de eenheidsmatrix als beginwaarde (`Mat4.cpp` is nog leeg). `Math` wordt nog door
+niemand gelinkt.
 
 Publieke interface van `Renderer`:
 
@@ -169,48 +172,29 @@ Bekende beperkingen, bewust zo gelaten:
 
 ## Volgende stap: 13, transformaties
 
-Het doel is een 3D-kubus. De besluiten over de wiskunde staan in de tabel (26 tot en met 29).
-Stap 13 gaat in kleine delen; alleen 13a is klaargezet, de rest is nog niet besproken.
+Het doel is een 3D-kubus. De besluiten over de wiskunde staan in de tabel (26 tot en met 31).
+Stap 13 gaat in kleine delen. 13a (de struct `Mat4`) is af; de rest is nog niet besproken,
+alleen de volgorde ligt vast.
 
-### 13a: de struct `Mat4` (klaargezet, de gebruiker schrijft)
+Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
+vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
+gekanteld staat ten opzichte van de schrijfwijze op papier. Voor de eenheidsmatrix maakt dat
+niets uit; voor een verplaatsing wel (`tx`, `ty`, `tz` staan in `m[3]`).
 
-In `Math/include/EZSE/Math/Mat4.h`, binnen `namespace ezse`: een struct `Mat4` met één
-publiek lid, `float m[4][4]`, net zo kaal als `Vertex`. In `Mat4.cpp` hoeft nog niets.
+### 13b: vermenigvuldigen van twee matrices (eerstvolgende, nog te bespreken)
 
-De eigenlijke vraag van deze opdracht is de **beginwaarde**: wat staat er in een `Mat4` die
-je aanmaakt zonder iets mee te geven? Dit is een open keuze voor de gebruiker:
+Drie keuzes liggen open en moeten eerst aan de gebruiker worden voorgelegd:
 
-| Beginwaarde | Gevolg |
-|---|---|
-| Eenheidsmatrix (advies) | een nieuwe matrix "doet niets": een punt blijft waar het is. Dit is wat glm doet met `glm::mat4(1.0f)` |
-| Allemaal nullen | elk punt komt op de oorsprong terecht; een vergeten matrix geeft een leeg scherm |
-| Niets invullen | de inhoud is willekeurig geheugen; fouten verschillen per keer |
+- `operator*` of een functie met een naam;
+- de volgorde (bij OpenGL-stijl past `A * B` eerst B toe, dan A);
+- hoe we de uitkomst controleren zolang er niets op het scherm komt (besluit 26 vraagt om
+  een controle met bekende uitkomsten).
 
-Het advies is de eenheidsmatrix als beginwaarde in de struct zelf, op dezelfde manier als
-`std::uint32_t id = 0` in de handles, zodat een `Mat4` nooit ongeldig kan zijn.
+### Daarna binnen stap 13 (alleen de volgorde)
 
-Achtergrond: `m[kolom][rij]`, dus de eerste index kiest een kolom van vier floats. Bij het
-uitschrijven van de zestien waarden in broncode staat elke kolom op een eigen regel; de
-matrix staat daardoor gekanteld ten opzichte van de schrijfwijze op papier.
-
-Denkvragen:
-
-- Hoe ziet de eenheidsmatrix eruit, en waarom verandert een punt niet als je het ermee
-  vermenigvuldigt?
-- Maakt de kanteling bij het uitschrijven voor de eenheidsmatrix iets uit? En voor een
-  verplaatsing?
-
-Controleren: Claude bouwt Debug en Release. Er is nog niets zichtbaars; `Math` wordt nog
-door niemand gelinkt.
-
-### Daarna binnen stap 13 (nog niet besproken, alleen de volgorde)
-
-1. **Vermenigvuldigen** van twee matrices. Open: `operator*` of een functie met een naam;
-   de volgorde (bij OpenGL-stijl past `A * B` eerst B toe, dan A); en hoe we de uitkomst
-   controleren zolang er niets op het scherm komt.
-2. **`Vec3`** en de eerste functie die een matrix maakt (verplaatsen, daarna schalen en
-   draaien).
-3. **Uniforms:** de matrix doorgeven aan een shader. Open: de uitbreiding van de publieke
+1. **`Vec3`** en de eerste functie die een matrix maakt (verplaatsen, daarna schalen en
+   draaien). Hier komt ook de vraag over `Vec4` terug (besluit 31).
+2. **Uniforms:** de matrix doorgeven aan een shader. Open: de uitbreiding van de publieke
    interface van `Renderer`, en of de Renderer `Mat4` kent of ruwe floats aanneemt.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
