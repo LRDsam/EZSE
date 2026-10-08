@@ -1,4 +1,4 @@
-#include "EZSE/Math/Mat4.h"
+#include "EZSE/Math/Transform.h"
 
 #include <cmath>
 #include <iostream>
@@ -27,7 +27,8 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
-// Built by hand so the tests do not depend on the Math functions they are checking.
+// Built by hand so the tests do not depend on the Math 
+// functions they are checking.
 ezse::Mat4 MakeTranslation(float x, float y, float z) {
     ezse::Mat4 result;
     result.m[3][0] = x;
@@ -52,7 +53,8 @@ void TestDefaultValue() {
           "a default Mat4 has ones on the diagonal");
     Check(identity.m[3][0] == 0.0f && identity.m[0][3] == 0.0f,
           "a default Mat4 has zeros off the diagonal");
-    Check(NearlyEqual(identity, ezse::Mat4{}), "two default Mat4s are nearly equal");
+    Check(NearlyEqual(identity, ezse::Mat4{}), 
+        "two default Mat4s are nearly equal");
 }
 
 void TestMultiply() {
@@ -64,15 +66,20 @@ void TestMultiply() {
         {13.0f, 14.0f, 15.0f, 16.0f},
     }};
 
-    Check(NearlyEqual(identity * identity, identity), "identity * identity is the identity");
-    Check(NearlyEqual(distinct * identity, distinct), "A * identity is A");
-    Check(NearlyEqual(identity * distinct, distinct), "identity * A is A");
+    Check(NearlyEqual(identity * identity, identity), 
+        "identity * identity is the identity");
+    Check(NearlyEqual(distinct * identity, distinct), 
+        "A * identity is A");
+    Check(NearlyEqual(identity * distinct, distinct), 
+        "identity * A is A");
 
-    Check(NearlyEqual(MakeTranslation(4.0f, 5.0f, 6.0f) * MakeTranslation(1.0f, 2.0f, 3.0f),
+    Check(NearlyEqual(
+        MakeTranslation(4.0f, 5.0f, 6.0f) * MakeTranslation(1.0f, 2.0f, 3.0f),
                       MakeTranslation(5.0f, 7.0f, 9.0f)),
           "two translations add up");
 
-    // A * B applies B first. The two orders below only differ in the translation.
+    // A * B applies B first. 
+    // The two orders below only differ in the translation.
     const ezse::Mat4 translation = MakeTranslation(1.0f, 0.0f, 0.0f);
     const ezse::Mat4 scale = MakeScale(2.0f);
 
@@ -87,11 +94,25 @@ void TestMultiply() {
           "S * T translates first, so the translation is scaled to 2");
 }
 
+void TestTranslation() {
+    const ezse::Vec3 first{1.0f, 2.0f, 3.0f};
+    const ezse::Vec3 second{4.0f, 5.0f, 6.0f};
+
+    Check(NearlyEqual(ezse::Translation(first), MakeTranslation(1.0f, 2.0f, 3.0f)),
+          "Translation puts the offset in the last column");
+    Check(NearlyEqual(ezse::Translation(ezse::Vec3{}), ezse::Mat4{}),
+          "Translation by a zero offset is the identity");
+    Check(NearlyEqual(ezse::Translation(first) * ezse::Translation(second),
+                      MakeTranslation(5.0f, 7.0f, 9.0f)),
+          "two Translations multiply into the sum of their offsets");
+}
+
 } // namespace
 
 int main() {
     TestDefaultValue();
     TestMultiply();
+    TestTranslation();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
