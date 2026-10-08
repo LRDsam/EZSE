@@ -85,7 +85,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*`, `Vec3`, `Translation` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*`, `Vec3`, `Translation` en `Scale` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -154,7 +154,7 @@ Regels die de Renderer herbruikbaar houden:
 | 33 | Volgorde | kolomvectoren, zoals OpenGL, GLSL en glm: `A * B` past eerst B toe en dan A; een punt transformeer je als `M * p`. Een keten lees je van rechts naar links |
 | 34 | Controleren van wiskunde | een eigen testprogramma `MathTests` (geen testbibliotheek, geen CTest) met `Check` en `NearlyEqual`; per onderwerp een function `Test...`. Verwachte matrices worden in de tests met de hand opgebouwd (`MakeTranslation`, `MakeScale`), zodat de tests niet leunen op de code die ze controleren. Performance meten hoort in een apart programma, later |
 | 35 | `Vec3` | struct met de members `x`, `y`, `z` (elk `float`, default value `0.0f`), in een eigen header `Vec3.h`. Geen array, geen `union` met `r`, `g`, `b` |
-| 36 | Transformatie-functions | maken een nieuwe matrix en combineren niets: `Mat4 Translation(const Vec3& offset)`. Combineren doet de aanroeper met `operator*`, zodat de volgorde zichtbaar is. Namen zijn zelfstandige naamwoorden (`Translation`, straks `Scale`, `Rotation...`) |
+| 36 | Transformatie-functions | maken een nieuwe matrix en combineren niets: `Mat4 Translation(const Vec3& offset)`. Combineren doet de aanroeper met `operator*`, zodat de volgorde zichtbaar is. Namen zijn zelfstandige naamwoorden (`Translation`, `Scale`, straks `Rotation...`). `Scale` neemt een `Vec3` met een factor per as |
 | 37 | Plek van die functions | `Transform.h` en `Transform.cpp`, zodat `Mat4.h` klein blijft en niet van `Vec3` afhangt |
 | 38 | Matrix naar de shader | een matrix per aanroep: `DrawMesh(mesh, shader, const Mat4& transform)`. Geen aparte function om een uniform te zetten |
 | 39 | Renderer en `Math` | de Renderer kent `Mat4` en linkt `EZSE::Math` als `PUBLIC`, omdat `Mat4` in de publieke header staat |
@@ -164,9 +164,9 @@ Regels die de Renderer herbruikbaar houden:
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Van stap 13 zijn 13a tot en met 13d af: de module `Math` bevat de
+en zes indices, met één shader. Van stap 13 zijn 13a tot en met 13e af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met twaalf controles (allemaal `[PASS]`). Verder zijn er `Vec3` en `Translation`.
+alles met vijftien controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Translation` en `Scale`.
 `DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox verschuift het vierkant
 daarmee naar rechtsboven.
 
@@ -197,7 +197,7 @@ Bekende beperkingen, bewust zo gelaten:
 
 Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 40).
 Stap 13 gaat in kleine delen. 13a (de struct `Mat4`), 13b (`operator*`), 13c (`Vec3` en
-`Translation`) en 13d (de matrix als uniform naar de shader) zijn af.
+`Translation`), 13d (de matrix als uniform naar de shader) en 13e (`Scale`) zijn af.
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -206,8 +206,8 @@ niets uit; voor een verplaatsing wel (`tx`, `ty`, `tz` staan in `m[3]`).
 
 ### Nog te doen binnen stap 13 (alleen de volgorde, nog te bespreken)
 
-1. **`Scale` en de draaiingen** in `Transform.h`, elk met controles in `MathTests`. De
-   helpers `MakeTranslation` en `MakeScale` in de tests blijven met de hand opgebouwd.
+1. **De draaiingen** in `Transform.h`, met controles in `MathTests`. De verwachte matrices
+   in de tests blijven met de hand opgebouwd.
 2. De vraag over `Vec4` uit besluit 31, zodra een punt getransformeerd moet worden.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?

@@ -10,4 +10,12 @@ Mat4 Translation(const Vec3& offset) {
     return mat;
 }
 
+Mat4 Scale(const Vec3& factor) {
+    Mat4 mat;
+    mat.m[0][0] = factor.x;
+    mat.m[1][1] = factor.y;
+    mat.m[2][2] = factor.z;
+    return mat;
+}
+
 } // namespace ezse

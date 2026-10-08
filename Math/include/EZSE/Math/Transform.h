@@ -6,5 +6,6 @@
 namespace ezse {
 
 Mat4 Translation(const Vec3& offset);
+Mat4 Scale(const Vec3& factor);
 
 } // namespace ezse

@@ -37,12 +37,16 @@ ezse::Mat4 MakeTranslation(float x, float y, float z) {
     return result;
 }
 
-ezse::Mat4 MakeScale(float factor) {
+ezse::Mat4 MakeScale(const ezse::Vec3& factor) {
     ezse::Mat4 result;
-    result.m[0][0] = factor;
-    result.m[1][1] = factor;
-    result.m[2][2] = factor;
+    result.m[0][0] = factor.x;
+    result.m[1][1] = factor.y;
+    result.m[2][2] = factor.z;
     return result;
+}
+
+ezse::Mat4 MakeScale(float factor) {
+    return MakeScale(ezse::Vec3{ factor, factor, factor });
 }
 
 void TestDefaultValue() {
@@ -107,12 +111,26 @@ void TestTranslation() {
           "two Translations multiply into the sum of their offsets");
 }
 
+void TestScale() {
+    const ezse::Vec3 first{ 2.0f, 3.0f, 4.0f };
+    Check(NearlyEqual(ezse::Scale(first), MakeScale(first)),
+        "Scale puts the factors on the diagonal");
+    Check(NearlyEqual(ezse::Scale(ezse::Vec3{ 1.0f, 1.0f, 1.0f }), ezse::Mat4{}),
+        "Scale by factors of one is the identity");
+
+    const ezse::Vec3 second{ 5.0f, 6.0f, 7.0f };
+    Check(NearlyEqual(ezse::Scale(first) * ezse::Scale(second),
+                      MakeScale(ezse::Vec3{ 10.0f, 18.0f, 28.0f })),
+        "two Scales multiply into the product of their factors");
+}
+
 } // namespace
 
 int main() {
     TestDefaultValue();
     TestMultiply();
     TestTranslation();
+    TestScale();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
