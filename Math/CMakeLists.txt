@@ -5,3 +5,6 @@ add_library(EZSEMath STATIC
 add_library(EZSE::Math ALIAS EZSEMath)
 
 target_include_directories(EZSEMath PUBLIC include)
+
+add_executable(MathTests tests/MathTests.cpp)
+target_link_libraries(MathTests PRIVATE EZSE::Math)

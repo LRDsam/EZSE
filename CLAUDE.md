@@ -11,7 +11,9 @@ en **Volgende stap** bij aan het eind van elke afgeronde stap.
 ## Werkwijze (belangrijk)
 
 De gebruiker schrijft in het Nederlands; antwoord in het Nederlands. Code, commentaar in
-code en commitberichten zijn Engels.
+code en commitberichten zijn Engels. Laat programmeertermen in de Nederlandse tekst in het
+Engels staan (loop, function, struct, member, header, array, index, pointer, default value);
+vertalingen als "lus" werken verwarrend.
 
 - **Elke keuze wordt eerst besproken.** Ook kleine (een naam, een versie, waar een bestand
   staat). Leg de opties voor met de gevolgen en een advies; de gebruiker beslist. Kies nooit
@@ -50,7 +52,11 @@ met driver die OpenGL 4.6 ondersteunt. De eerste keer genereren downloadt GLFW 3
 cmake -S . -B build
 cmake --build build
 ./build/Sandbox/Debug/Sandbox.exe
+./build/Math/Debug/MathTests.exe
 ```
+
+`MathTests` opent geen venster, print per controle `[PASS]` of `[FAIL]` en eindigt met
+exit code `0` als alles klopt. Claude draait het zelf na elke wijziging in `Math`.
 
 Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
 In Visual Studio: open `build/EZSE.sln`. Bij een nieuw gegenereerde `build/` is Sandbox al
@@ -69,13 +75,13 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
         |   \    |    /    |
       GLFW    Core       glad
 
-      Math   (staat los; wordt nog door niemand gelinkt)
+      Math ◄── MathTests   (Math wordt nog niet door de engine gelinkt)
 ```
 
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` (alleen de struct), later `Vec3` | niets |
+| `Math` | `Mat4` met `operator*`, later `Vec3`; testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle drie |
@@ -140,14 +146,17 @@ Regels die de Renderer herbruikbaar houden:
 | 29 | Indeling `Mat4` | kolom voor kolom (column-major), zoals OpenGL en glm; lid `float m[4][4]` met index `[kolom][rij]`. De verplaatsing staat in `m[3]` |
 | 30 | Beginwaarde `Mat4` | de eenheidsmatrix, als beginwaarde van het lid in de struct zelf; een `Mat4` is daardoor nooit ongeldig |
 | 31 | `Vec4` | nog niet. `Mat4` blijft `float m[4][4]` en wordt niet uit vier `Vec4`-kolommen opgebouwd. Opnieuw bekijken bij de eerste functie die een punt transformeert (matrix maal vector van vier); overstappen verandert de indeling in het geheugen niet |
+| 32 | Vermenigvuldigen | `Mat4 operator*(const Mat4& a, const Mat4& b)`, een losse function in `Mat4.h`/`Mat4.cpp` |
+| 33 | Volgorde | kolomvectoren, zoals OpenGL, GLSL en glm: `A * B` past eerst B toe en dan A; een punt transformeer je als `M * p`. Een keten lees je van rechts naar links |
+| 34 | Controleren van wiskunde | een eigen testprogramma `MathTests` (geen testbibliotheek, geen CTest) met `Check` en `NearlyEqual`; per onderwerp een function `Test...`. Verwachte matrices worden in de tests met de hand opgebouwd (`MakeTranslation`, `MakeScale`), zodat de tests niet leunen op de code die ze controleren. Performance meten hoort in een apart programma, later |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Van stap 13 is 13a af: de module `Math` bevat de struct
-`Mat4` met de eenheidsmatrix als beginwaarde (`Mat4.cpp` is nog leeg). `Math` wordt nog door
-niemand gelinkt.
+en zes indices, met één shader. Van stap 13 zijn 13a en 13b af: de module `Math` bevat de
+struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
+beide met negen controles (allemaal `[PASS]`). `Math` wordt nog niet door de engine gelinkt.
 
 Publieke interface van `Renderer`:
 
@@ -172,29 +181,31 @@ Bekende beperkingen, bewust zo gelaten:
 
 ## Volgende stap: 13, transformaties
 
-Het doel is een 3D-kubus. De besluiten over de wiskunde staan in de tabel (26 tot en met 31).
-Stap 13 gaat in kleine delen. 13a (de struct `Mat4`) is af; de rest is nog niet besproken,
-alleen de volgorde ligt vast.
+Het doel is een 3D-kubus. De besluiten over de wiskunde staan in de tabel (26 tot en met 34).
+Stap 13 gaat in kleine delen. 13a (de struct `Mat4`) en 13b (`operator*`) zijn af; de rest
+is nog niet besproken, alleen de volgorde ligt vast.
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
 gekanteld staat ten opzichte van de schrijfwijze op papier. Voor de eenheidsmatrix maakt dat
 niets uit; voor een verplaatsing wel (`tx`, `ty`, `tz` staan in `m[3]`).
 
-### 13b: vermenigvuldigen van twee matrices (eerstvolgende, nog te bespreken)
+### 13c: `Vec3` en de eerste function die een matrix maakt (eerstvolgende, nog te bespreken)
 
-Drie keuzes liggen open en moeten eerst aan de gebruiker worden voorgelegd:
+Begin met de verplaatsing; schalen en draaien volgen daarna. Open keuzes die eerst aan de
+gebruiker moeten worden voorgelegd:
 
-- `operator*` of een functie met een naam;
-- de volgorde (bij OpenGL-stijl past `A * B` eerst B toe, dan A);
-- hoe we de uitkomst controleren zolang er niets op het scherm komt (besluit 26 vraagt om
-  een controle met bekende uitkomsten).
+- de vorm van `Vec3` (members, default value) en waar hij staat;
+- de naam en vorm van de function die een verplaatsingsmatrix maakt;
+- de vraag over `Vec4` uit besluit 31, zodra een punt getransformeerd moet worden.
+
+Elke nieuwe function krijgt controles in `MathTests`. De helpers `MakeTranslation` en
+`MakeScale` in de tests blijven met de hand opgebouwd, ook als `Math` zelf zulke functions
+krijgt.
 
 ### Daarna binnen stap 13 (alleen de volgorde)
 
-1. **`Vec3`** en de eerste functie die een matrix maakt (verplaatsen, daarna schalen en
-   draaien). Hier komt ook de vraag over `Vec4` terug (besluit 31).
-2. **Uniforms:** de matrix doorgeven aan een shader. Open: de uitbreiding van de publieke
+1. **Uniforms:** de matrix doorgeven aan een shader. Open: de uitbreiding van de publieke
    interface van `Renderer`, en of de Renderer `Mat4` kent of ruwe floats aanneemt.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
