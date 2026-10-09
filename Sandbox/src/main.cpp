@@ -7,6 +7,8 @@
 
 #include "EZSE/Math/Transform.h"
 
+#include <chrono>
+
 int main() {
     auto window = ezse::Window::Create({.title = "EZSE Sandbox"});
     if (!window) {
@@ -53,16 +55,30 @@ void main() {
     ezse::MeshHandle mesh = renderer->CreateMesh(triangle, indices);
     ezse::ShaderHandle shader = renderer->CreateShader(vertShaderSource, fragShaderSource);
 
-   
+    ezse::Mat4 translation = ezse::Translation(ezse::Vec3{ 0.5f,0.5f,0.0f });
+    ezse::Mat4 scale = ezse::Scale(ezse::Vec3{ 1.0f,2.0f,1.0f });
+    ezse::Mat4 rotationZ = ezse::RotationZ(0.7854f);
+    ezse::Mat4 proj = ezse::Perspective(0.7854f, 1280.0f / 720.0f, 0.1f, 100.0f);
+
+    const auto start = std::chrono::steady_clock::now();
     while (!window->ShouldClose()) {
+        const std::chrono::duration<float> elapsed = std::chrono::steady_clock::now() - start;
+        const float seconds = elapsed.count();
+        float z = -3 + std::sin(seconds);
+        ezse::LogInfo("z: {}", z);
+        translation = ezse::Translation(ezse::Vec3{ 0.0f,0.0f, z });
+
+
         window->PollEvents();
         renderer->Clear(0.1f, 0.2f, 0.3f);
         renderer->DrawMesh(
             mesh, 
             shader, 
-            ezse::Translation(ezse::Vec3{0.5f,0.5f,0.0f}));
+            proj * translation );
         window->SwapBuffers();
     }
+
+
 
     ezse::LogInfo("Sandbox closed");
     return 0;

@@ -33,6 +33,11 @@ bool NearlyEqual(const ezse::Vec4& a, const ezse::Vec4& b) {
            std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
 }
 
+// What the graphics card does after the vertex shader: divide by w.
+ezse::Vec4 PerspectiveDivide(const ezse::Vec4& clip) {
+    return ezse::Vec4{ clip.x / clip.w, clip.y / clip.w, clip.z / clip.w, 1.0f };
+}
+
 // Built by hand so the tests do not depend on the Math 
 // functions they are checking.
 ezse::Mat4 MakeTranslation(float x, float y, float z) {
@@ -213,6 +218,38 @@ void TestTransformVector() {
         "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
 }
 
+void TestPerspective() {
+    const float fovY = std::numbers::pi_v<float> / 3.0f;
+    const float aspect = 2.0f;
+    const float nearPlane = 0.5f;
+    const float farPlane = 10.0f;
+    const ezse::Mat4 projection = ezse::Perspective(fovY, aspect, nearPlane, farPlane);
+
+    // Half the height and width of the visible area at the near plane.
+    const float halfHeight = nearPlane * std::tan(fovY / 2.0f);
+    const float halfWidth = halfHeight * aspect;
+
+    const ezse::Vec4 nearCenter = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, 0.0f, -nearPlane, 1.0f });
+    Check(NearlyEqual(nearCenter, ezse::Vec4{ 0.0f, 0.0f, -1.0f, 1.0f }),
+        "Perspective maps the center of the near plane to depth -1");
+
+    const ezse::Vec4 farCenter = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, 0.0f, -farPlane, 1.0f });
+    Check(NearlyEqual(farCenter, ezse::Vec4{ 0.0f, 0.0f, 1.0f, 1.0f }),
+        "Perspective maps the center of the far plane to depth 1");
+
+    const ezse::Vec4 nearTop = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, halfHeight, -nearPlane, 1.0f });
+    Check(NearlyEqual(nearTop, ezse::Vec4{ 0.0f, 1.0f, -1.0f, 1.0f }),
+        "Perspective maps the top edge of the near plane to y = 1");
+
+    const ezse::Vec4 nearRight = PerspectiveDivide(projection * ezse::Vec4{ halfWidth, 0.0f, -nearPlane, 1.0f });
+    Check(NearlyEqual(nearRight, ezse::Vec4{ 1.0f, 0.0f, -1.0f, 1.0f }),
+        "Perspective maps the right edge of the near plane to x = 1");
+
+    const ezse::Vec4 clip = projection * ezse::Vec4{ 3.0f, 4.0f, -5.0f, 1.0f };
+    Check(std::abs(clip.w - 5.0f) <= 0.0001f,
+        "Perspective puts the distance to the camera (-z) in w");
+}
+
 } // namespace
 
 int main() {
@@ -225,6 +262,7 @@ int main() {
     TestRotationZ();
     TestRotationOrder();
     TestTransformVector();
+    TestPerspective();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

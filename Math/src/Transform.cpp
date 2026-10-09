@@ -56,4 +56,17 @@ Mat4 RotationZ(float angle) {
     return mat;
 }
 
+Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane) {
+    const float tangent = std::tan(fovY / 2.0f);
+
+    Mat4 mat;
+    mat.m[0][0] = 1.0f / (aspect * tangent);
+    mat.m[1][1] = 1.0f / tangent;
+    mat.m[2][2] = -((farPlane + nearPlane) / (farPlane - nearPlane));
+    mat.m[3][2] = -((2.0f * farPlane * nearPlane) / (farPlane - nearPlane));
+    mat.m[2][3] = -1.0f;
+    mat.m[3][3] = 0.0f;
+    return mat;
+}
+
 } // namespace ezse

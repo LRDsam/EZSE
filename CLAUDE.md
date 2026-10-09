@@ -85,7 +85,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY` en `RotationZ` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -166,17 +166,18 @@ Regels die de Renderer herbruikbaar houden:
 | 45 | Matrix maal vector | `Vec4 operator*(const Mat4& mat, const Vec4& vec)` in `Mat4.h`/`Mat4.cpp`; `Mat4.h` include daarvoor `Vec4.h` |
 | 46 | Perspectief | `Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane)`. De camera staat in de oorsprong en kijkt langs de negatieve Z-as (right-handed); de diepte loopt van -1 tot 1 (standaard van OpenGL, geen `glClipControl`); `fovY` is de verticale kijkhoek in radialen. De namen `near` en `far` vermijden we: dat zijn macro's in de Windows-headers |
 | 47 | Projectie naar de shader | Sandbox rekent `projection * model` uit en geeft die aan `DrawMesh`; de Renderer verandert niet. Aparte uniforms komen pas bij belichting |
+| 48 | Tijd | voorlopig `std::chrono::steady_clock` rechtstreeks in Sandbox (testcode). Een klok in de engine ontwerpen we wanneer de game loop naar de Engine-module gaat; niet via `Window`/GLFW, want tijd is geen eigenschap van een venster |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 is 14a af: de module `Math` bevat de
+en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a en 14b af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 33 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
-`Translation`, `Scale` en de draaiingen `RotationX`, `RotationY` en `RotationZ`.
-`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox verschuift het vierkant
-daarmee naar rechtsboven.
+alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
+`Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
+`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox geeft `projection * model`
+mee en laat het vierkant met de tijd naar voren en naar achteren bewegen (`z = -3 + sin(t)`).
 
 Publieke interface van `Renderer`:
 
@@ -200,17 +201,20 @@ Bekende beperkingen, bewust zo gelaten:
   zo noemen.
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
+- De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
+  niet (hangt samen met besluit 20).
+- Sandbox logt `z` elk frame en bevat nog ongebruikte variabelen van eerdere proeven.
 
 ## Volgende stap: 14, camera en perspectief
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 47). Stap 13
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 48). Stap 13
 (transformaties) is af. Stap 14 gaat in kleine delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|
 | 14a | `Vec4` en `Mat4 * Vec4` | af |
-| 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | eerstvolgende; keuzes liggen vast (besluiten 46 en 47), opdracht is gegeven |
-| 14c | de camera: de view-matrix | keuzes nog voorleggen |
+| 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | af |
+| 14c | de camera: de view-matrix | eerstvolgende; keuzes nog voorleggen |
 | 14d | de kubus en de dieptebuffer | keuzes nog voorleggen |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
@@ -223,17 +227,9 @@ uitkomst. `RotationX` en `RotationY` zijn zonder perspectief niet op het scherm 
 (ze drukken het vierkant alleen plat); de richting is vastgelegd met de kwartslag-controles in
 `MathTests`.
 
-### 14b: `Perspective` (de opdracht in het kort)
-
-Met `f = 1 / tan(fovY / 2)` moet de matrix opleveren: `x' = (f / aspect) * x`, `y' = f * y`,
-`z' = A * z + B * w` en `w' = -z`, met `A = (farPlane + nearPlane) / (nearPlane - farPlane)`
-en `B = (2 * farPlane * nearPlane) / (nearPlane - farPlane)`. De videokaart deelt daarna door
-`w'`. Let op: `m[3][3]` van de eenheidsmatrix moet hier nul worden.
-
-Controles (met `Vec4`, na delen door `w`): midden op het near plane geeft diepte -1, midden op
-het far plane +1; de bovenrand van het near plane geeft `y = 1`, de rechterrand `x = 1`; `w'`
-is gelijk aan `-z`. In Sandbox: het vierkant met `Translation` naar achteren zetten (negatieve
-z), want op `z = 0` ligt het in de camera.
+Achtergrond bij `Perspective`: de matrix zet de afstand tot de camera in `w` (`w' = -z`) en de
+videokaart deelt daarna door `w`; daarom moet `m[3][3]` van de eenheidsmatrix nul worden. De
+tests doen die deling zelf met de helper `PerspectiveDivide`.
 
 Open voor 14c: `LookAt(eye, target, up)` (vraagt bewerkingen op `Vec3`) of de view-matrix als
 omgekeerde van de plaatsing van de camera, met de bestaande functions.
