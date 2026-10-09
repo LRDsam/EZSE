@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <numbers>
 
 namespace {
 
@@ -124,6 +125,70 @@ void TestScale() {
         "two Scales multiply into the product of their factors");
 }
 
+// A quarter turn only contains zeros, ones and a minus one, so the expected
+// matrices below are filled in by hand, without sin or cos.
+const float quarterTurn = std::numbers::pi_v<float> / 2.0f;
+
+void TestRotationX() {
+    // The Y axis ends up on Z, the Z axis on minus Y.
+    ezse::Mat4 expected;
+    expected.m[1][1] = 0.0f;
+    expected.m[1][2] = 1.0f;
+    expected.m[2][1] = -1.0f;
+    expected.m[2][2] = 0.0f;
+
+    Check(NearlyEqual(ezse::RotationX(0.0f), ezse::Mat4{}),
+        "RotationX by zero is the identity");
+    Check(NearlyEqual(ezse::RotationX(quarterTurn), expected),
+        "RotationX by a quarter turn moves Y onto Z");
+    Check(NearlyEqual(ezse::RotationX(0.3f) * ezse::RotationX(0.5f), ezse::RotationX(0.8f)),
+        "two RotationX multiply into the sum of their angles");
+    Check(NearlyEqual(ezse::RotationX(0.7f) * ezse::RotationX(-0.7f), ezse::Mat4{}),
+        "RotationX by an angle and its opposite is the identity");
+}
+
+void TestRotationY() {
+    // The Z axis ends up on X, the X axis on minus Z.
+    ezse::Mat4 expected;
+    expected.m[2][2] = 0.0f;
+    expected.m[2][0] = 1.0f;
+    expected.m[0][2] = -1.0f;
+    expected.m[0][0] = 0.0f;
+
+    Check(NearlyEqual(ezse::RotationY(0.0f), ezse::Mat4{}),
+        "RotationY by zero is the identity");
+    Check(NearlyEqual(ezse::RotationY(quarterTurn), expected),
+        "RotationY by a quarter turn moves Z onto X");
+    Check(NearlyEqual(ezse::RotationY(0.3f) * ezse::RotationY(0.5f), ezse::RotationY(0.8f)),
+        "two RotationY multiply into the sum of their angles");
+    Check(NearlyEqual(ezse::RotationY(0.7f) * ezse::RotationY(-0.7f), ezse::Mat4{}),
+        "RotationY by an angle and its opposite is the identity");
+}
+
+void TestRotationZ() {
+    // The X axis ends up on Y, the Y axis on minus X.
+    ezse::Mat4 expected;
+    expected.m[0][0] = 0.0f;
+    expected.m[0][1] = 1.0f;
+    expected.m[1][0] = -1.0f;
+    expected.m[1][1] = 0.0f;
+
+    Check(NearlyEqual(ezse::RotationZ(0.0f), ezse::Mat4{}),
+        "RotationZ by zero is the identity");
+    Check(NearlyEqual(ezse::RotationZ(quarterTurn), expected),
+        "RotationZ by a quarter turn moves X onto Y");
+    Check(NearlyEqual(ezse::RotationZ(0.3f) * ezse::RotationZ(0.5f), ezse::RotationZ(0.8f)),
+        "two RotationZ multiply into the sum of their angles");
+    Check(NearlyEqual(ezse::RotationZ(0.7f) * ezse::RotationZ(-0.7f), ezse::Mat4{}),
+        "RotationZ by an angle and its opposite is the identity");
+}
+
+void TestRotationOrder() {
+    Check(!NearlyEqual(ezse::RotationX(quarterTurn) * ezse::RotationY(quarterTurn),
+                       ezse::RotationY(quarterTurn) * ezse::RotationX(quarterTurn)),
+        "RotationX * RotationY differs from RotationY * RotationX");
+}
+
 } // namespace
 
 int main() {
@@ -131,6 +196,10 @@ int main() {
     TestMultiply();
     TestTranslation();
     TestScale();
+    TestRotationX();
+    TestRotationY();
+    TestRotationZ();
+    TestRotationOrder();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
