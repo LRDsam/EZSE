@@ -167,17 +167,20 @@ Regels die de Renderer herbruikbaar houden:
 | 46 | Perspectief | `Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane)`. De camera staat in de oorsprong en kijkt langs de negatieve Z-as (right-handed); de diepte loopt van -1 tot 1 (standaard van OpenGL, geen `glClipControl`); `fovY` is de verticale kijkhoek in radialen. De namen `near` en `far` vermijden we: dat zijn macro's in de Windows-headers |
 | 47 | Projectie naar de shader | Sandbox rekent `projection * model` uit en geeft die aan `DrawMesh`; de Renderer verandert niet. Aparte uniforms komen pas bij belichting |
 | 48 | Tijd | voorlopig `std::chrono::steady_clock` rechtstreeks in Sandbox (testcode). Een klok in de engine ontwerpen we wanneer de game loop naar de Engine-module gaat; niet via `Window`/GLFW, want tijd is geen eigenschap van een venster |
+| 49 | View-matrix | het omgekeerde van de plaatsing van de camera, opgebouwd met bestaande functions: de camera staat met `Translation(position) * RotationY(yaw)`, dus `view = RotationY(-yaw) * Translation(-position)`. Geen function in `Math` en geen algemene `Inverse`; een `Camera`-struct hoort later in de Engine-module. `LookAt(eye, target, up)` wordt een eigen stap zodra we om een voorwerp heen willen draaien (vraagt aftrekken, `Dot`, `Cross` en `Normalize` op `Vec3`) |
+| 50 | Camera en model gescheiden naar de shader | ja, als eigen stap (14d): twee uniforms, `u_viewProjection` (per frame) en `u_model` (per voorwerp), met een function op de Renderer om de camera te zetten en `DrawMesh(mesh, shader, model)`. Aanleiding: meerdere voorwerpen en straks belichting, die de model-matrix los nodig heeft. Tot die stap rekent Sandbox `projection * view * model` uit (besluit 47) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a en 14b af: de module `Math` bevat de
+en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a, 14b en 14c af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
-`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox geeft `projection * model`
-mee en laat het vierkant met de tijd naar voren en naar achteren bewegen (`z = -3 + sin(t)`).
+`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox geeft
+`projection * view * model` mee; de camera staat op `(0, 0, 3)` en draait met de tijd heen en weer
+om de Y-as, waardoor het vierkant opzij door het beeld schuift.
 
 Publieke interface van `Renderer`:
 
@@ -203,19 +206,19 @@ Bekende beperkingen, bewust zo gelaten:
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 - De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
   niet (hangt samen met besluit 20).
-- Sandbox logt `z` elk frame en bevat nog ongebruikte variabelen van eerdere proeven.
 
 ## Volgende stap: 14, camera en perspectief
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 48). Stap 13
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 50). Stap 13
 (transformaties) is af. Stap 14 gaat in kleine delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|
 | 14a | `Vec4` en `Mat4 * Vec4` | af |
 | 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | af |
-| 14c | de camera: de view-matrix | eerstvolgende; keuzes nog voorleggen |
-| 14d | de kubus en de dieptebuffer | keuzes nog voorleggen |
+| 14c | de camera: de view-matrix, in Sandbox | af |
+| 14d | de camera naar de Renderer (besluit 50) | eerstvolgende; keuzes nog voorleggen |
+| 14e | de kubus en de dieptebuffer | keuzes nog voorleggen |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -231,8 +234,11 @@ Achtergrond bij `Perspective`: de matrix zet de afstand tot de camera in `w` (`w
 videokaart deelt daarna door `w`; daarom moet `m[3][3]` van de eenheidsmatrix nul worden. De
 tests doen die deling zelf met de helper `PerspectiveDivide`.
 
-Open voor 14c: `LookAt(eye, target, up)` (vraagt bewerkingen op `Vec3`) of de view-matrix als
-omgekeerde van de plaatsing van de camera, met de bestaande functions.
+Open voor 14d, eerst voorleggen: de naam van de function die de camera zet; of hij `view` en
+`projection` los krijgt of al vermenigvuldigd; de namen van de uniforms (voorstel
+`u_viewProjection` en `u_model`); en wat er gebeurt met een shader die een van beide mist.
+De Renderer moet de camera onthouden en bij elke `DrawMesh` naar de shader sturen, omdat een
+uniform bij één shaderprogramma hoort. De code in de Renderer schrijft de gebruiker.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
 
