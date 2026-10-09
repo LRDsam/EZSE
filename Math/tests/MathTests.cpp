@@ -28,6 +28,11 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
+bool NearlyEqual(const ezse::Vec4& a, const ezse::Vec4& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
+}
+
 // Built by hand so the tests do not depend on the Math 
 // functions they are checking.
 ezse::Mat4 MakeTranslation(float x, float y, float z) {
@@ -189,6 +194,25 @@ void TestRotationOrder() {
         "RotationX * RotationY differs from RotationY * RotationX");
 }
 
+void TestTransformVector() {
+    const ezse::Vec4 point{ 4.0f, 5.0f, 6.0f, 1.0f };
+    const ezse::Vec4 direction{ 4.0f, 5.0f, 6.0f, 0.0f };
+    const ezse::Mat4 translation = MakeTranslation(1.0f, 2.0f, 3.0f);
+
+    Check(NearlyEqual(ezse::Mat4{} * point, point),
+        "the identity leaves a vector unchanged");
+    Check(NearlyEqual(translation * point, ezse::Vec4{ 5.0f, 7.0f, 9.0f, 1.0f }),
+        "a translation moves a point (w = 1)");
+    Check(NearlyEqual(translation * direction, direction),
+        "a translation leaves a direction alone (w = 0)");
+    Check(NearlyEqual(MakeScale(ezse::Vec3{ 2.0f, 3.0f, 4.0f }) * ezse::Vec4{ 1.0f, 1.0f, 1.0f, 1.0f },
+                      ezse::Vec4{ 2.0f, 3.0f, 4.0f, 1.0f }),
+        "a scale multiplies each coordinate by its factor");
+    Check(NearlyEqual(ezse::RotationZ(quarterTurn) * ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f },
+                      ezse::Vec4{ 0.0f, 1.0f, 0.0f, 1.0f }),
+        "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
+}
+
 } // namespace
 
 int main() {
@@ -200,6 +224,7 @@ int main() {
     TestRotationY();
     TestRotationZ();
     TestRotationOrder();
+    TestTransformVector();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

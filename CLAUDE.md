@@ -85,7 +85,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*`, `Vec3`; `Translation`, `Scale`, `RotationX`, `RotationY` en `RotationZ` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY` en `RotationZ` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -162,15 +162,19 @@ Regels die de Renderer herbruikbaar houden:
 | 41 | Draaiingen | drie losse functions: `Mat4 RotationX(float angle)`, `RotationY` en `RotationZ`. Geen `enum` voor de as (scheelt geen code) en geen willekeurige as (nog niet nodig; kan later ernaast komen, met deze drie als controle) |
 | 42 | Hoek en richting | de hoek is in radialen, zoals `std::sin`, GLSL en glm; pi komt uit `<numbers>` (`std::numbers::pi_v<float>`). Een positieve hoek draait tegen de klok in, gezien vanaf de positieve kant van de as naar de oorsprong |
 | 43 | Drie hoeken in één function | nu niet: `Rotation(const Vec3& angles)` moet zelf een volgorde kiezen en verstopt die (botst met besluit 36). Komt terug als dunne function bovenop de drie losse, zodra iets een stand als drie hoeken opslaat (een `Transform`-component in de Engine-module); dan leggen we één volgorde vast |
+| 44 | `Vec4` (vervolg op 31) | toegevoegd, zo klein mogelijk: struct met de members `x`, `y`, `z`, `w` (elk `float`, default value `0.0f`) in `Vec4.h`. De aanroeper schrijft `w` altijd zelf: `1` is een punt, `0` een richting. `Mat4` blijft `float m[4][4]`. Aanleiding: een perspectiefmatrix controleren op wat hij met een punt doet, niet op zijn elementen |
+| 45 | Matrix maal vector | `Vec4 operator*(const Mat4& mat, const Vec4& vec)` in `Mat4.h`/`Mat4.cpp`; `Mat4.h` include daarvoor `Vec4.h` |
+| 46 | Perspectief | `Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane)`. De camera staat in de oorsprong en kijkt langs de negatieve Z-as (right-handed); de diepte loopt van -1 tot 1 (standaard van OpenGL, geen `glClipControl`); `fovY` is de verticale kijkhoek in radialen. De namen `near` en `far` vermijden we: dat zijn macro's in de Windows-headers |
+| 47 | Projectie naar de shader | Sandbox rekent `projection * model` uit en geeft die aan `DrawMesh`; de Renderer verandert niet. Aparte uniforms komen pas bij belichting |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Van stap 13 zijn 13a tot en met 13f af: de module `Math` bevat de
+en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 is 14a af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 28 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Translation`, `Scale` en de
-draaiingen `RotationX`, `RotationY` en `RotationZ`.
+alles met 33 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
+`Translation`, `Scale` en de draaiingen `RotationX`, `RotationY` en `RotationZ`.
 `DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox verschuift het vierkant
 daarmee naar rechtsboven.
 
@@ -197,12 +201,17 @@ Bekende beperkingen, bewust zo gelaten:
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 
-## Volgende stap: 13, transformaties
+## Volgende stap: 14, camera en perspectief
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 43).
-Stap 13 gaat in kleine delen. 13a (de struct `Mat4`), 13b (`operator*`), 13c (`Vec3` en
-`Translation`), 13d (de matrix als uniform naar de shader), 13e (`Scale`) en 13f (de draaiingen)
-zijn af. Daarmee zijn de transformaties compleet.
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 47). Stap 13
+(transformaties) is af. Stap 14 gaat in kleine delen:
+
+| Deel | Onderwerp | Stand |
+|---|---|---|
+| 14a | `Vec4` en `Mat4 * Vec4` | af |
+| 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | eerstvolgende; keuzes liggen vast (besluiten 46 en 47), opdracht is gegeven |
+| 14c | de camera: de view-matrix | keuzes nog voorleggen |
+| 14d | de kubus en de dieptebuffer | keuzes nog voorleggen |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -214,17 +223,25 @@ uitkomst. `RotationX` en `RotationY` zijn zonder perspectief niet op het scherm 
 (ze drukken het vierkant alleen plat); de richting is vastgelegd met de kwartslag-controles in
 `MathTests`.
 
-### Nog open binnen stap 13 (nog te bespreken)
+### 14b: `Perspective` (de opdracht in het kort)
 
-- De vraag over `Vec4` uit besluit 31, zodra een punt getransformeerd moet worden.
-- Daarna volgt de camera en het perspectief (zie hieronder); eerst de keuzes voorleggen.
+Met `f = 1 / tan(fovY / 2)` moet de matrix opleveren: `x' = (f / aspect) * x`, `y' = f * y`,
+`z' = A * z + B * w` en `w' = -z`, met `A = (farPlane + nearPlane) / (nearPlane - farPlane)`
+en `B = (2 * farPlane * nearPlane) / (nearPlane - farPlane)`. De videokaart deelt daarna door
+`w'`. Let op: `m[3][3]` van de eenheidsmatrix moet hier nul worden.
+
+Controles (met `Vec4`, na delen door `w`): midden op het near plane geeft diepte -1, midden op
+het far plane +1; de bovenrand van het near plane geeft `y = 1`, de rechterrand `x = 1`; `w'`
+is gelijk aan `-z`. In Sandbox: het vierkant met `Translation` naar achteren zetten (negatieve
+z), want op `z = 0` ligt het in de camera.
+
+Open voor 14c: `LookAt(eye, target, up)` (vraagt bewerkingen op `Vec3`) of de view-matrix als
+omgekeerde van de plaatsing van de camera, met de bestaande functions.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
 
 ## Daarna
 
-**Camera en perspectief**, en de dieptebuffer. Daarmee is de 3D-kubus compleet.
-
-Verder op de lijst, zonder vaste volgorde: texturen (met het vrije vertex-formaat), het
+Op de lijst, zonder vaste volgorde: texturen (met het vrije vertex-formaat), het
 event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
 en de Engine-module met een Entity Component System en een resource manager.
