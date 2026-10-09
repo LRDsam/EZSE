@@ -20,11 +20,13 @@ public:
     static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
-    void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform);
+    void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
 
     ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
     void DestroyShader(ShaderHandle shader);
+
+    void SetCamera(const Mat4& view, const Mat4& projection);
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -44,12 +46,13 @@ private:
 
     struct ShaderData {
         unsigned int shaderProgram = 0;
-        int transformLocation = -1;
+        int modelLocation = -1;
     };
 
     MeshData& GetMeshData(MeshHandle mesh);
     ShaderData& GetShaderData(ShaderHandle shader);
 
+    unsigned int m_viewProjectionBuffer = 0;
     std::vector<MeshData> m_meshData;
     std::vector<ShaderData> m_shaderData;
 };

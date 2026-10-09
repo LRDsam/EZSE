@@ -12,6 +12,8 @@ namespace ezse {
 
 namespace {
 
+constexpr GLuint c_cameraBindingPoint = 0;
+
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
 }
@@ -68,6 +70,9 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     LogInfo("Driver: {}", GetString(GL_VERSION));
 
     std::unique_ptr<Renderer> renderer(new Renderer());
+    glCreateBuffers(1, &renderer->m_viewProjectionBuffer);
+    glNamedBufferStorage(renderer->m_viewProjectionBuffer, sizeof(Mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
+    glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_viewProjectionBuffer);
     return renderer;
 }
 
@@ -114,7 +119,7 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     meshData = MeshData{};
 }
 
-void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform) {
+void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model) {
     const MeshData& meshData = GetMeshData(mesh);
     const ShaderData& shaderData = GetShaderData(shader);
 
@@ -122,10 +127,10 @@ void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transf
     glBindVertexArray(meshData.vertexArrayObj);
     glProgramUniformMatrix4fv(
         shaderData.shaderProgram,
-        shaderData.transformLocation,
+        shaderData.modelLocation,
         1,
         GL_FALSE,
-        &transform.m[0][0]);
+        &model.m[0][0]);
     glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
@@ -156,9 +161,9 @@ ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_v
         return {};
     }
 
-    shaderData.transformLocation = glGetUniformLocation(shaderData.shaderProgram, "u_transform");
-    if (shaderData.transformLocation < 0) {
-        LogWarn("Uniform for transform not found in shader!");
+    shaderData.modelLocation = glGetUniformLocation(shaderData.shaderProgram, "u_model");
+    if (shaderData.modelLocation < 0) {
+        LogWarn("Uniform u_model not found in shader!");
     }
 
     m_shaderData.push_back(shaderData);
@@ -171,6 +176,11 @@ void Renderer::DestroyShader(ShaderHandle shader) {
     glDeleteProgram(shaderData.shaderProgram);
     shaderData = ShaderData{};
 
+}
+
+void Renderer::SetCamera(const Mat4& view, const Mat4& projection) {
+    const Mat4 viewProjection = projection * view;
+    glNamedBufferSubData(m_viewProjectionBuffer, 0, sizeof(Mat4), &viewProjection.m[0][0]);
 }
 
 Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
@@ -206,6 +216,8 @@ Renderer::~Renderer() {
         glDeleteProgram(shaderData.shaderProgram);
         
     }
+
+    glDeleteBuffers(1, &m_viewProjectionBuffer);
 }
 
 } // namespace ezse

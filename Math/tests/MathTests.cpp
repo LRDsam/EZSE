@@ -137,7 +137,7 @@ void TestScale() {
 
 // A quarter turn only contains zeros, ones and a minus one, so the expected
 // matrices below are filled in by hand, without sin or cos.
-const float quarterTurn = std::numbers::pi_v<float> / 2.0f;
+const float c_quarterTurn = std::numbers::pi_v<float> / 2.0f;
 
 void TestRotationX() {
     // The Y axis ends up on Z, the Z axis on minus Y.
@@ -149,7 +149,7 @@ void TestRotationX() {
 
     Check(NearlyEqual(ezse::RotationX(0.0f), ezse::Mat4{}),
         "RotationX by zero is the identity");
-    Check(NearlyEqual(ezse::RotationX(quarterTurn), expected),
+    Check(NearlyEqual(ezse::RotationX(c_quarterTurn), expected),
         "RotationX by a quarter turn moves Y onto Z");
     Check(NearlyEqual(ezse::RotationX(0.3f) * ezse::RotationX(0.5f), ezse::RotationX(0.8f)),
         "two RotationX multiply into the sum of their angles");
@@ -167,7 +167,7 @@ void TestRotationY() {
 
     Check(NearlyEqual(ezse::RotationY(0.0f), ezse::Mat4{}),
         "RotationY by zero is the identity");
-    Check(NearlyEqual(ezse::RotationY(quarterTurn), expected),
+    Check(NearlyEqual(ezse::RotationY(c_quarterTurn), expected),
         "RotationY by a quarter turn moves Z onto X");
     Check(NearlyEqual(ezse::RotationY(0.3f) * ezse::RotationY(0.5f), ezse::RotationY(0.8f)),
         "two RotationY multiply into the sum of their angles");
@@ -185,7 +185,7 @@ void TestRotationZ() {
 
     Check(NearlyEqual(ezse::RotationZ(0.0f), ezse::Mat4{}),
         "RotationZ by zero is the identity");
-    Check(NearlyEqual(ezse::RotationZ(quarterTurn), expected),
+    Check(NearlyEqual(ezse::RotationZ(c_quarterTurn), expected),
         "RotationZ by a quarter turn moves X onto Y");
     Check(NearlyEqual(ezse::RotationZ(0.3f) * ezse::RotationZ(0.5f), ezse::RotationZ(0.8f)),
         "two RotationZ multiply into the sum of their angles");
@@ -194,8 +194,8 @@ void TestRotationZ() {
 }
 
 void TestRotationOrder() {
-    Check(!NearlyEqual(ezse::RotationX(quarterTurn) * ezse::RotationY(quarterTurn),
-                       ezse::RotationY(quarterTurn) * ezse::RotationX(quarterTurn)),
+    Check(!NearlyEqual(ezse::RotationX(c_quarterTurn) * ezse::RotationY(c_quarterTurn),
+                       ezse::RotationY(c_quarterTurn) * ezse::RotationX(c_quarterTurn)),
         "RotationX * RotationY differs from RotationY * RotationX");
 }
 
@@ -213,7 +213,7 @@ void TestTransformVector() {
     Check(NearlyEqual(MakeScale(ezse::Vec3{ 2.0f, 3.0f, 4.0f }) * ezse::Vec4{ 1.0f, 1.0f, 1.0f, 1.0f },
                       ezse::Vec4{ 2.0f, 3.0f, 4.0f, 1.0f }),
         "a scale multiplies each coordinate by its factor");
-    Check(NearlyEqual(ezse::RotationZ(quarterTurn) * ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f },
+    Check(NearlyEqual(ezse::RotationZ(c_quarterTurn) * ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f },
                       ezse::Vec4{ 0.0f, 1.0f, 0.0f, 1.0f }),
         "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
 }

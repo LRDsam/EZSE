@@ -110,7 +110,9 @@ Regels die de Renderer herbruikbaar houden:
   `EZSE::Core`; bestandsnamen met hoofdletter (`Window.h`).
 - Per module `include/EZSE/<Module>/` (publiek) en `src/` (intern). Includes met het volledige
   pad: `#include "EZSE/Core/Log.h"`. Eigen headers boven standaardheaders.
-- `#pragma once`. Membervariabelen met `m_`.
+- `#pragma once`. Membervariabelen met `m_`. Constanten op namespace-niveau met `c_`
+  (`c_cameraBindingPoint`); een lokale `const` in een function krijgt geen voorvoegsel.
+  Geen hoofdletters met underscores: die zijn voor macro's.
 - Hulpfuncties die alleen in één `.cpp` nodig zijn staan in een naamloze namespace.
 - Een macro alleen als een functie het niet kan (asserts, platform-schakelaars).
 - Iets dat kan mislukken krijgt een `Create`-functie die een lege `unique_ptr` of een handle
@@ -169,18 +171,21 @@ Regels die de Renderer herbruikbaar houden:
 | 48 | Tijd | voorlopig `std::chrono::steady_clock` rechtstreeks in Sandbox (testcode). Een klok in de engine ontwerpen we wanneer de game loop naar de Engine-module gaat; niet via `Window`/GLFW, want tijd is geen eigenschap van een venster |
 | 49 | View-matrix | het omgekeerde van de plaatsing van de camera, opgebouwd met bestaande functions: de camera staat met `Translation(position) * RotationY(yaw)`, dus `view = RotationY(-yaw) * Translation(-position)`. Geen function in `Math` en geen algemene `Inverse`; een `Camera`-struct hoort later in de Engine-module. `LookAt(eye, target, up)` wordt een eigen stap zodra we om een voorwerp heen willen draaien (vraagt aftrekken, `Dot`, `Cross` en `Normalize` op `Vec3`) |
 | 50 | Camera en model gescheiden naar de shader | ja, als eigen stap (14d): twee uniforms, `u_viewProjection` (per frame) en `u_model` (per voorwerp), met een function op de Renderer om de camera te zetten en `DrawMesh(mesh, shader, model)`. Aanleiding: meerdere voorwerpen en straks belichting, die de model-matrix los nodig heeft. Tot die stap rekent Sandbox `projection * view * model` uit (besluit 47) |
+| 51 | Camera naar de shader (uitwerking van 50) | `void SetCamera(const Mat4& view, const Mat4& projection)`: de aanroeper geeft beide los, de Renderer rekent `projection * view` één keer uit. De camera blijft staan tot de volgende aanroep. `DrawMesh(mesh, shader, const Mat4& model)` stuurt alleen de model-matrix |
+| 52 | Uniform buffer | de camera staat in een uniform buffer die alle shaders delen, niet in een gewone uniform per shader. In de shader: `layout(std140, binding = 0) uniform Camera { mat4 u_viewProjection; };`. Bindpunt 0, als `c_cameraBindingPoint` in `Renderer.cpp`. Het blok bevat alleen `u_viewProjection`; `view` en `projection` los komen erbij zodra een shader ze nodig heeft |
+| 53 | Model-matrix | blijft een gewone uniform, nu met de naam `u_model` (was `u_transform`); opzoeken en waarschuwen zoals in besluit 40 |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a, 14b en 14c af: de module `Math` bevat de
+en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a tot en met 14d af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
-`DrawMesh` geeft een `Mat4` door aan de uniform `u_transform`; Sandbox geeft
-`projection * view * model` mee; de camera staat op `(0, 0, 3)` en draait met de tijd heen en weer
-om de Y-as, waardoor het vierkant opzij door het beeld schuift.
+De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
+model-matrix door aan de uniform `u_model`. In Sandbox staat de camera op `(0, 0, 3)` en draait
+hij met de tijd heen en weer om de Y-as, waardoor het vierkant opzij door het beeld schuift.
 
 Publieke interface van `Renderer`:
 
@@ -190,7 +195,8 @@ MeshHandle   CreateMesh(std::span<const Vertex> vertices, std::span<const std::u
 void         DestroyMesh(MeshHandle mesh);
 ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
 void         DestroyShader(ShaderHandle shader);
-void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& transform);
+void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
+void         SetCamera(const Mat4& view, const Mat4& projection);
 void         Clear(float red, float green, float blue);
 ```
 
@@ -200,8 +206,10 @@ Bekende beperkingen, bewust zo gelaten:
 - Eén venster tegelijk: GLFW wordt gestart in `Window::Create` en afgesloten in de destructor.
 - De attribuutnummers in `CreateMesh` en de `location`-nummers in de shader zijn een
   afspraak die nergens wordt afgedwongen.
-- Hetzelfde geldt voor de naam `u_transform`: de Renderer en de shader moeten hem allebei
-  zo noemen.
+- Hetzelfde geldt voor de naam `u_model` en voor het blok `Camera` op bindpunt 0: de Renderer
+  en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
+- De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera`
+  aan te roepen, tekent met onbepaalde waarden.
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 - De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
@@ -209,7 +217,7 @@ Bekende beperkingen, bewust zo gelaten:
 
 ## Volgende stap: 14, camera en perspectief
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 50). Stap 13
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 53). Stap 13
 (transformaties) is af. Stap 14 gaat in kleine delen:
 
 | Deel | Onderwerp | Stand |
@@ -217,8 +225,8 @@ Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 50). Sta
 | 14a | `Vec4` en `Mat4 * Vec4` | af |
 | 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | af |
 | 14c | de camera: de view-matrix, in Sandbox | af |
-| 14d | de camera naar de Renderer (besluit 50) | eerstvolgende; keuzes nog voorleggen |
-| 14e | de kubus en de dieptebuffer | keuzes nog voorleggen |
+| 14d | de camera naar de Renderer, met een uniform buffer (besluiten 50 tot en met 53) | af |
+| 14e | de kubus en de dieptebuffer | eerstvolgende; keuzes nog voorleggen |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -234,11 +242,10 @@ Achtergrond bij `Perspective`: de matrix zet de afstand tot de camera in `w` (`w
 videokaart deelt daarna door `w`; daarom moet `m[3][3]` van de eenheidsmatrix nul worden. De
 tests doen die deling zelf met de helper `PerspectiveDivide`.
 
-Open voor 14d, eerst voorleggen: de naam van de function die de camera zet; of hij `view` en
-`projection` los krijgt of al vermenigvuldigd; de namen van de uniforms (voorstel
-`u_viewProjection` en `u_model`); en wat er gebeurt met een shader die een van beide mist.
-De Renderer moet de camera onthouden en bij elke `DrawMesh` naar de shader sturen, omdat een
-uniform bij één shaderprogramma hoort. De code in de Renderer schrijft de gebruiker.
+Achtergrond bij de uniform buffer: de id van de buffer geeft OpenGL (`glCreateBuffers`), het
+nummer van het bindpunt kiezen we zelf. `glBindBufferBase` legt de buffer in dat genummerde
+vakje en de shader leest eruit met `binding = 0`. `std140` legt de indeling in het geheugen
+vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
 
