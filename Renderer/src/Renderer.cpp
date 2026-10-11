@@ -75,6 +75,7 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_viewProjectionBuffer);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 
     return renderer;
 }

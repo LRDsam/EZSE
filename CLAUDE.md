@@ -177,17 +177,18 @@ Regels die de Renderer herbruikbaar houden:
 | 54 | Kubus | in Sandbox als array, niet als function in de Renderer (regel 3: de Renderer kent geen vormen). Elk vlak een eigen effen kleur: 24 hoekpunten (vier per vlak) en 36 indices, want de kleur hoort bij het hoekpunt en elke hoek van de kubus hoort bij drie vlakken. Dezelfde opbouw is straks nodig voor normalen |
 | 55 | Draairichting | alle driehoeken tegen de klok in, gezien vanaf de buitenkant (de standaard van OpenGL voor een voorkant). Face culling staat nog uit en wordt later een eigen kleine stap; met culling aan zou een dichte kubus ook zonder dieptebuffer goed lijken |
 | 56 | Dieptebuffer | als eigen stap na de kubus (14f), zodat eerst zichtbaar is wat er zonder misgaat. De dieptetest staat altijd aan, één keer gezet in `Renderer::Create`; een function om hem uit te zetten komt pas bij doorzichtige voorwerpen of een interface over het beeld. `Clear(red, green, blue)` maakt kleur en diepte allebei leeg, de signatuur verandert niet. Het venster heeft al 24 bits diepte (standaard van GLFW) |
+| 57 | Face culling | altijd aan, één keer gezet in `Renderer::Create` (`glEnable(GL_CULL_FACE)`), met de standaardinstellingen van OpenGL: tegen de klok in is de voorkant (`GL_CCW`), de achterkant valt weg (`GL_BACK`). Een function om het per voorwerp uit te zetten komt bij het eerste voorwerp dat van twee kanten zichtbaar moet zijn |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en van stap 14
-zijn 14a tot en met 14f af; daarmee is stap 14 compleet: de module `Math` bevat de
+zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) is ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
-model-matrix door aan de uniform `u_model`. De dieptetest staat aan en `Clear`
+model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`
 maakt kleur en diepte leeg. Sandbox tekent een kubus met zes effen gekleurde vlakken die om
 twee assen draait; de camera staat stil op `(0, 0, 3)`.
 
@@ -214,6 +215,8 @@ Bekende beperkingen, bewust zo gelaten:
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
 - De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera`
   aan te roepen, tekent met onbepaalde waarden.
+- Face culling staat altijd aan: een los vlak is van achteren gezien onzichtbaar, en een
+  driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
 - De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
@@ -222,7 +225,7 @@ Bekende beperkingen, bewust zo gelaten:
 ## Volgende stap: nog te kiezen
 
 Het doel van stap 13 en 14, een draaiende 3D-kubus, is gehaald. De besluiten staan in de tabel
-(26 tot en met 56). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
+(26 tot en met 57). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
 **Daarna** voor. Stap 14 ging in deze delen:
 
 | Deel | Onderwerp | Stand |
@@ -255,8 +258,7 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
 
-Op de lijst, zonder vaste volgorde: face culling (klein; de kubus is er al klaar voor, besluit 55),
-`LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
+Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
 model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), het
 event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
 en de Engine-module met een Entity Component System en een resource manager.
