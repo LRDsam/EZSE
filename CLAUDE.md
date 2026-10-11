@@ -174,18 +174,22 @@ Regels die de Renderer herbruikbaar houden:
 | 51 | Camera naar de shader (uitwerking van 50) | `void SetCamera(const Mat4& view, const Mat4& projection)`: de aanroeper geeft beide los, de Renderer rekent `projection * view` één keer uit. De camera blijft staan tot de volgende aanroep. `DrawMesh(mesh, shader, const Mat4& model)` stuurt alleen de model-matrix |
 | 52 | Uniform buffer | de camera staat in een uniform buffer die alle shaders delen, niet in een gewone uniform per shader. In de shader: `layout(std140, binding = 0) uniform Camera { mat4 u_viewProjection; };`. Bindpunt 0, als `c_cameraBindingPoint` in `Renderer.cpp`. Het blok bevat alleen `u_viewProjection`; `view` en `projection` los komen erbij zodra een shader ze nodig heeft |
 | 53 | Model-matrix | blijft een gewone uniform, nu met de naam `u_model` (was `u_transform`); opzoeken en waarschuwen zoals in besluit 40 |
+| 54 | Kubus | in Sandbox als array, niet als function in de Renderer (regel 3: de Renderer kent geen vormen). Elk vlak een eigen effen kleur: 24 hoekpunten (vier per vlak) en 36 indices, want de kleur hoort bij het hoekpunt en elke hoek van de kubus hoort bij drie vlakken. Dezelfde opbouw is straks nodig voor normalen |
+| 55 | Draairichting | alle driehoeken tegen de klok in, gezien vanaf de buitenkant (de standaard van OpenGL voor een voorkant). Face culling staat nog uit en wordt later een eigen kleine stap; met culling aan zou een dichte kubus ook zonder dieptebuffer goed lijken |
+| 56 | Dieptebuffer | als eigen stap na de kubus (14f), zodat eerst zichtbaar is wat er zonder misgaat. De dieptetest staat altijd aan, één keer gezet in `Renderer::Create`; een function om hem uit te zetten komt pas bij doorzichtige voorwerpen of een interface over het beeld. `Clear(red, green, blue)` maakt kleur en diepte allebei leeg, de signatuur verandert niet. Het venster heeft al 24 bits diepte (standaard van GLFW) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
-Stappen 1 tot en met 12 zijn af en gecommit. Sandbox tekent een vierkant uit vier hoekpunten
-en zes indices, met één shader. Stap 13 (transformaties) is af, en van stap 14 zijn 14a tot en met 14d af: de module `Math` bevat de
+Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en van stap 14
+zijn 14a tot en met 14e af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
-model-matrix door aan de uniform `u_model`. In Sandbox staat de camera op `(0, 0, 3)` en draait
-hij met de tijd heen en weer om de Y-as, waardoor het vierkant opzij door het beeld schuift.
+model-matrix door aan de uniform `u_model`. Sandbox tekent een kubus met zes
+effen gekleurde vlakken die om de Y-as draait; de camera staat stil op `(0, 0, 3)`. Zonder
+dieptebuffer staan vlakken van de achterkant soms over de voorkant heen (dat lost 14f op).
 
 Publieke interface van `Renderer`:
 
@@ -211,13 +215,14 @@ Bekende beperkingen, bewust zo gelaten:
 - De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera`
   aan te roepen, tekent met onbepaalde waarden.
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
-- Sandbox controleert de handle van `CreateShader` niet (testcode).
+- Sandbox controleert de handle van `CreateShader` niet (testcode), en bevat nog het oude
+  vierkant (`plane`, `planeMesh`) dat niet meer getekend wordt.
 - De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
   niet (hangt samen met besluit 20).
 
 ## Volgende stap: 14, camera en perspectief
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 53). Stap 13
+Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 56). Stap 13
 (transformaties) is af. Stap 14 gaat in kleine delen:
 
 | Deel | Onderwerp | Stand |
@@ -226,7 +231,8 @@ Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 53). Sta
 | 14b | `Perspective`, met controles in `MathTests`, en zichtbaar in Sandbox | af |
 | 14c | de camera: de view-matrix, in Sandbox | af |
 | 14d | de camera naar de Renderer, met een uniform buffer (besluiten 50 tot en met 53) | af |
-| 14e | de kubus en de dieptebuffer | eerstvolgende; keuzes nog voorleggen |
+| 14e | de kubus in Sandbox, nog zonder dieptebuffer (besluiten 54 en 55) | af |
+| 14f | de dieptebuffer (besluit 56) | eerstvolgende; opdracht is gegeven: `glEnable(GL_DEPTH_TEST)` in `Create` en `GL_DEPTH_BUFFER_BIT` erbij in `Clear` |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -246,8 +252,6 @@ Achtergrond bij de uniform buffer: de id van de buffer geeft OpenGL (`glCreateBu
 nummer van het bindpunt kiezen we zelf. `glBindBufferBase` legt de buffer in dat genummerde
 vakje en de shader leest eruit met `binding = 0`. `std140` legt de indeling in het geheugen
 vast; een `Mat4` van ons past daar precies op een `mat4`.
-
-Denkvraag die nog openstaat: komt een kubus met effen gekleurde vlakken uit met 8 hoekpunten?
 
 ## Daarna
 

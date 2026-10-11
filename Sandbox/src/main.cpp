@@ -21,13 +21,64 @@ int main() {
         return 1;
     }
 
-    const ezse::Vertex triangle[] = {
+    const ezse::Vertex plane[] = {
         {{-0.25f, -0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
         {{ 0.25f, -0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
         {{ 0.25f,  0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
         {{-0.25f,  0.25f, 0.0f}, {1.0f, 0.0f, 0.0f}},
     };
-    const std::uint32_t indices[] = { 0, 1, 2, 0, 2, 3};
+    const std::uint32_t planeIndices[] = { 0, 1, 2, 0, 2, 3 };
+
+
+    const ezse::Vertex cubeVertices[] = {
+        // Front (z = 0.5), red
+        {{-0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.5f, -0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 0.0f}},
+
+        // Back (z = -0.5), green
+        {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{ 0.5f,  0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+
+        // Right (x = 0.5), blue
+        {{ 0.5f, -0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{ 0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{ 0.5f,  0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{ 0.5f,  0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},
+
+        // Left (x = -0.5), yellow
+        {{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+        {{-0.5f, -0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}},
+        {{-0.5f,  0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}},
+        {{-0.5f,  0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+
+        // Top (y = 0.5), magenta
+        {{-0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}},
+        {{ 0.5f,  0.5f,  0.5f}, {1.0f, 0.0f, 1.0f}},
+        {{ 0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+        {{-0.5f,  0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+
+        // Bottom (y = -0.5), cyan
+        {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+        {{ 0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+        {{ 0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}},
+        {{-0.5f, -0.5f,  0.5f}, {0.0f, 1.0f, 1.0f}},
+    };
+    const std::uint32_t cubeIndices[] = {
+         0,  1,  2,   0,  2,  3,   // front
+         4,  5,  6,   4,  6,  7,   // back
+         8,  9, 10,   8, 10, 11,   // right
+        12, 13, 14,  12, 14, 15,   // left
+        16, 17, 18,  16, 18, 19,   // top
+        20, 21, 22,  20, 22, 23,   // bottom
+    };
+
+
+    
+
 
     const char* vertShaderSource = R"(#version 460 core
 
@@ -56,31 +107,31 @@ void main() {
 }
 )";
 
-    ezse::MeshHandle mesh = renderer->CreateMesh(triangle, indices);
+    ezse::MeshHandle planeMesh = renderer->CreateMesh(plane, planeIndices);
+    ezse::MeshHandle cube = renderer->CreateMesh(cubeVertices, cubeIndices);
+
     ezse::ShaderHandle shader = renderer->CreateShader(vertShaderSource, fragShaderSource);
 
     const ezse::Mat4 model =
         ezse::Translation(ezse::Vec3{ 0.0f, 0.0f, 0.0f }) * ezse::RotationZ(0.7854f);
     const ezse::Mat4 projection = ezse::Perspective(0.7854f, 1280.0f / 720.0f, 0.1f, 100.0f);
-
-    const ezse::Vec3 cameraPos{ 0.0f, 0.0f, 3.0f };
+    const ezse::Mat4 view = ezse::Translation(ezse::Vec3{ 0.0f, 0.0f, -3.0f });
 
     const auto start = std::chrono::steady_clock::now();
     while (!window->ShouldClose()) {
         const std::chrono::duration<float> elapsed = std::chrono::steady_clock::now() - start;
         const float seconds = elapsed.count();
-        const float cameraYaw = std::sin(seconds) * 0.5f;
+        const float cameraYaw = seconds * 0.5f;
 
         // The camera is placed with Translation(cameraPos) * RotationY(cameraYaw).
         // The view matrix undoes that: both parts inverted, in the opposite order.
-        const ezse::Mat4 view =
-            ezse::RotationY(-cameraYaw) *
-            ezse::Translation(ezse::Vec3{ -cameraPos.x, -cameraPos.y, -cameraPos.z });
+        const ezse::Mat4 model =
+            ezse::RotationY(-cameraYaw);
 
         window->PollEvents();
         renderer->Clear(0.1f, 0.2f, 0.3f);
         renderer->SetCamera(view, projection);
-        renderer->DrawMesh(mesh, shader, model);
+        renderer->DrawMesh(cube, shader, model);
         window->SwapBuffers();
     }
 
