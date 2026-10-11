@@ -73,6 +73,9 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glCreateBuffers(1, &renderer->m_viewProjectionBuffer);
     glNamedBufferStorage(renderer->m_viewProjectionBuffer, sizeof(Mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_viewProjectionBuffer);
+
+    glEnable(GL_DEPTH_TEST);
+
     return renderer;
 }
 
@@ -202,7 +205,7 @@ Renderer::ShaderData& Renderer::GetShaderData(ShaderHandle shader) {
 
 void Renderer::Clear(float red, float green, float blue) {
     glClearColor(red, green, blue, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 Renderer::~Renderer() {

@@ -182,14 +182,14 @@ Regels die de Renderer herbruikbaar houden:
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en van stap 14
-zijn 14a tot en met 14e af: de module `Math` bevat de
+zijn 14a tot en met 14f af; daarmee is stap 14 compleet: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
-model-matrix door aan de uniform `u_model`. Sandbox tekent een kubus met zes
-effen gekleurde vlakken die om de Y-as draait; de camera staat stil op `(0, 0, 3)`. Zonder
-dieptebuffer staan vlakken van de achterkant soms over de voorkant heen (dat lost 14f op).
+model-matrix door aan de uniform `u_model`. De dieptetest staat aan en `Clear`
+maakt kleur en diepte leeg. Sandbox tekent een kubus met zes effen gekleurde vlakken die om
+twee assen draait; de camera staat stil op `(0, 0, 3)`.
 
 Publieke interface van `Renderer`:
 
@@ -215,15 +215,15 @@ Bekende beperkingen, bewust zo gelaten:
 - De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera`
   aan te roepen, tekent met onbepaalde waarden.
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
-- Sandbox controleert de handle van `CreateShader` niet (testcode), en bevat nog het oude
-  vierkant (`plane`, `planeMesh`) dat niet meer getekend wordt.
+- Sandbox controleert de handle van `CreateShader` niet (testcode).
 - De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
   niet (hangt samen met besluit 20).
 
-## Volgende stap: 14, camera en perspectief
+## Volgende stap: nog te kiezen
 
-Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 56). Stap 13
-(transformaties) is af. Stap 14 gaat in kleine delen:
+Het doel van stap 13 en 14, een draaiende 3D-kubus, is gehaald. De besluiten staan in de tabel
+(26 tot en met 56). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
+**Daarna** voor. Stap 14 ging in deze delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|
@@ -232,7 +232,7 @@ Het doel is een 3D-kubus. De besluiten staan in de tabel (26 tot en met 56). Sta
 | 14c | de camera: de view-matrix, in Sandbox | af |
 | 14d | de camera naar de Renderer, met een uniform buffer (besluiten 50 tot en met 53) | af |
 | 14e | de kubus in Sandbox, nog zonder dieptebuffer (besluiten 54 en 55) | af |
-| 14f | de dieptebuffer (besluit 56) | eerstvolgende; opdracht is gegeven: `glEnable(GL_DEPTH_TEST)` in `Create` en `GL_DEPTH_BUFFER_BIT` erbij in `Clear` |
+| 14f | de dieptebuffer (besluit 56) | af |
 
 Achtergrond die al is uitgelegd: `m[kolom][rij]`, dus de eerste index kiest een kolom van
 vier floats. In een initializer staat elke kolom op een eigen regel, waardoor de matrix
@@ -255,6 +255,8 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
 
-Op de lijst, zonder vaste volgorde: texturen (met het vrije vertex-formaat), het
+Op de lijst, zonder vaste volgorde: face culling (klein; de kubus is er al klaar voor, besluit 55),
+`LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
+model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), het
 event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
 en de Engine-module met een Entity Component System en een resource manager.
