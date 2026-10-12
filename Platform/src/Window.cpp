@@ -49,6 +49,10 @@ std::unique_ptr<Window> Window::Create(const WindowDesc& desc) {
 
 Window::Window(GLFWwindow* handle) : m_handle(handle) {
     EZSE_ASSERT(m_handle != nullptr, "Window constructed without a GLFW handle");
+
+    // GLFW calls plain functions; this pointer lets them find the Window again.
+    glfwSetWindowUserPointer(m_handle, this);
+    glfwSetFramebufferSizeCallback(m_handle, OnFramebufferResized);
 }
 
 Window::~Window() {
@@ -57,6 +61,7 @@ Window::~Window() {
 }
 
 void Window::PollEvents() {
+    m_events.clear();
     glfwPollEvents();
 }
 
@@ -68,8 +73,23 @@ bool Window::ShouldClose() const {
     return glfwWindowShouldClose(m_handle) != 0;
 }
 
+std::span<const WindowEvent> Window::GetEvents() const {
+    return m_events;
+}
+
+FramebufferSize Window::GetFramebufferSize() const {
+    FramebufferSize size;
+    glfwGetFramebufferSize(m_handle, &size.width, &size.height);
+    return size;
+}
+
 Window::GLLoadFunction Window::GetGLLoadFunction() const {
     return glfwGetProcAddress;
+}
+
+void Window::OnFramebufferResized(GLFWwindow* handle, int width, int height) {
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    window->m_events.push_back(FramebufferResized{width, height});
 }
 
 } // namespace ezse

@@ -18,6 +18,7 @@ using GLLoadFunction = GLProc (*)(const char* name);
 class Renderer {
 public:
     static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
+    void SetViewport(int width, int height);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
     void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);

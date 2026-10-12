@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <variant>
 
 int main() {
     auto window = ezse::Window::Create({.title = "EZSE Sandbox"});
@@ -100,7 +101,21 @@ void main() {
     // The camera stands at (0, 0, 3) and looks down the negative Z axis;
     // the view matrix is the inverse of that placement.
     const ezse::Mat4 view = ezse::Translation(ezse::Vec3{ 0.0f, 0.0f, -3.0f });
-    const ezse::Mat4 projection = ezse::Perspective(0.7854f, 1280.0f / 720.0f, 0.1f, 100.0f);
+
+    // The drawing area and the projection both follow the size of the framebuffer.
+    // A minimized window has size zero; then both are left as they were.
+    ezse::Mat4 projection;
+    const auto applyFramebufferSize = [&](int width, int height) {
+        if (width == 0 || height == 0) {
+            return;
+        }
+        const float aspect = static_cast<float>(width) / static_cast<float>(height);
+        renderer->SetViewport(width, height);
+        projection = ezse::Perspective(0.7854f, aspect, 0.1f, 100.0f);
+    };
+
+    const ezse::FramebufferSize framebufferSize = window->GetFramebufferSize();
+    applyFramebufferSize(framebufferSize.width, framebufferSize.height);
 
     const auto start = std::chrono::steady_clock::now();
     while (!window->ShouldClose()) {
@@ -112,6 +127,12 @@ void main() {
             ezse::RotationY(seconds * 0.5f) * ezse::RotationX(seconds * 0.35f);
 
         window->PollEvents();
+        for (const ezse::WindowEvent& event : window->GetEvents()) {
+            if (const auto* resized = std::get_if<ezse::FramebufferResized>(&event)) {
+                applyFramebufferSize(resized->width, resized->height);
+            }
+        }
+
         renderer->Clear(0.1f, 0.2f, 0.3f);
         renderer->SetCamera(view, projection);
         renderer->DrawMesh(cube, shader, model);

@@ -86,7 +86,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `Platform` | `Window` (GLFW, verborgen achter eigen interface) | Core, GLFW (PRIVATE) |
+| `Platform` | `Window` (GLFW, verborgen achter eigen interface) en `WindowEvent` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/` | |
@@ -142,7 +142,7 @@ Regels die de Renderer herbruikbaar houden:
 | 16 | Laden van OpenGL | de opvraagfunctie wordt aan de Renderer aangereikt |
 | 17 | Debug-uitvoer | debug context en callback alleen in Debug-builds (`EZSE_DEBUG`); alleen loggen, niet pauzeren |
 | 19 | Stijl | Direct State Access |
-| 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing |
+| 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing. Opgelost in stap 16 (besluiten 58 tot en met 62) |
 | 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
 | 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
 | 25 | Indices | altijd verplicht, 32 bits (`std::uint32_t`); `CreateMesh` controleert met asserts dat het aantal een veelvoud van drie is en dat elke index naar een bestaand hoekpunt wijst |
@@ -178,19 +178,26 @@ Regels die de Renderer herbruikbaar houden:
 | 55 | Draairichting | alle driehoeken tegen de klok in, gezien vanaf de buitenkant (de standaard van OpenGL voor een voorkant). Face culling staat nog uit en wordt later een eigen kleine stap; met culling aan zou een dichte kubus ook zonder dieptebuffer goed lijken |
 | 56 | Dieptebuffer | als eigen stap na de kubus (14f), zodat eerst zichtbaar is wat er zonder misgaat. De dieptetest staat altijd aan, één keer gezet in `Renderer::Create`; een function om hem uit te zetten komt pas bij doorzichtige voorwerpen of een interface over het beeld. `Clear(red, green, blue)` maakt kleur en diepte allebei leeg, de signatuur verandert niet. Het venster heeft al 24 bits diepte (standaard van GLFW) |
 | 57 | Face culling | altijd aan, één keer gezet in `Renderer::Create` (`glEnable(GL_CULL_FACE)`), met de standaardinstellingen van OpenGL: tegen de klok in is de voorkant (`GL_CCW`), de achterkant valt weg (`GL_BACK`). Een function om het per voorwerp uit te zetten komt bij het eerste voorwerp dat van twee kanten zichtbaar moet zijn |
+| 58 | Events uit het venster | een lijst, geen callback in de code van de aanroeper: `Window::PollEvents` maakt de lijst leeg en vult hem, `std::span<const WindowEvent> GetEvents() const` leest hem uit (geldig tot de volgende `PollEvents`). Binnen `Platform` komt GLFW bij het `Window`-object via `glfwSetWindowUserPointer` en een `static` member function als callback |
+| 59 | Vorm van een event | een struct per soort met alleen zijn eigen gegevens, samen in een `std::variant`; uitlezen met `std::get_if`. Geen `enum` met een struct vol velden en geen basisklasse met `virtual`: een event heeft geen gedrag, zou per stuk op de heap moeten, en de soorten liggen vast |
+| 60 | Naam en plek | `WindowEvent` in `Platform/WindowEvent.h`, niet `Event`: die naam blijft vrij. Events binnen het spel ("speel dit geluid", "vijand geraakt") worden later een eigen systeem in de Engine-module met eigen soorten; geen centraal type dat alle modules moeten kennen |
+| 61 | Eigenaar van de lijst | het `Window`, zolang er één venster is. Bij een tweede venster verhuist de lijst naar een object in `Platform` boven de vensters, samen met het starten van GLFW en `PollEvents` (`glfwPollEvents` geldt voor alle vensters tegelijk) |
+| 62 | Venstergrootte | het event is `FramebufferResized { width, height }`, in pixels (niet de venstergrootte in schermcoördinaten; die verschilt bij schaling). De grootte bij de start komt uit `FramebufferSize Window::GetFramebufferSize() const`. De Renderer krijgt `void SetViewport(int width, int height)`; Sandbox roept die aan en rekent de `projection` opnieuw uit, en slaat beide over bij grootte 0 (geminimaliseerd) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
 
 Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en van stap 14
-zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) is ook af: de module `Math` bevat de
+zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) en
+stap 16 (events uit het venster, eerst alleen de grootte) zijn ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
 alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
 model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`
 maakt kleur en diepte leeg. Sandbox tekent een kubus met zes effen gekleurde vlakken die om
-twee assen draait; de camera staat stil op `(0, 0, 3)`.
+twee assen draait; de camera staat stil op `(0, 0, 3)`. Het tekengebied en de `aspect` volgen de grootte van
+het venster via `FramebufferResized`.
 
 Publieke interface van `Renderer`:
 
@@ -202,12 +209,23 @@ ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragme
 void         DestroyShader(ShaderHandle shader);
 void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection);
+void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
+```
+
+Publieke interface van `Window`, voor zover nieuw in stap 16:
+
+```cpp
+void                         PollEvents();
+std::span<const WindowEvent> GetEvents() const;
+FramebufferSize              GetFramebufferSize() const;
 ```
 
 Bekende beperkingen, bewust zo gelaten:
 
-- Het tekengebied volgt de grootte van het venster niet (besluit 20).
+- Tijdens het slepen aan de rand van het venster staat het beeld stil: op Windows blokkeert
+  `glfwPollEvents` zolang de muisknop is ingedrukt. Daarna staan alle tussenliggende groottes
+  achter elkaar in de lijst.
 - Eén venster tegelijk: GLFW wordt gestart in `Window::Create` en afgesloten in de destructor.
 - De attribuutnummers in `CreateMesh` en de `location`-nummers in de shader zijn een
   afspraak die nergens wordt afgedwongen.
@@ -219,13 +237,11 @@ Bekende beperkingen, bewust zo gelaten:
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
-- De `aspect` van `Perspective` staat vast in Sandbox (`1280.0f / 720.0f`) en volgt het venster
-  niet (hangt samen met besluit 20).
 
 ## Volgende stap: nog te kiezen
 
 Het doel van stap 13 en 14, een draaiende 3D-kubus, is gehaald. De besluiten staan in de tabel
-(26 tot en met 57). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
+(26 tot en met 62). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
 **Daarna** voor. Stap 14 ging in deze delen:
 
 | Deel | Onderwerp | Stand |
@@ -260,5 +276,5 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
 model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), het
-event-systeem (venstergrootte, toetsenbord, muis), shaders en modellen uit bestanden laden,
+toetsenbord en muis als nieuwe soorten `WindowEvent` (daarna een camera die je zelf bestuurt), shaders en modellen uit bestanden laden,
 en de Engine-module met een Entity Component System en een resource manager.

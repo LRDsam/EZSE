@@ -80,6 +80,12 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     return renderer;
 }
 
+void Renderer::SetViewport(int width, int height) {
+    if (width > 0 && height > 0) {
+        glViewport(0, 0, width, height);
+    }
+}
+
 MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices) {
     EZSE_ASSERT(!vertices.empty(), "CreateMesh needs at least one vertex");
     EZSE_ASSERT(!indices.empty(), "CreateMesh needs at least one index");
