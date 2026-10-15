@@ -5,6 +5,7 @@ add_library(EZSEMath STATIC
     include/EZSE/Math/Vec4.h
     src/Mat4.cpp
     src/Transform.cpp
+    src/Vec3.cpp
 )
 add_library(EZSE::Math ALIAS EZSEMath)
 

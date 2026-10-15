@@ -85,7 +85,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) en `WindowEvent` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -183,6 +183,7 @@ Regels die de Renderer herbruikbaar houden:
 | 60 | Naam en plek | `WindowEvent` in `Platform/WindowEvent.h`, niet `Event`: die naam blijft vrij. Events binnen het spel ("speel dit geluid", "vijand geraakt") worden later een eigen systeem in de Engine-module met eigen soorten; geen centraal type dat alle modules moeten kennen |
 | 61 | Eigenaar van de lijst | het `Window`, zolang er één venster is. Bij een tweede venster verhuist de lijst naar een object in `Platform` boven de vensters, samen met het starten van GLFW en `PollEvents` (`glfwPollEvents` geldt voor alle vensters tegelijk) |
 | 62 | Venstergrootte | het event is `FramebufferResized { width, height }`, in pixels (niet de venstergrootte in schermcoördinaten; die verschilt bij schaling). De grootte bij de start komt uit `FramebufferSize Window::GetFramebufferSize() const`. De Renderer krijgt `void SetViewport(int width, int height)`; Sandbox roept die aan en rekent de `projection` opnieuw uit, en slaat beide over bij grootte 0 (geminimaliseerd) |
+| 63 | Operators op `Vec3` | losse functions, declaration in `Vec3.h` en definition in `Vec3.cpp` (niet `inline` in de header, zoals besluit 27). Voorlopig alleen `a + b` en unary `-a` (voor `Translation(-position)`); `a - b` komt als iets het nodig heeft |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -191,7 +192,7 @@ Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en 
 zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) en
 stap 16 (events uit het venster, eerst alleen de grootte) zijn ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 38 controles (allemaal `[PASS]`). Verder zijn er `Vec3`, `Vec4` met `Mat4 * Vec4`,
+alles met 44 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b` en `-a`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
 model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`

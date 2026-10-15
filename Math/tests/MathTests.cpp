@@ -28,6 +28,11 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
+bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f;
+}
+
 bool NearlyEqual(const ezse::Vec4& a, const ezse::Vec4& b) {
     return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
            std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
@@ -70,6 +75,29 @@ void TestDefaultValue() {
           "a default Mat4 has zeros off the diagonal");
     Check(NearlyEqual(identity, ezse::Mat4{}), 
         "two default Mat4s are nearly equal");
+}
+
+void TestVec3Add() {
+    const ezse::Vec3 first{ 1.0f, 2.0f, 3.0f };
+    const ezse::Vec3 second{ 4.0f, 5.0f, 6.0f };
+
+    Check(NearlyEqual(first + second, ezse::Vec3{ 5.0f, 7.0f, 9.0f }),
+        "Vec3 + Vec3 adds each coordinate");
+    Check(NearlyEqual(first + ezse::Vec3{}, first),
+        "adding a zero Vec3 changes nothing");
+    Check(NearlyEqual(first + second, second + first),
+        "the order of a Vec3 addition does not matter");
+}
+
+void TestVec3Negate() {
+    const ezse::Vec3 vec{ 1.0f, -2.0f, 3.0f };
+
+    Check(NearlyEqual(-vec, ezse::Vec3{ -1.0f, 2.0f, -3.0f }),
+        "-Vec3 flips the sign of each coordinate");
+    Check(NearlyEqual(-(-vec), vec),
+        "negating a Vec3 twice gives the original");
+    Check(NearlyEqual(vec + (-vec), ezse::Vec3{}),
+        "a Vec3 plus its negation is zero");
 }
 
 void TestMultiply() {
@@ -254,6 +282,8 @@ void TestPerspective() {
 
 int main() {
     TestDefaultValue();
+    TestVec3Add();
+    TestVec3Negate();
     TestMultiply();
     TestTranslation();
     TestScale();
