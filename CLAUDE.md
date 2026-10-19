@@ -57,10 +57,12 @@ cmake -S . -B build
 cmake --build build
 ./build/Sandbox/Debug/Sandbox.exe
 ./build/Math/Debug/MathTests.exe
+./build/ECS/Debug/ECSTests.exe
 ```
 
-`MathTests` opent geen venster, print per controle `[PASS]` of `[FAIL]` en eindigt met
-exit code `0` als alles klopt. Claude draait het zelf na elke wijziging in `Math`.
+`MathTests` en `ECSTests` openen geen venster, printen per controle `[PASS]` of `[FAIL]` en
+eindigen met exit code `0` als alles klopt. Claude draait ze zelf na elke wijziging in `Math`
+of `ECS`.
 
 Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
 In Visual Studio: open `build/EZSE.sln`. Bij een nieuw gegenereerde `build/` is Sandbox al
@@ -78,14 +80,17 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
       Platform   |    Renderer ───► Math ◄── MathTests
         |   \    |    /    |
       GLFW    Core       glad
+               ▲
+              ECS ◄── ECSTests
 
-      (Sandbox linkt ook Math, voor `Translation`)
+      (Sandbox linkt ook Math, voor `Translation`; Sandbox gebruikt ECS nog niet)
 ```
 
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); testprogramma `ECSTests` in `ECS/tests/` | Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -190,6 +195,12 @@ Regels die de Renderer herbruikbaar houden:
 | 67 | Vertalen van GLFW naar `Key` | `ToKey` in `Window.cpp` vertaalt letters, cijfers en F-toetsen met een offset per reeks, en de overige toetsen met een `switch`. Drie `static_assert`s controleren dat elke reeks in `Key` en in GLFW even lang is |
 | 68 | Camera in Sandbox | een tijdelijke `Transform { position, rotationY }` in een naamloze namespace. De `view` wordt elk frame opnieuw uitgerekend uit positie en hoek (besluit 49), zonder matrices op te stapelen. WASD beweegt de camera langs zijn eigen assen; `RotateVec3Y` draait die beweging naar de assen van de wereld via `Mat4 * Vec4` met `w = 0`. Er komt niets bij in `Math`. Bij een tweede plek die richtingen draait (een camera in de Engine, normalen) kiezen we tussen `Vec3 TransformDirection(const Mat4&, const Vec3&)` en omzetten tussen `Vec3` en `Vec4` zoals in GLSL |
 | 69 | Tijd per frame | Sandbox rekent met de tijd sinds het vorige frame (één `now()` per frame), niet meer met de tijd sinds de start (vervolg op 48) |
+| 70 | Opzet van de ECS | naar het artikel van Austin Morlan (signature als `std::bitset`, een packed array per soort component met swap-with-last, systems met een eigen lijst entities), met aanpassingen: geen globale coordinator (de world gaat als `World&` mee), `std::unique_ptr` in plaats van `std::shared_ptr`, systems in een `std::vector` zodat de volgorde vastligt, geen `typeid(T).name()` als sleutel, onze namen en asserts. De ECS-code schrijft de gebruiker, net als rendering en `Math` |
+| 71 | Module `ECS` | eigen statische library `EZSE::ECS`, hangt alleen van `Core` af; de loop en het render-system komen later in een module `Engine` daarboven |
+| 72 | Systems | een klasse met `virtual void Update(World&, float deltaTime)`; de engine roept ze elk frame in volgorde aan. Een virtual call per system per frame kost niets meetbaars; components blijven kale structs zonder `virtual`. Members van een system zijn alleen gereedschap (zoals `Renderer&`), nooit toestand van het spel: die staat in components. Eerst alleen per frame met `deltaTime`; een vaste tick komt bij de eerste aanleiding (physics) |
+| 73 | `Entity` | een struct met `std::uint32_t id`, `0` is geen entity, zoals de handles van de Renderer (een `using` geeft geen controle door de compiler). Ids worden niet hergebruikt; de id is de index plus één. Hergebruik met een generation komt zodra entities vaak worden aangemaakt en verwijderd |
+| 74 | `EntityManager` | houdt alleen bij of een entity leeft, in een `std::vector<bool>` zonder maximum (met niet-hergebruikte ids zou `MAX_ENTITIES` een grens zijn op het aantal ooit). Geen aparte lijst met entities: de index is de entity. Signatures komen erbij met de components. `DestroyEntity` op een entity die niet leeft is een assert; `IsAlive` geeft dan gewoon `false` |
+| 75 | `ECSTests` | eigen testprogramma zoals `MathTests` (besluit 34) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -207,6 +218,9 @@ twee assen draait. Het tekengebied en de `aspect` volgen de grootte van
 het venster via `FramebufferResized`. Stap 17 (het toetsenbord) is ook af: `Window` geeft
 `KeyPressed` en `KeyReleased` als events en heeft `IsKeyDown`. In Sandbox begint de camera op
 `(0, 0, 3)`; je loopt met WASD, draait met de pijltjes links en rechts, en Escape sluit af.
+
+Stap 18 (de ECS) is begonnen met deel 18a: de module `ECS` met `Entity` en `EntityManager`,
+gecontroleerd door `ECSTests` (11 controles, allemaal `[PASS]`). Sandbox gebruikt de ECS nog niet.
 
 Publieke interface van `Renderer`:
 
@@ -254,12 +268,30 @@ Bekende beperkingen, bewust zo gelaten:
   een andere volgorde binnen een reeks.
 - De naam `Transform` in Sandbox kan later botsen met een `Transform`-component in de
   Engine-module.
+- Entity-ids worden niet hergebruikt: de `std::vector<bool>` in `EntityManager` groeit met elke
+  entity die ooit is aangemaakt (besluit 73). Na 2³² entities loopt de id over naar `0`; daar is
+  geen controle voor.
+- `DestroyEntity` op een entity die niet leeft is in Release (zonder assert) ongedefinieerd
+  gedrag.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: 18b, `ComponentArray`
 
-Het doel van stap 13 en 14, een draaiende 3D-kubus, is gehaald. De besluiten staan in de tabel
-(26 tot en met 62). De volgende stap is nog niet gekozen; leg de gebruiker de lijst onder
-**Daarna** voor. Stap 14 ging in deze delen:
+Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
+de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
+
+| Deel | Onderwerp | Stand |
+|---|---|---|
+| 18a | module `ECS`, `Entity` en `EntityManager`, `ECSTests` (besluiten 70 tot en met 75) | af |
+| 18b | `ComponentArray<T>`: packed array per soort component, met swap-with-last | volgende |
+| 18c | `ComponentManager`: soorten components registreren; signatures in `EntityManager` | |
+| 18d | `System` en `SystemManager` | |
+| 18e | de `World`, en daarna de loop in een module `Engine` | |
+
+Open punten voor 18b: vaste `std::array` met een maximum of `std::vector`; de koppeling tussen
+entity en index (`unordered_map` zoals Morlan, of arrays); `EZSE::Core` wordt `PUBLIC` zodra
+een header (template) `EZSE_ASSERT` gebruikt.
+
+Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|
@@ -294,4 +326,4 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
 model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), de
 muis als nieuwe soort `WindowEvent` (daarna de camera ook met de muis besturen), shaders en modellen uit bestanden laden,
-en de Engine-module met een Entity Component System en een resource manager.
+en de Engine-module met de game loop en een resource manager (de ECS is stap 18).
