@@ -1,3 +1,4 @@
+#include "EZSE/ECS/ComponentArray.h"
 #include "EZSE/ECS/EntityManager.h"
 
 #include <iostream>
@@ -5,6 +6,11 @@
 namespace {
 
 int failureCount = 0;
+
+// A component that only exists for the tests.
+struct Health {
+    int value = 0;
+};
 
 void Check(bool condition, const char* description) {
     if (condition) {
@@ -55,6 +61,78 @@ void TestInvalidEntity() {
     Check(!entities.IsAlive(ezse::Entity{2}), "IsAlive: an id that was never handed out is not alive");
 }
 
+// Entities 4, 2 and 5 get a component, in that order; 1 and 3 do not.
+void FillComponents(ezse::ComponentArray<Health>& components) {
+    components.Add(ezse::Entity{4}, Health{40});
+    components.Add(ezse::Entity{2}, Health{20});
+    components.Add(ezse::Entity{5}, Health{50});
+}
+
+void TestComponentAdd() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+
+    Check(components.Has(ezse::Entity{4}), "ComponentArray Add: entity 4 has the component");
+    Check(components.Has(ezse::Entity{2}), "ComponentArray Add: entity 2 has the component");
+    Check(components.Has(ezse::Entity{5}), "ComponentArray Add: entity 5 has the component");
+    Check(components.Get(ezse::Entity{4}).value == 40, "ComponentArray Add: entity 4 gets its own value");
+    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Add: entity 2 gets its own value");
+    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Add: entity 5 gets its own value");
+}
+
+void TestComponentHas() {
+    ezse::ComponentArray<Health> components;
+    Check(!components.Has(ezse::Entity{1}), "ComponentArray Has: nothing in an empty array");
+
+    FillComponents(components);
+    Check(!components.Has(ezse::Entity{1}), "ComponentArray Has: entity 1 has no component");
+    Check(!components.Has(ezse::Entity{3}), "ComponentArray Has: entity 3, between two others, has no component");
+    Check(!components.Has(ezse::Entity{7}), "ComponentArray Has: an id beyond the sparse array has no component");
+    Check(!components.Has(ezse::Entity{}), "ComponentArray Has: entity 0 has no component");
+}
+
+void TestComponentGetReference() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+    components.Get(ezse::Entity{2}).value = 25;
+
+    Check(components.Get(ezse::Entity{2}).value == 25, "ComponentArray Get: a change through the reference is kept");
+}
+
+void TestComponentRemove() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+    components.Remove(ezse::Entity{4});
+
+    Check(!components.Has(ezse::Entity{4}), "ComponentArray Remove: entity 4 no longer has the component");
+    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Remove: the moved entity 5 keeps its value");
+    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Remove: entity 2 keeps its value");
+}
+
+void TestComponentRemoveLast() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+    components.Remove(ezse::Entity{5});
+
+    Check(!components.Has(ezse::Entity{5}), "ComponentArray Remove last: entity 5 no longer has the component");
+    Check(components.Get(ezse::Entity{4}).value == 40, "ComponentArray Remove last: entity 4 keeps its value");
+    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Remove last: entity 2 keeps its value");
+
+    components.Remove(ezse::Entity{2});
+    components.Remove(ezse::Entity{4});
+    Check(!components.Has(ezse::Entity{4}), "ComponentArray Remove last: the only component can be removed");
+}
+
+void TestComponentAddAfterRemove() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+    components.Remove(ezse::Entity{4});
+    components.Add(ezse::Entity{4}, Health{44});
+
+    Check(components.Get(ezse::Entity{4}).value == 44, "ComponentArray Add after Remove: entity 4 gets its new value");
+    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Add after Remove: entity 5 keeps its value");
+}
+
 } // namespace
 
 int main() {
@@ -62,6 +140,12 @@ int main() {
     TestDestroyEntity();
     TestNoReuse();
     TestInvalidEntity();
+    TestComponentAdd();
+    TestComponentHas();
+    TestComponentGetReference();
+    TestComponentRemove();
+    TestComponentRemoveLast();
+    TestComponentAddAfterRemove();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
