@@ -13,6 +13,44 @@ void OnGlfwError(int code, const char* description) {
     LogError("GLFW error {}: {}", code, description);
 }
 
+// Letters, digits and function keys are consecutive in both GLFW and Key,
+// so those ranges are translated with an offset instead of a case per key.
+// The checks below fail to compile when a range in Key gets a gap or a different length.
+static_assert(static_cast<int>(Key::Z) - static_cast<int>(Key::A) == GLFW_KEY_Z - GLFW_KEY_A);
+static_assert(static_cast<int>(Key::Digit9) - static_cast<int>(Key::Digit0) == GLFW_KEY_9 - GLFW_KEY_0);
+static_assert(static_cast<int>(Key::F12) - static_cast<int>(Key::F1) == GLFW_KEY_F12 - GLFW_KEY_F1);
+
+Key ToKey(int glfwKey) {
+    if (glfwKey >= GLFW_KEY_A && glfwKey <= GLFW_KEY_Z) {
+        return static_cast<Key>(static_cast<int>(Key::A) + (glfwKey - GLFW_KEY_A));
+    }
+    if (glfwKey >= GLFW_KEY_0 && glfwKey <= GLFW_KEY_9) {
+        return static_cast<Key>(static_cast<int>(Key::Digit0) + (glfwKey - GLFW_KEY_0));
+    }
+    if (glfwKey >= GLFW_KEY_F1 && glfwKey <= GLFW_KEY_F12) {
+        return static_cast<Key>(static_cast<int>(Key::F1) + (glfwKey - GLFW_KEY_F1));
+    }
+
+    switch (glfwKey) {
+        case GLFW_KEY_SPACE:         return Key::Space;
+        case GLFW_KEY_ESCAPE:        return Key::Escape;
+        case GLFW_KEY_ENTER:         return Key::Enter;
+        case GLFW_KEY_TAB:           return Key::Tab;
+        case GLFW_KEY_BACKSPACE:     return Key::Backspace;
+        case GLFW_KEY_LEFT:          return Key::Left;
+        case GLFW_KEY_RIGHT:         return Key::Right;
+        case GLFW_KEY_UP:            return Key::Up;
+        case GLFW_KEY_DOWN:          return Key::Down;
+        case GLFW_KEY_LEFT_SHIFT:    return Key::LeftShift;
+        case GLFW_KEY_RIGHT_SHIFT:   return Key::RightShift;
+        case GLFW_KEY_LEFT_CONTROL:  return Key::LeftControl;
+        case GLFW_KEY_RIGHT_CONTROL: return Key::RightControl;
+        case GLFW_KEY_LEFT_ALT:      return Key::LeftAlt;
+        case GLFW_KEY_RIGHT_ALT:     return Key::RightAlt;
+        default:                     return Key::Unknown;
+    }
+}
+
 } // namespace
 
 std::unique_ptr<Window> Window::Create(const WindowDesc& desc) {
@@ -53,6 +91,7 @@ Window::Window(GLFWwindow* handle) : m_handle(handle) {
     // GLFW calls plain functions; this pointer lets them find the Window again.
     glfwSetWindowUserPointer(m_handle, this);
     glfwSetFramebufferSizeCallback(m_handle, OnFramebufferResized);
+    glfwSetKeyCallback(m_handle, OnKey);
 }
 
 Window::~Window() {
@@ -83,6 +122,11 @@ FramebufferSize Window::GetFramebufferSize() const {
     return size;
 }
 
+bool Window::IsKeyDown(Key key) const {
+    EZSE_ASSERT(key < Key::Count, "IsKeyDown needs a real key");
+    return m_keysDown[static_cast<std::size_t>(key)];
+}
+
 Window::GLLoadFunction Window::GetGLLoadFunction() const {
     return glfwGetProcAddress;
 }
@@ -90,6 +134,23 @@ Window::GLLoadFunction Window::GetGLLoadFunction() const {
 void Window::OnFramebufferResized(GLFWwindow* handle, int width, int height) {
     Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
     window->m_events.push_back(FramebufferResized{width, height});
+}
+
+void Window::OnKey(GLFWwindow* handle, int glfwKey, int, int action, int) {
+    const Key key = ToKey(glfwKey);
+    if (key == Key::Unknown || action == GLFW_REPEAT) {
+        return;
+    }
+
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    const bool pressed = action == GLFW_PRESS;
+    window->m_keysDown[static_cast<std::size_t>(key)] = pressed;
+
+    if (pressed) {
+        window->m_events.push_back(KeyPressed{key});
+    } else {
+        window->m_events.push_back(KeyReleased{key});
+    }
 }
 
 } // namespace ezse

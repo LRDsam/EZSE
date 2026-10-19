@@ -86,7 +86,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `Platform` | `Window` (GLFW, verborgen achter eigen interface) en `WindowEvent` | Core, GLFW (PRIVATE) |
+| `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/` | |
@@ -184,6 +184,12 @@ Regels die de Renderer herbruikbaar houden:
 | 61 | Eigenaar van de lijst | het `Window`, zolang er één venster is. Bij een tweede venster verhuist de lijst naar een object in `Platform` boven de vensters, samen met het starten van GLFW en `PollEvents` (`glfwPollEvents` geldt voor alle vensters tegelijk) |
 | 62 | Venstergrootte | het event is `FramebufferResized { width, height }`, in pixels (niet de venstergrootte in schermcoördinaten; die verschilt bij schaling). De grootte bij de start komt uit `FramebufferSize Window::GetFramebufferSize() const`. De Renderer krijgt `void SetViewport(int width, int height)`; Sandbox roept die aan en rekent de `projection` opnieuw uit, en slaat beide over bij grootte 0 (geminimaliseerd) |
 | 63 | Operators op `Vec3` | losse functions, declaration in `Vec3.h` en definition in `Vec3.cpp` (niet `inline` in de header, zoals besluit 27). Voorlopig alleen `a + b` en unary `-a` (voor `Translation(-position)`); `a - b` komt als iets het nodig heeft |
+| 64 | Toetsen | een eigen `enum class Key` in `Platform/Key.h`. Een toets is benoemd naar zijn plek op het toetsenbord, met de namen van de US-indeling, zoals GLFW. De eerste waarde is `Unknown` (de default value in de events), de laatste is `Count` (het aantal, voor de grootte van een array). Buiten `Platform` is geen GLFW-nummer zichtbaar. De lijst bevat alleen de toetsen die er nu toe doen; meer komt bij als iets het nodig heeft |
+| 65 | Toets-events | `KeyPressed { key }` en `KeyReleased { key }` in de `WindowEvent`-variant (besluit 59). Een ingedrukt gehouden toets geeft geen herhaalde events (`GLFW_REPEAT` wordt overgeslagen). Toetsen die niet in `Key` staan, worden genegeerd |
+| 66 | Ingedrukt houden | `bool Window::IsKeyDown(Key key) const`, uit een `std::array<bool, Count>` die de key-callback bijhoudt. Een event gebruik je voor iets dat één keer gebeurt (Escape sluit af), `IsKeyDown` voor iets dat duurt zolang de toets ingedrukt is (lopen). Een assert vangt `Count` af; `Unknown` geeft gewoon `false` |
+| 67 | Vertalen van GLFW naar `Key` | `ToKey` in `Window.cpp` vertaalt letters, cijfers en F-toetsen met een offset per reeks, en de overige toetsen met een `switch`. Drie `static_assert`s controleren dat elke reeks in `Key` en in GLFW even lang is |
+| 68 | Camera in Sandbox | een tijdelijke `Transform { position, rotationY }` in een naamloze namespace. De `view` wordt elk frame opnieuw uitgerekend uit positie en hoek (besluit 49), zonder matrices op te stapelen. WASD beweegt de camera langs zijn eigen assen; `RotateVec3Y` draait die beweging naar de assen van de wereld via `Mat4 * Vec4` met `w = 0`. Er komt niets bij in `Math`. Bij een tweede plek die richtingen draait (een camera in de Engine, normalen) kiezen we tussen `Vec3 TransformDirection(const Mat4&, const Vec3&)` en omzetten tussen `Vec3` en `Vec4` zoals in GLSL |
+| 69 | Tijd per frame | Sandbox rekent met de tijd sinds het vorige frame (één `now()` per frame), niet meer met de tijd sinds de start (vervolg op 48) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -197,8 +203,10 @@ alles met 44 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b` en
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
 model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`
 maakt kleur en diepte leeg. Sandbox tekent een kubus met zes effen gekleurde vlakken die om
-twee assen draait; de camera staat stil op `(0, 0, 3)`. Het tekengebied en de `aspect` volgen de grootte van
-het venster via `FramebufferResized`.
+twee assen draait. Het tekengebied en de `aspect` volgen de grootte van
+het venster via `FramebufferResized`. Stap 17 (het toetsenbord) is ook af: `Window` geeft
+`KeyPressed` en `KeyReleased` als events en heeft `IsKeyDown`. In Sandbox begint de camera op
+`(0, 0, 3)`; je loopt met WASD, draait met de pijltjes links en rechts, en Escape sluit af.
 
 Publieke interface van `Renderer`:
 
@@ -214,12 +222,13 @@ void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
 ```
 
-Publieke interface van `Window`, voor zover nieuw in stap 16:
+Publieke interface van `Window`, voor zover nieuw in stap 16 en 17:
 
 ```cpp
 void                         PollEvents();
 std::span<const WindowEvent> GetEvents() const;
 FramebufferSize              GetFramebufferSize() const;
+bool                         IsKeyDown(Key key) const;
 ```
 
 Bekende beperkingen, bewust zo gelaten:
@@ -238,6 +247,13 @@ Bekende beperkingen, bewust zo gelaten:
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
 - Sandbox controleert de handle van `CreateShader` niet (testcode).
+- Diagonaal lopen in Sandbox gaat ongeveer 1,4 keer zo snel als rechtdoor (testcode).
+- `Key` bevat geen numeriek toetsenblok, en de modifiers (Shift, Ctrl) gaan niet met het
+  event mee.
+- De `static_assert`s bij `ToKey` merken een tussengevoegde toets in een reeks op, maar niet
+  een andere volgorde binnen een reeks.
+- De naam `Transform` in Sandbox kan later botsen met een `Transform`-component in de
+  Engine-module.
 
 ## Volgende stap: nog te kiezen
 
@@ -276,6 +292,6 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 ## Daarna
 
 Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
-model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), het
-toetsenbord en muis als nieuwe soorten `WindowEvent` (daarna een camera die je zelf bestuurt), shaders en modellen uit bestanden laden,
+model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), de
+muis als nieuwe soort `WindowEvent` (daarna de camera ook met de muis besturen), shaders en modellen uit bestanden laden,
 en de Engine-module met een Entity Component System en een resource manager.
