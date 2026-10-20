@@ -1,7 +1,10 @@
 add_library(EZSEECS STATIC
     include/EZSE/ECS/ComponentArray.h
+    include/EZSE/ECS/ComponentManager.h
+    include/EZSE/ECS/ComponentType.h
     include/EZSE/ECS/Entity.h
     include/EZSE/ECS/EntityManager.h
+    src/ComponentManager.cpp
     src/EntityManager.cpp
 )
 add_library(EZSE::ECS ALIAS EZSEECS)

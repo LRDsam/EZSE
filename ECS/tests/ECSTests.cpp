@@ -1,4 +1,6 @@
 #include "EZSE/ECS/ComponentArray.h"
+#include "EZSE/ECS/ComponentManager.h"
+#include "EZSE/ECS/ComponentType.h"
 #include "EZSE/ECS/EntityManager.h"
 
 #include <iostream>
@@ -9,6 +11,19 @@ int failureCount = 0;
 
 // A component that only exists for the tests.
 struct Health {
+    int value = 0;
+};
+
+// A second component type, to check that types get different numbers.
+struct Speed {
+    float value = 0.0f;
+};
+
+// Gets a type number but is never registered, so a ComponentManager has an empty slot for it.
+struct Unregistered {};
+
+// Registered after Unregistered got its number, so its slot lies beyond the empty one.
+struct Armor {
     int value = 0;
 };
 
@@ -133,6 +148,68 @@ void TestComponentAddAfterRemove() {
     Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Add after Remove: entity 5 keeps its value");
 }
 
+void TestComponentType() {
+    Check(ezse::ComponentType<Health>() == ezse::ComponentType<Health>(),
+          "ComponentType: the same type always gets the same number");
+    Check(ezse::ComponentType<Health>() != ezse::ComponentType<Speed>(),
+          "ComponentType: two types get different numbers");
+}
+
+void TestComponentEntityDestroyed() {
+    ezse::ComponentArray<Health> components;
+    FillComponents(components);
+    ezse::IComponentArray& base = components;
+
+    base.EntityDestroyed(ezse::Entity{4});
+    Check(!components.Has(ezse::Entity{4}), "EntityDestroyed: the component of entity 4 is removed");
+    Check(components.Get(ezse::Entity{5}).value == 50, "EntityDestroyed: the moved entity 5 keeps its value");
+
+    base.EntityDestroyed(ezse::Entity{1});
+    Check(components.Has(ezse::Entity{2}) && components.Has(ezse::Entity{5}),
+          "EntityDestroyed: an entity without the component changes nothing");
+}
+
+void TestComponentManager() {
+    ezse::ComponentManager components;
+    components.Register<Health>();
+    components.Register<Speed>();
+
+    components.Add(ezse::Entity{1}, Health{10});
+    components.Add(ezse::Entity{1}, Speed{2.5f});
+    components.Add(ezse::Entity{2}, Health{20});
+
+    // Has is const, so this also uses the const GetArray.
+    const ezse::ComponentManager& constComponents = components;
+    Check(constComponents.Has<Health>(ezse::Entity{1}), "ComponentManager: entity 1 has Health");
+    Check(constComponents.Has<Speed>(ezse::Entity{1}), "ComponentManager: entity 1 has Speed");
+    Check(!constComponents.Has<Speed>(ezse::Entity{2}), "ComponentManager: entity 2 has no Speed");
+    Check(components.Get<Health>(ezse::Entity{2}).value == 20, "ComponentManager: Get finds the Health of entity 2");
+    Check(components.Get<Speed>(ezse::Entity{1}).value == 2.5f, "ComponentManager: Get finds the Speed of entity 1");
+
+    components.Remove<Health>(ezse::Entity{1});
+    Check(!components.Has<Health>(ezse::Entity{1}), "ComponentManager: Remove takes away only Health");
+    Check(components.Has<Speed>(ezse::Entity{1}), "ComponentManager: Remove leaves Speed of the same entity");
+}
+
+void TestComponentManagerEntityDestroyed() {
+    ezse::ComponentType<Unregistered>();
+    ezse::ComponentManager components;
+    components.Register<Health>();
+    components.Register<Armor>();
+    Check(ezse::ComponentType<Unregistered>() < ezse::ComponentType<Armor>(),
+          "ComponentManager EntityDestroyed: the manager has an empty slot before Armor");
+
+    components.Add(ezse::Entity{1}, Health{10});
+    components.Add(ezse::Entity{1}, Armor{5});
+    components.Add(ezse::Entity{2}, Health{20});
+    components.EntityDestroyed(ezse::Entity{1});
+
+    Check(!components.Has<Health>(ezse::Entity{1}), "ComponentManager EntityDestroyed: Health of entity 1 is removed");
+    Check(!components.Has<Armor>(ezse::Entity{1}), "ComponentManager EntityDestroyed: Armor of entity 1 is removed");
+    Check(components.Get<Health>(ezse::Entity{2}).value == 20,
+          "ComponentManager EntityDestroyed: entity 2 keeps its Health");
+}
+
 } // namespace
 
 int main() {
@@ -146,6 +223,10 @@ int main() {
     TestComponentRemove();
     TestComponentRemoveLast();
     TestComponentAddAfterRemove();
+    TestComponentType();
+    TestComponentEntityDestroyed();
+    TestComponentManager();
+    TestComponentManagerEntityDestroyed();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

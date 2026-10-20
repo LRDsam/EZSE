@@ -10,13 +10,20 @@
 
 namespace ezse {
 
+class IComponentArray {
+public:
+    virtual ~IComponentArray() = default;
+    virtual void EntityDestroyed(Entity entity) = 0;
+};
+
 template <typename T>
-class ComponentArray {
+class ComponentArray : public IComponentArray {
 public:
     void Add(Entity entity, T component);
     void Remove(Entity entity);
     bool Has(Entity entity) const;
     T& Get(Entity entity);
+    void EntityDestroyed(Entity entity) override;
 
 private:
     std::vector<T> m_components;
@@ -64,6 +71,13 @@ template <typename T>
 T& ComponentArray<T>::Get(Entity entity) {
     EZSE_ASSERT(Has(entity), "Entity does not have component");
     return m_components[m_sparse[entity.id - 1] - 1];
+}
+
+template <typename T>
+void ComponentArray<T>::EntityDestroyed(Entity entity) {
+    if (Has(entity)) {
+        Remove(entity);
+    }
 }
 
 } // namespace ezse

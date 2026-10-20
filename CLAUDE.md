@@ -90,7 +90,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
+| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -203,6 +203,10 @@ Regels die de Renderer herbruikbaar houden:
 | 75 | `ECSTests` | eigen testprogramma zoals `MathTests` (besluit 34) |
 | 76 | `ComponentArray<T>` | een sparse set, header-only (template). `std::vector<T>` met de components zonder gaten, `std::vector<Entity>` met per plek de eigenaar, en `std::vector<std::uint32_t> m_sparse` met per entity (index `id - 1`) de plek plus één, `0` = geen component. Geen `unordered_map` zoals Morlan: geen hash, en dezelfde afspraak als onze handles. Verwijderen met swap-with-last; de volgorde van de components ligt dus niet vast |
 | 77 | Functions van `ComponentArray` | `Add(Entity, T component)` (by value, de vector in met `std::move`), `Remove`, `T& Get` en `bool Has` (zonder assert). `Add` assert op entity `0` en op een dubbel component; `Remove` en `Get` op een ontbrekend component. De basisklasse `IComponentArray` komt pas in 18c, met de `ComponentManager` |
+| 78 | Omvang van 18c | alleen de `ComponentManager`. Signatures en het maximum aantal soorten (de grootte van de `std::bitset`) gaan naar 18d, waar de systems ze nodig hebben |
+| 79 | Nummer per soort component | een eigen teller, geen `std::type_index` en geen `typeid(T).name()`: `inline std::uint32_t NextComponentType()` met een `static` teller en `template <typename T> std::uint32_t ComponentType()` met een `static const`, in `ComponentType.h`. Kleine opeenvolgende nummers (0, 1, 2 en zo verder) in volgorde van eerste gebruik, voor het hele programma. Direct bruikbaar als index en straks als bit; geen hash en geen RTTI. Werkt niet over DLL-grenzen, maar we hebben statische libraries (besluit 6) |
+| 80 | `IComponentArray` | in `ComponentArray.h`: `virtual` destructor (`= default`) en `virtual void EntityDestroyed(Entity) = 0`. `ComponentArray<T>` erft ervan; zijn `EntityDestroyed` verwijdert het component als het er is, zonder assert. Dit is de enige virtual call in de opslag, en hij gebeurt niet per frame |
+| 81 | `ComponentManager` | soorten met de hand registreren met `Register<T>()` (assert bij twee keer; `Get`, `Has` en dergelijke op een niet-geregistreerde soort is ook een assert). Opslag `std::vector<std::unique_ptr<IComponentArray>>` met als index `ComponentType<T>()`; plekken van soorten die in deze manager niet geregistreerd zijn blijven `nullptr`. Een private `GetArray<T>()` in een gewone en een `const`-versie zet de pointer met `static_cast` om naar `ComponentArray<T>`. `Add`, `Remove`, `Get` en `Has` (korte namen, zoals in `ComponentArray`) geven door; `EntityDestroyed` (in de `.cpp`) loopt langs alle arrays en slaat `nullptr` over. De manager controleert niet of een entity leeft: dat doet straks de `World` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -222,7 +226,8 @@ het venster via `FramebufferResized`. Stap 17 (het toetsenbord) is ook af: `Wind
 `(0, 0, 3)`; je loopt met WASD, draait met de pijltjes links en rechts, en Escape sluit af.
 
 Stap 18 (de ECS) is begonnen. Deel 18a: de module `ECS` met `Entity` en `EntityManager`.
-Deel 18b: `ComponentArray<T>` als sparse set. `ECSTests` controleert beide met 32 controles
+Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de basisklasse
+`IComponentArray` en de `ComponentManager`. `ECSTests` controleert alles met 48 controles
 (allemaal `[PASS]`, in Debug en Release). Sandbox gebruikt de ECS nog niet.
 
 Publieke interface van `Renderer`:
@@ -280,8 +285,11 @@ Bekende beperkingen, bewust zo gelaten:
   voor entities zonder dat component (4 bytes per entity per soort component).
 - Een `T&` uit `ComponentArray::Get` wordt ongeldig bij een volgende `Add` (de vector kan
   groeien) of `Remove` (swap-with-last); niet bewaren over die aanroepen heen.
+- Het nummer van een soort component hangt af van de volgorde van eerste gebruik, en geldt
+  voor het hele programma. Het is dus niet geschikt om op te slaan (bijvoorbeeld in een
+  bestand) en kan per run verschillen.
 
-## Volgende stap: 18c, `ComponentManager`
+## Volgende stap: 18d, `System` en `SystemManager`
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -290,14 +298,17 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 |---|---|---|
 | 18a | module `ECS`, `Entity` en `EntityManager`, `ECSTests` (besluiten 70 tot en met 75) | af |
 | 18b | `ComponentArray<T>`: packed array per soort component, met swap-with-last (besluiten 76 en 77) | af |
-| 18c | `ComponentManager`: soorten components registreren; signatures in `EntityManager` | volgende |
-| 18d | `System` en `SystemManager` | |
+| 18c | `ComponentManager`: soorten components registreren (besluiten 78 tot en met 81) | af |
+| 18d | signatures, `System` en `SystemManager` | volgende |
 | 18e | de `World`, en daarna de loop in een module `Engine` | |
 
-Open punten voor 18c: hoe een soort component een nummer krijgt (`std::type_index` of een eigen
-teller per type, niet `typeid(T).name()`); de basisklasse `IComponentArray` met
-`virtual EntityDestroyed`, zodat arrays van verschillende soorten in één lijst passen; het
-maximum aantal soorten en dus de grootte van de `std::bitset`; signatures in `EntityManager`.
+Open punten voor 18d: het maximum aantal soorten en dus de grootte van de `std::bitset` (en een
+assert in `Register`); waar de signature per entity staat (in `EntityManager`, zoals Morlan);
+hoe een system zijn entities bijhoudt (`std::set` zoals Morlan, of iets dat beter gaat met de
+cache); de basisklasse `System` met `virtual Update(World&, float)` (besluit 72) en hoe de
+`SystemManager` systems in volgorde bewaart; wanneer een system hoort te weten dat de
+signature van een entity veranderde. Mogelijk is 18d te groot voor één stap en splitsen we
+het.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
