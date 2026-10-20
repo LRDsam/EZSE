@@ -210,6 +210,40 @@ void TestComponentManagerEntityDestroyed() {
           "ComponentManager EntityDestroyed: entity 2 keeps its Health");
 }
 
+void TestSignature() {
+    ezse::ComponentManager components;
+    components.Register<Health>();
+    components.Register<Speed>();
+    const std::uint32_t health = ezse::ComponentType<Health>();
+    const std::uint32_t speed = ezse::ComponentType<Speed>();
+
+    Check(components.GetSignature(ezse::Entity{}).none(), "Signature: entity 0 has an empty signature");
+    Check(components.GetSignature(ezse::Entity{1}).none(), "Signature: an entity without components has an empty signature");
+
+    components.Add(ezse::Entity{1}, Health{10});
+    components.Add(ezse::Entity{1}, Speed{2.5f});
+    components.Add(ezse::Entity{2}, Health{20});
+
+    const ezse::Signature first = components.GetSignature(ezse::Entity{1});
+    Check(first.test(health) && first.test(speed) && first.count() == 2,
+          "Signature: Add sets the bits of Health and Speed for entity 1");
+    const ezse::Signature second = components.GetSignature(ezse::Entity{2});
+    Check(second.test(health) && second.count() == 1, "Signature: Add sets only the Health bit for entity 2");
+    Check(components.GetSignature(ezse::Entity{99}).none(), "Signature: an id beyond all entities has an empty signature");
+
+    components.Remove<Speed>(ezse::Entity{1});
+    const ezse::Signature afterRemove = components.GetSignature(ezse::Entity{1});
+    Check(afterRemove.test(health) && !afterRemove.test(speed), "Signature: Remove clears only the Speed bit");
+
+    components.EntityDestroyed(ezse::Entity{2});
+    Check(components.GetSignature(ezse::Entity{2}).none(), "Signature: EntityDestroyed clears the whole signature");
+    Check(components.GetSignature(ezse::Entity{1}).test(health), "Signature: EntityDestroyed leaves other entities alone");
+
+    components.EntityDestroyed(ezse::Entity{50});
+    Check(components.GetSignature(ezse::Entity{50}).none(),
+          "Signature: EntityDestroyed on an entity that never had a component is harmless");
+}
+
 } // namespace
 
 int main() {
@@ -227,6 +261,7 @@ int main() {
     TestComponentEntityDestroyed();
     TestComponentManager();
     TestComponentManagerEntityDestroyed();
+    TestSignature();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

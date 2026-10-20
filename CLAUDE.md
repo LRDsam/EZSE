@@ -90,7 +90,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
+| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -207,6 +207,10 @@ Regels die de Renderer herbruikbaar houden:
 | 79 | Nummer per soort component | een eigen teller, geen `std::type_index` en geen `typeid(T).name()`: `inline std::uint32_t NextComponentType()` met een `static` teller en `template <typename T> std::uint32_t ComponentType()` met een `static const`, in `ComponentType.h`. Kleine opeenvolgende nummers (0, 1, 2 en zo verder) in volgorde van eerste gebruik, voor het hele programma. Direct bruikbaar als index en straks als bit; geen hash en geen RTTI. Werkt niet over DLL-grenzen, maar we hebben statische libraries (besluit 6) |
 | 80 | `IComponentArray` | in `ComponentArray.h`: `virtual` destructor (`= default`) en `virtual void EntityDestroyed(Entity) = 0`. `ComponentArray<T>` erft ervan; zijn `EntityDestroyed` verwijdert het component als het er is, zonder assert. Dit is de enige virtual call in de opslag, en hij gebeurt niet per frame |
 | 81 | `ComponentManager` | soorten met de hand registreren met `Register<T>()` (assert bij twee keer; `Get`, `Has` en dergelijke op een niet-geregistreerde soort is ook een assert). Opslag `std::vector<std::unique_ptr<IComponentArray>>` met als index `ComponentType<T>()`; plekken van soorten die in deze manager niet geregistreerd zijn blijven `nullptr`. Een private `GetArray<T>()` in een gewone en een `const`-versie zet de pointer met `static_cast` om naar `ComponentArray<T>`. `Add`, `Remove`, `Get` en `Has` (korte namen, zoals in `ComponentArray`) geven door; `EntityDestroyed` (in de `.cpp`) loopt langs alle arrays en slaat `nullptr` over. De manager controleert niet of een entity leeft: dat doet straks de `World` |
+| 82 | Opsplitsing van stap 18 | 18d signatures, 18e `System` en `SystemManager`, 18f de `World` en daarna de loop in een module `Engine` |
+| 83 | `Signature` | `using Signature = std::bitset<c_maxComponentTypes>;` met `inline constexpr std::uint32_t c_maxComponentTypes = 64;` in `Signature.h`. Een `using` en geen struct: een signature is een waarde met de bewerkingen van `std::bitset` (`set`, `reset`, `test`, `&`, `==`), geen handle, en er is niets om hem mee te verwisselen. 64 bits passen in één machinewoord. `Register` assert dat het nummer van een soort onder het maximum blijft |
+| 84 | Eigenaar van de signatures | de `ComponentManager`, niet de `EntityManager` zoals bij Morlan. Een signature is een samenvatting van de components van een entity (elke bit is `Has<T>` voor één soort), dus de class die de components bewaart houdt hem bij: `std::vector<Signature> m_signatures` (index `id - 1`), bijgewerkt in `Add`, `Remove` en `EntityDestroyed`. Zo kunnen components en signature nooit uit elkaar lopen. De `World` (18f) blijft nodig om de managers te verbinden, maar hoeft de signature niet zelf bij te werken. De signature van een system komt in de `SystemManager` (18e) |
+| 85 | Uitlezen | `Signature GetSignature(Entity) const`, by value (8 bytes; een kopie kan niet ongeldig worden), zonder assert: een lege signature voor entity `0`, voor een entity zonder components en voor een id voorbij `m_signatures` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -227,7 +231,8 @@ het venster via `FramebufferResized`. Stap 17 (het toetsenbord) is ook af: `Wind
 
 Stap 18 (de ECS) is begonnen. Deel 18a: de module `ECS` met `Entity` en `EntityManager`.
 Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de basisklasse
-`IComponentArray` en de `ComponentManager`. `ECSTests` controleert alles met 48 controles
+`IComponentArray` en de `ComponentManager`. Deel 18d: signatures, bijgehouden door de
+`ComponentManager`. `ECSTests` controleert alles met 57 controles
 (allemaal `[PASS]`, in Debug en Release). Sandbox gebruikt de ECS nog niet.
 
 Publieke interface van `Renderer`:
@@ -288,8 +293,10 @@ Bekende beperkingen, bewust zo gelaten:
 - Het nummer van een soort component hangt af van de volgorde van eerste gebruik, en geldt
   voor het hele programma. Het is dus niet geschikt om op te slaan (bijvoorbeeld in een
   bestand) en kan per run verschillen.
+- Elk nummer telt mee voor het maximum van 64, ook van een soort die nooit wordt
+  geregistreerd (`ComponentType<T>()` deelt het nummer uit bij het eerste gebruik).
 
-## Volgende stap: 18d, `System` en `SystemManager`
+## Volgende stap: 18e, `System` en `SystemManager`
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -299,16 +306,16 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18a | module `ECS`, `Entity` en `EntityManager`, `ECSTests` (besluiten 70 tot en met 75) | af |
 | 18b | `ComponentArray<T>`: packed array per soort component, met swap-with-last (besluiten 76 en 77) | af |
 | 18c | `ComponentManager`: soorten components registreren (besluiten 78 tot en met 81) | af |
-| 18d | signatures, `System` en `SystemManager` | volgende |
-| 18e | de `World`, en daarna de loop in een module `Engine` | |
+| 18d | signatures, bijgehouden door de `ComponentManager` (besluiten 82 tot en met 85) | af |
+| 18e | `System` en `SystemManager` | volgende |
+| 18f | de `World`, en daarna de loop in een module `Engine` | |
 
-Open punten voor 18d: het maximum aantal soorten en dus de grootte van de `std::bitset` (en een
-assert in `Register`); waar de signature per entity staat (in `EntityManager`, zoals Morlan);
-hoe een system zijn entities bijhoudt (`std::set` zoals Morlan, of iets dat beter gaat met de
-cache); de basisklasse `System` met `virtual Update(World&, float)` (besluit 72) en hoe de
-`SystemManager` systems in volgorde bewaart; wanneer een system hoort te weten dat de
-signature van een entity veranderde. Mogelijk is 18d te groot voor één stap en splitsen we
-het.
+Open punten voor 18e: hoe een system zijn entities bijhoudt (`std::set` zoals Morlan, of iets
+dat beter gaat met de cache); de basisklasse `System` met `virtual Update(World&, float)`
+(besluit 72), terwijl de `World` pas in 18f komt (een forward declaration?); hoe de
+`SystemManager` systems en hun signatures in volgorde bewaart; een helper om de signature van
+een system op te bouwen uit een lijst soorten (variadic template, `MakeSignature<A, B>()`);
+wanneer een system hoort te weten dat de signature van een entity veranderde.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 

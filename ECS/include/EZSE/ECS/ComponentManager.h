@@ -3,6 +3,7 @@
 #include "EZSE/ECS/ComponentArray.h"
 #include "EZSE/ECS/ComponentType.h"
 #include "EZSE/ECS/Entity.h"
+#include "EZSE/ECS/Signature.h"
 
 #include "EZSE/Core/Assert.h"
 
@@ -20,18 +21,23 @@ public:
     template <typename T> void Remove(Entity entity);
     template <typename T> T& Get(Entity entity);
     template <typename T> bool Has(Entity entity) const;
+
     void EntityDestroyed(Entity entity);
+    Signature GetSignature(Entity entity) const;
 
 private:
     template <typename T> ComponentArray<T>& GetArray();
     template <typename T> const ComponentArray<T>& GetArray() const;
 
     std::vector<std::unique_ptr<IComponentArray>> m_arrays;
+    std::vector<Signature> m_signatures; // index: id - 1
 };
 
 template <typename T>
 void ComponentManager::Register() {
     const std::uint32_t type = ComponentType<T>();
+    EZSE_ASSERT(type < c_maxComponentTypes,
+        "Maximum number of components Registered");
     if (type >= m_arrays.size()) {
         m_arrays.resize(type + 1);
     }
@@ -42,11 +48,16 @@ void ComponentManager::Register() {
 template <typename T>
 void ComponentManager::Add(Entity entity, T component) {
     GetArray<T>().Add(entity, std::move(component));
+    if (entity.id > m_signatures.size()) {
+        m_signatures.resize(entity.id);
+    }
+    m_signatures[entity.id - 1].set(ComponentType<T>());
 }
 
 template <typename T>
 void ComponentManager::Remove(Entity entity) {
     GetArray<T>().Remove(entity);
+    m_signatures[entity.id - 1].reset(ComponentType<T>());
 }
 
 template <typename T>
