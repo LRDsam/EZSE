@@ -90,7 +90,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
+| `ECS` | `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -215,6 +215,10 @@ Regels die de Renderer herbruikbaar houden:
 | 87 | Entities per system | een eigen class `EntitySet` (`EntitySet.h`/`.cpp`): een sparse set zonder gegevens ernaast, met dezelfde techniek als `ComponentArray` (`m_entities` packed, `m_sparse` met plek plus één). Elk frame snel erover lopen, toevoegen, verwijderen en opzoeken in O(1). Geen `std::set` zoals Morlan (losse nodes, slecht voor de cache) en geen kale `std::vector` (opzoeken O(n)). Dat `ComponentArray` intern een `EntitySet` zou kunnen gebruiken, is een opschoonstap voor later. Op verzoek van de gebruiker door Claude geschreven, omdat de techniek al in 18b is geoefend |
 | 88 | Gedrag van `EntitySet` | `Insert` doet niets als de entity er al in zit, `Remove` niets als hij er niet in zit (zoals `std::set`); de `SystemManager` hoeft dan niet eerst te controleren. Alleen `Insert` met entity `0` is een assert. Bewust anders dan `ComponentArray`, waar een dubbel component een fout is |
 | 89 | Uitlezen van een `EntitySet` | `std::span<const Entity> GetEntities() const`, zoals `Window::GetEvents`; geldig tot de volgende `Insert` of `Remove` |
+| 90 | `MakeSignature` | `template <typename... Ts> Signature MakeSignature()` in `Signature.h` (dat daarvoor `ComponentType.h` include): een fold expression `(signature.set(ComponentType<Ts>()), ...)`. Zonder types een lege signature. `std::bitset::set` gooit `std::out_of_range` bij een nummer van 64 of hoger; de assert in `Register` vangt dat eerder af |
+| 91 | `System` | basisklasse in `System.h` (geen `.cpp`): `virtual ~System() = default` (systems worden via `std::unique_ptr<System>` verwijderd), een public `GetEntities()` (binnen de class gedefinieerd, dus vanzelf `inline`), en private `m_signature` en `m_entities` (een `EntitySet`). `friend class SystemManager;`: alleen de manager mag die veranderen, ook afgeleide systems niet |
+| 92 | `SystemManager::Add` | `template <typename T, typename... Args> T& Add(Signature, Args&&... args)`: assert op een lege signature (die zou elke entity krijgen), het system met `std::make_unique<T>(std::forward<Args>(args)...)` (perfect forwarding naar de constructor), signature zetten, de `T&` bewaren en dan met `std::move` achteraan in `std::vector<std::unique_ptr<System>> m_systems`. De volgorde van toevoegen wordt straks de volgorde van `Update`. De teruggegeven `T&` blijft geldig: het system zelf verhuist niet als de vector groeit. Twee systems van hetzelfde type mogen; niets zoekt op type |
+| 93 | Bijwerken van de systems | `EntitySignatureChanged(Entity, Signature)`: per system `Insert` als `(signature & system) == system` (de entity heeft minstens alle components van het system), anders `Remove`. `EntityDestroyed(Entity)`: `Remove` uit elk system. Beide in `SystemManager.cpp`. Een system dat wordt toegevoegd terwijl er al entities zijn, kent die niet; dat lost de `World` op (18g) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -236,7 +240,8 @@ het venster via `FramebufferResized`. Stap 17 (het toetsenbord) is ook af: `Wind
 Stap 18 (de ECS) is begonnen. Deel 18a: de module `ECS` met `Entity` en `EntityManager`.
 Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de basisklasse
 `IComponentArray` en de `ComponentManager`. Deel 18d: signatures, bijgehouden door de
-`ComponentManager`. Deel 18e: `EntitySet`. `ECSTests` controleert alles met 68 controles
+`ComponentManager`. Deel 18e: `EntitySet`. Deel 18f: `MakeSignature`, `System` en
+`SystemManager`. `ECSTests` controleert alles met 82 controles
 (allemaal `[PASS]`, in Debug en Release). Sandbox gebruikt de ECS nog niet.
 
 Publieke interface van `Renderer`:
@@ -299,8 +304,11 @@ Bekende beperkingen, bewust zo gelaten:
   bestand) en kan per run verschillen.
 - Elk nummer telt mee voor het maximum van 64, ook van een soort die nooit wordt
   geregistreerd (`ComponentType<T>()` deelt het nummer uit bij het eerste gebruik).
+- Een system dat wordt toegevoegd terwijl er al entities zijn, kent die bestaande entities
+  niet: de `SystemManager` hoort alleen van signatures die hem later worden aangereikt. Op te
+  lossen in de `World` (18g).
 
-## Volgende stap: 18f, `System`, `MakeSignature` en `SystemManager`
+## Volgende stap: 18g, de `World`
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -312,16 +320,17 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18c | `ComponentManager`: soorten components registreren (besluiten 78 tot en met 81) | af |
 | 18d | signatures, bijgehouden door de `ComponentManager` (besluiten 82 tot en met 85) | af |
 | 18e | `EntitySet`: de entities van een system (besluiten 86 tot en met 89) | af |
-| 18f | `System`, `MakeSignature<...>()` en `SystemManager` | volgende |
-| 18g | de `World` met `Update`, en daarna de loop in een module `Engine` | |
+| 18f | `System`, `MakeSignature<...>()` en `SystemManager` (besluiten 90 tot en met 93) | af |
+| 18g | de `World` met `Update`, en daarna de loop in een module `Engine` | volgende |
 
-Open punten voor 18f: waar de `EntitySet` en de signature van een system staan (waarschijnlijk
-in de basisklasse `System`, alleen te veranderen door de `SystemManager` via `friend`);
-`MakeSignature<A, B>()` als variadic template met een fold expression; systems registreren met
-`Add<T>(signature, args...)` en de argumenten doorgeven aan de constructor (perfect
-forwarding), opgeslagen in een `std::vector<std::unique_ptr<System>>` in volgorde van
-toevoegen; `EntitySignatureChanged(Entity, Signature)` en `EntityDestroyed(Entity)`; wat er
-gebeurt met entities die al bestaan als een system later wordt toegevoegd.
+Open punten voor 18g: de `World` bezit een `EntityManager`, `ComponentManager` en
+`SystemManager` en verbindt ze (`CreateEntity`, `DestroyEntity`, `AddComponent`,
+`RemoveComponent`, `GetComponent`, `AddSystem`), met `IsAlive`-asserts; `virtual void
+Update(World&, float deltaTime)` op `System` (besluit 72), en of die pure virtual wordt; een
+function die alle systems in volgorde aanroept (de `World` of de `SystemManager`); bestaande
+entities doorgeven aan een system dat later wordt toegevoegd; `World.h` en `System.h` hebben
+elkaar nodig (forward declaration). Mogelijk is 18g weer te groot voor één stap; de loop in een
+module `Engine` en Sandbox ombouwen zijn in elk geval eigen stappen.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 

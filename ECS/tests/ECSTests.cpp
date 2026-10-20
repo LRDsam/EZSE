@@ -3,6 +3,8 @@
 #include "EZSE/ECS/ComponentType.h"
 #include "EZSE/ECS/EntityManager.h"
 #include "EZSE/ECS/EntitySet.h"
+#include "EZSE/ECS/Signature.h"
+#include "EZSE/ECS/SystemManager.h"
 
 #include <iostream>
 
@@ -292,6 +294,91 @@ void TestEntitySetGetEntities() {
     Check(idSum == 4, "EntitySet GetEntities: a loop visits every entity once");
 }
 
+void TestMakeSignature() {
+    const std::uint32_t health = ezse::ComponentType<Health>();
+    const std::uint32_t speed = ezse::ComponentType<Speed>();
+
+    const ezse::Signature both = ezse::MakeSignature<Health, Speed>();
+    Check(both.test(health) && both.test(speed) && both.count() == 2,
+          "MakeSignature: two types set exactly their two bits");
+    const ezse::Signature one = ezse::MakeSignature<Speed>();
+    Check(one.test(speed) && one.count() == 1, "MakeSignature: one type sets one bit");
+    Check(ezse::MakeSignature<>().none(), "MakeSignature: no types gives an empty signature");
+}
+
+// A system that only exists for the tests. It keeps a reference, to check that Add
+// passes constructor arguments on as references.
+class CountingSystem : public ezse::System {
+public:
+    explicit CountingSystem(int& counter) : counter(counter) {}
+    int& counter;
+};
+
+// A system without constructor arguments.
+class PlainSystem : public ezse::System {};
+
+bool SystemHas(const ezse::System& system, ezse::Entity entity) {
+    for (ezse::Entity member : system.GetEntities()) {
+        if (member.id == entity.id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void TestSystemManagerAdd() {
+    ezse::SystemManager systems;
+    int counter = 0;
+    CountingSystem& counting = systems.Add<CountingSystem>(ezse::MakeSignature<Health>(), counter);
+    counter = 7;
+    Check(counting.counter == 7, "SystemManager Add: a reference argument stays a reference");
+
+    for (int i = 0; i < 20; ++i) {
+        systems.Add<PlainSystem>(ezse::MakeSignature<Speed>());
+    }
+    counter = 8;
+    Check(counting.counter == 8, "SystemManager Add: the returned reference stays valid as systems are added");
+    Check(counting.GetEntities().empty(), "SystemManager Add: a new system has no entities");
+}
+
+void TestSystemManagerSignatureChanged() {
+    ezse::SystemManager systems;
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health, Speed>());
+
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
+    systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
+    systems.EntitySignatureChanged(ezse::Entity{3}, ezse::MakeSignature<Speed>());
+
+    Check(SystemHas(healthSystem, ezse::Entity{1}),
+          "SystemManager: an entity with more components than the system needs belongs to it");
+    Check(SystemHas(healthSystem, ezse::Entity{2}),
+          "SystemManager: an entity with exactly the components belongs to the system");
+    Check(!SystemHas(healthSystem, ezse::Entity{3}),
+          "SystemManager: an entity without a needed component does not belong to the system");
+    Check(SystemHas(movingSystem, ezse::Entity{1}) && movingSystem.GetEntities().size() == 1,
+          "SystemManager: only entity 1 has both components of the second system");
+
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
+    Check(!SystemHas(movingSystem, ezse::Entity{1}),
+          "SystemManager: an entity that loses a component leaves the system");
+    Check(SystemHas(healthSystem, ezse::Entity{1}),
+          "SystemManager: the same entity stays in a system it still matches");
+}
+
+void TestSystemManagerEntityDestroyed() {
+    ezse::SystemManager systems;
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health, Speed>());
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
+    systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
+
+    systems.EntityDestroyed(ezse::Entity{1});
+    Check(!SystemHas(healthSystem, ezse::Entity{1}) && !SystemHas(movingSystem, ezse::Entity{1}),
+          "SystemManager EntityDestroyed: the entity leaves every system");
+    Check(SystemHas(healthSystem, ezse::Entity{2}), "SystemManager EntityDestroyed: other entities stay");
+}
+
 } // namespace
 
 int main() {
@@ -313,6 +400,10 @@ int main() {
     TestEntitySetInsert();
     TestEntitySetRemove();
     TestEntitySetGetEntities();
+    TestMakeSignature();
+    TestSystemManagerAdd();
+    TestSystemManagerSignatureChanged();
+    TestSystemManagerEntityDestroyed();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

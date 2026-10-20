@@ -6,9 +6,12 @@ add_library(EZSEECS STATIC
     include/EZSE/ECS/EntityManager.h
     include/EZSE/ECS/EntitySet.h
     include/EZSE/ECS/Signature.h
+    include/EZSE/ECS/System.h
+    include/EZSE/ECS/SystemManager.h
     src/ComponentManager.cpp
     src/EntityManager.cpp
     src/EntitySet.cpp
+    src/SystemManager.cpp
 )
 add_library(EZSE::ECS ALIAS EZSEECS)
 
