@@ -2,6 +2,7 @@
 #include "EZSE/ECS/ComponentManager.h"
 #include "EZSE/ECS/ComponentType.h"
 #include "EZSE/ECS/EntityManager.h"
+#include "EZSE/ECS/EntitySet.h"
 
 #include <iostream>
 
@@ -244,6 +245,53 @@ void TestSignature() {
           "Signature: EntityDestroyed on an entity that never had a component is harmless");
 }
 
+void TestEntitySetInsert() {
+    ezse::EntitySet set;
+    Check(set.GetEntities().empty(), "EntitySet: a new set is empty");
+    Check(!set.Contains(ezse::Entity{}), "EntitySet: entity 0 is never in the set");
+
+    set.Insert(ezse::Entity{4});
+    set.Insert(ezse::Entity{2});
+    set.Insert(ezse::Entity{4});
+
+    Check(set.Contains(ezse::Entity{4}) && set.Contains(ezse::Entity{2}), "EntitySet Insert: both entities are in the set");
+    Check(!set.Contains(ezse::Entity{3}), "EntitySet Insert: an entity between them is not in the set");
+    Check(!set.Contains(ezse::Entity{9}), "EntitySet Insert: an id beyond the sparse array is not in the set");
+    Check(set.GetEntities().size() == 2, "EntitySet Insert: inserting an entity twice keeps it once");
+}
+
+void TestEntitySetRemove() {
+    ezse::EntitySet set;
+    set.Insert(ezse::Entity{4});
+    set.Insert(ezse::Entity{2});
+    set.Insert(ezse::Entity{5});
+
+    set.Remove(ezse::Entity{4});
+    Check(!set.Contains(ezse::Entity{4}), "EntitySet Remove: entity 4 is no longer in the set");
+    Check(set.Contains(ezse::Entity{5}) && set.Contains(ezse::Entity{2}),
+          "EntitySet Remove: the moved entity 5 and entity 2 are still in the set");
+
+    set.Remove(ezse::Entity{4});
+    set.Remove(ezse::Entity{7});
+    Check(set.GetEntities().size() == 2, "EntitySet Remove: removing an absent entity changes nothing");
+
+    set.Remove(ezse::Entity{2});
+    set.Remove(ezse::Entity{5});
+    Check(set.GetEntities().empty(), "EntitySet Remove: the set can be emptied, also from the back");
+}
+
+void TestEntitySetGetEntities() {
+    ezse::EntitySet set;
+    set.Insert(ezse::Entity{3});
+    set.Insert(ezse::Entity{1});
+
+    std::uint32_t idSum = 0;
+    for (ezse::Entity entity : set.GetEntities()) {
+        idSum += entity.id;
+    }
+    Check(idSum == 4, "EntitySet GetEntities: a loop visits every entity once");
+}
+
 } // namespace
 
 int main() {
@@ -262,6 +310,9 @@ int main() {
     TestComponentManager();
     TestComponentManagerEntityDestroyed();
     TestSignature();
+    TestEntitySetInsert();
+    TestEntitySetRemove();
+    TestEntitySetGetEntities();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
