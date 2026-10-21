@@ -17,4 +17,8 @@ bool World::IsAlive(Entity entity) const {
     return m_entities.IsAlive(entity);
 }
 
+void World::Update(float deltaTime) {
+    m_systems.Update(*this, deltaTime);
+}
+
 } // namespace ezse

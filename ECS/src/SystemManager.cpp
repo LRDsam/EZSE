@@ -18,4 +18,10 @@ void SystemManager::EntityDestroyed(Entity entity) {
     }
 }
 
+void SystemManager::Update(World& world, float deltaTime) {
+    for (auto& system : m_systems) {
+        system->Update(world, deltaTime);
+    }
+}
+
 } // namespace ezse

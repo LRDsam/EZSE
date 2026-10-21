@@ -90,7 +90,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
-| `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
+| `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -222,6 +222,9 @@ Regels die de Renderer herbruikbaar houden:
 | 94 | `World` | in `World.h`/`.cpp`: bezit `EntityManager`, `ComponentManager` en `SystemManager` by value (geen `unique_ptr` en geen `Init()` zoals Morlan; niets kan mislukken). Kan vanzelf niet gekopieerd worden. Geen getters voor de managers: de `World` is de enige ingang, zodat ze niet uit de pas kunnen lopen. De managers blijven publieke headers, omdat `World.h` ze by value bevat. De gebruiker schrijft de `World` zelf, omdat dit de code is die het meest gebruikt gaat worden |
 | 95 | Functions van de `World` | `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent<T>`, `AddComponent<T>`, `RemoveComponent<T>`, `GetComponent<T>`, `HasComponent<T>` en `AddSystem<T>(signature, args...)`, mét "Component" in de naam (besluit 81). `DestroyEntity`, `AddComponent`, `RemoveComponent` en `GetComponent` assert dat de entity leeft; `HasComponent` niet (vragen is geen fout). `DestroyEntity` ruimt eerst components en systems op en verwijdert de entity als laatste. `AddComponent` en `RemoveComponent` geven daarna `GetSignature` door aan `EntitySignatureChanged` |
 | 96 | Later toegevoegde systems | `AddSystem` loopt na het toevoegen langs alle uitgegeven ids (`EntityManager::GetCreatedCount()`, ook verwijderde) en geeft van elke levende entity de signature door aan `EntitySignatureChanged`. De andere systems krijgen dan ook een melding, wat onschuldig is (besluit 88). Daarmee is de beperking uit 18f opgelost |
+| 97 | `System::Update` | `virtual void Update(World& world, float deltaTime) = 0;`: pure virtual, dus `System` is abstract en elk system moet hem schrijven (met `override`). `protected`: alleen afgeleide systems en de `SystemManager` (friend) komen erbij; van buitenaf roept niemand een system los aan. Een system krijgt de `World` als parameter (geen global zoals Morlan, besluit 70), omdat hij zelf alleen ids heeft en de components via de `World` ophaalt. `deltaTime` in seconden |
+| 98 | `World` in `System.h` | een forward declaration `class World;` binnen `namespace ezse`: `World.h` include via `SystemManager.h` al `System.h`, en voor een `World&` is een incomplete type genoeg. Een concreet system include `World.h` in zijn eigen bestand |
+| 99 | Systems aanroepen | `SystemManager::Update(World&, float)` loopt in volgorde van toevoegen over `m_systems`; `World::Update(float deltaTime)` geeft door met `*this`. Niet `const`: systems veranderen components |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -244,8 +247,8 @@ Stap 18 (de ECS) is begonnen. Deel 18a: de module `ECS` met `Entity` en `EntityM
 Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de basisklasse
 `IComponentArray` en de `ComponentManager`. Deel 18d: signatures, bijgehouden door de
 `ComponentManager`. Deel 18e: `EntitySet`. Deel 18f: `MakeSignature`, `System` en
-`SystemManager`. Deel 18g: de `World`, die de managers verbindt. `ECSTests` controleert alles
-met 96 controles
+`SystemManager`. Deel 18g: de `World`, die de managers verbindt. Deel 18h: `Update` op elk system en
+`World::Update`. `ECSTests` controleert alles met 100 controles
 (allemaal `[PASS]`, in Debug en Release). Sandbox gebruikt de ECS nog niet.
 
 Publieke interface van `Renderer`:
@@ -312,8 +315,12 @@ Bekende beperkingen, bewust zo gelaten:
   dat kost tijd naar het aantal entities ooit, maar alleen bij het toevoegen van een system.
 - Wie de managers zelf gebruikt in plaats van de `World`, moet ze zelf in de pas houden (de
   tests doen dat bewust).
+- Een system mag in zijn `Update` geen components toevoegen of verwijderen (of entities
+  verwijderen) waardoor een entity in of uit zijn eigen `EntitySet` gaat: de span uit
+  `GetEntities()` wordt dan ongeldig terwijl hij erover loopt. Componentwaarden veranderen mag
+  wel. Een command buffer (wijzigingen na de loop uitvoeren) komt bij de eerste aanleiding.
 
-## Volgende stap: 18h, `Update`
+## Volgende stap: 18i, de module `Engine`
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -327,15 +334,16 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18e | `EntitySet`: de entities van een system (besluiten 86 tot en met 89) | af |
 | 18f | `System`, `MakeSignature<...>()` en `SystemManager` (besluiten 90 tot en met 93) | af |
 | 18g | de `World`: de managers verbinden (besluiten 94 tot en met 96) | af |
-| 18h | `virtual Update(World&, float)` op `System` en `World::Update` | volgende |
-| 18i | de module `Engine` met de game loop en een klok | |
+| 18h | `virtual Update(World&, float)` op `System` en `World::Update` (besluiten 97 tot en met 99) | af |
+| 18i | de module `Engine` met de game loop en een klok | volgende |
 | 18j | Sandbox ombouwen naar entities en systems | |
 
-Open punten voor 18h: `virtual void Update(World&, float deltaTime)` op `System` (besluit 72),
-pure virtual (`= 0`) of met een lege body; `World.h` include `System.h`, terwijl `System.h`
-`World` nodig heeft (forward declaration `class World;`; een referentie heeft geen volledige
-definitie nodig); wie de systems in volgorde aanroept (`World::Update` die doorgeeft aan een
-function op de `SystemManager`, of de `World` zelf); `const` of niet.
+Open punten voor 18i: wat de module `Engine` bezit (`Window`, `Renderer`, `World`) en waar hij
+van afhangt (alle andere modules); wie de loop schrijft en hoe het spel er code in kwijt kan
+(systems toevoegen vóór de start, of een basisklasse voor het spel); de klok (besluit 48: niet
+via `Window`; `std::chrono::steady_clock` in een eigen kleine class of in de loop zelf); wie
+`PollEvents`, `Clear` en `SwapBuffers` aanroept en hoe systems bij de events en de `Renderer`
+komen; Escape en het sluiten van het venster.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 

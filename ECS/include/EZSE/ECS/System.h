@@ -8,6 +8,8 @@
 
 namespace ezse {
 
+class World;
+
 class System {
 public:
     virtual ~System() = default;
@@ -15,6 +17,9 @@ public:
     std::span<const Entity> GetEntities() const {
         return m_entities.GetEntities();
     }
+
+protected:
+    virtual void Update(World& world, float deltaTime) = 0;
 
 private:
     friend class SystemManager;

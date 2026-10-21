@@ -20,6 +20,8 @@ public:
     void EntitySignatureChanged(Entity entity, Signature signature);
     void EntityDestroyed(Entity entity);
 
+    void Update(World& world, float deltaTime);
+
 private:
     std::vector<std::unique_ptr<System>> m_systems;
 };

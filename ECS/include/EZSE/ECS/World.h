@@ -28,6 +28,8 @@ public:
     template <typename T, typename... Args>
     T& AddSystem(Signature signature, Args&&... args);
 
+    void Update(float deltaTime);
+
 private:
     EntityManager m_entities;
     ComponentManager m_components;

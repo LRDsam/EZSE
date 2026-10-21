@@ -8,6 +8,7 @@
 #include "EZSE/ECS/World.h"
 
 #include <iostream>
+#include <vector>
 
 namespace {
 
@@ -313,10 +314,45 @@ class CountingSystem : public ezse::System {
 public:
     explicit CountingSystem(int& counter) : counter(counter) {}
     int& counter;
+
+protected:
+    void Update(ezse::World&, float) override {}
 };
 
 // A system without constructor arguments.
-class PlainSystem : public ezse::System {};
+class PlainSystem : public ezse::System {
+protected:
+    void Update(ezse::World&, float) override {}
+};
+
+// Writes its number and the delta time to a shared log on every Update, to check the order.
+class LoggingSystem : public ezse::System {
+public:
+    LoggingSystem(int number, std::vector<int>& numbers, std::vector<float>& deltaTimes)
+        : number(number), numbers(numbers), deltaTimes(deltaTimes) {}
+
+protected:
+    void Update(ezse::World&, float deltaTime) override {
+        numbers.push_back(number);
+        deltaTimes.push_back(deltaTime);
+    }
+
+private:
+    int number;
+    std::vector<int>& numbers;
+    std::vector<float>& deltaTimes;
+};
+
+// Raises the Health of each of its entities by one, to check that a system reaches its
+// components through the World.
+class HealSystem : public ezse::System {
+protected:
+    void Update(ezse::World& world, float) override {
+        for (ezse::Entity entity : GetEntities()) {
+            world.GetComponent<Health>(entity).value += 1;
+        }
+    }
+};
 
 bool SystemHas(const ezse::System& system, ezse::Entity entity) {
     for (ezse::Entity member : system.GetEntities()) {
@@ -451,6 +487,36 @@ void TestWorldAddSystemLater() {
     Check(!SystemHas(healthSystem, bare), "World AddSystem: a later system skips entities it does not match");
 }
 
+void TestWorldUpdateOrder() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    std::vector<int> numbers;
+    std::vector<float> deltaTimes;
+    world.AddSystem<LoggingSystem>(ezse::MakeSignature<Health>(), 1, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::MakeSignature<Health>(), 2, numbers, deltaTimes);
+
+    world.Update(0.5f);
+    Check(numbers == std::vector<int>{1, 2}, "World Update: every system runs once, in the order they were added");
+    Check(deltaTimes == std::vector<float>{0.5f, 0.5f}, "World Update: every system gets the delta time");
+}
+
+void TestWorldUpdateComponents() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    world.RegisterComponent<Speed>();
+    world.AddSystem<HealSystem>(ezse::MakeSignature<Health>());
+
+    const ezse::Entity healthy = world.CreateEntity();
+    const ezse::Entity fast = world.CreateEntity();
+    world.AddComponent(healthy, Health{10});
+    world.AddComponent(fast, Speed{2.0f});
+
+    world.Update(0.016f);
+    world.Update(0.016f);
+    Check(world.GetComponent<Health>(healthy).value == 12, "World Update: a system changes the components of its entities");
+    Check(!world.HasComponent<Health>(fast), "World Update: an entity outside the system is left alone");
+}
+
 } // namespace
 
 int main() {
@@ -480,6 +546,8 @@ int main() {
     TestWorldSystems();
     TestWorldDestroyEntity();
     TestWorldAddSystemLater();
+    TestWorldUpdateOrder();
+    TestWorldUpdateComponents();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
