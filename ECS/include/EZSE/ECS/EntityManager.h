@@ -2,7 +2,7 @@
 
 #include "EZSE/ECS/Entity.h"
 
-#include <vector> 
+#include <vector>
 
 namespace ezse {
 
@@ -11,6 +11,7 @@ public:
     Entity CreateEntity();
     void DestroyEntity(Entity entity);
     bool IsAlive(Entity entity) const;
+    std::uint32_t GetCreatedCount() const;
 private:
     std::vector<bool> m_alive;
 };

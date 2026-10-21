@@ -23,4 +23,8 @@ bool EntityManager::IsAlive(Entity entity) const {
     return m_alive[entity.id - 1];
 }
 
+std::uint32_t EntityManager::GetCreatedCount() const {
+    return static_cast<std::uint32_t>(m_alive.size());
+}
+
 } // namespace ezse

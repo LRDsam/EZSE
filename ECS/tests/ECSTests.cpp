@@ -5,6 +5,7 @@
 #include "EZSE/ECS/EntitySet.h"
 #include "EZSE/ECS/Signature.h"
 #include "EZSE/ECS/SystemManager.h"
+#include "EZSE/ECS/World.h"
 
 #include <iostream>
 
@@ -379,6 +380,77 @@ void TestSystemManagerEntityDestroyed() {
     Check(SystemHas(healthSystem, ezse::Entity{2}), "SystemManager EntityDestroyed: other entities stay");
 }
 
+void TestWorldComponents() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    const ezse::Entity entity = world.CreateEntity();
+
+    Check(world.IsAlive(entity), "World: a created entity is alive");
+    Check(!world.HasComponent<Health>(entity), "World: a new entity has no components");
+
+    world.AddComponent(entity, Health{10});
+    Check(world.HasComponent<Health>(entity) && world.GetComponent<Health>(entity).value == 10,
+          "World AddComponent: the entity has the component with its value");
+
+    world.RemoveComponent<Health>(entity);
+    Check(!world.HasComponent<Health>(entity), "World RemoveComponent: the component is gone");
+}
+
+void TestWorldSystems() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    world.RegisterComponent<Speed>();
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+
+    const ezse::Entity healthy = world.CreateEntity();
+    const ezse::Entity fast = world.CreateEntity();
+    world.AddComponent(healthy, Health{10});
+    world.AddComponent(fast, Speed{2.0f});
+
+    Check(SystemHas(healthSystem, healthy), "World AddComponent: an entity enters a system it now matches");
+    Check(!SystemHas(healthSystem, fast), "World AddComponent: an entity stays out of a system it does not match");
+
+    world.RemoveComponent<Health>(healthy);
+    Check(!SystemHas(healthSystem, healthy), "World RemoveComponent: an entity leaves a system it no longer matches");
+}
+
+void TestWorldDestroyEntity() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+
+    const ezse::Entity first = world.CreateEntity();
+    const ezse::Entity second = world.CreateEntity();
+    world.AddComponent(first, Health{10});
+    world.AddComponent(second, Health{20});
+    world.DestroyEntity(first);
+
+    Check(!world.IsAlive(first), "World DestroyEntity: the entity is no longer alive");
+    Check(!world.HasComponent<Health>(first), "World DestroyEntity: its components are gone");
+    Check(!SystemHas(healthSystem, first), "World DestroyEntity: it leaves every system");
+    Check(SystemHas(healthSystem, second) && world.GetComponent<Health>(second).value == 20,
+          "World DestroyEntity: other entities keep their components and systems");
+}
+
+void TestWorldAddSystemLater() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    const ezse::Entity first = world.CreateEntity();
+    const ezse::Entity second = world.CreateEntity();
+    const ezse::Entity destroyed = world.CreateEntity();
+    const ezse::Entity bare = world.CreateEntity();
+    world.AddComponent(first, Health{10});
+    world.AddComponent(second, Health{20});
+    world.AddComponent(destroyed, Health{30});
+    world.DestroyEntity(destroyed);
+
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+    Check(SystemHas(healthSystem, first) && SystemHas(healthSystem, second),
+          "World AddSystem: a later system gets the existing entities it matches");
+    Check(!SystemHas(healthSystem, destroyed), "World AddSystem: a later system skips destroyed entities");
+    Check(!SystemHas(healthSystem, bare), "World AddSystem: a later system skips entities it does not match");
+}
+
 } // namespace
 
 int main() {
@@ -404,6 +476,10 @@ int main() {
     TestSystemManagerAdd();
     TestSystemManagerSignatureChanged();
     TestSystemManagerEntityDestroyed();
+    TestWorldComponents();
+    TestWorldSystems();
+    TestWorldDestroyEntity();
+    TestWorldAddSystemLater();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
