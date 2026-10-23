@@ -11,6 +11,7 @@ add_subdirectory(Math)
 add_subdirectory(ECS)
 add_subdirectory(Platform)
 add_subdirectory(Renderer)
+add_subdirectory(Engine)
 add_subdirectory(Sandbox)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Sandbox)

@@ -83,7 +83,9 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
                ▲
               ECS ◄── ECSTests
 
-      (Sandbox linkt ook Math, voor `Translation`; Sandbox gebruikt ECS nog niet)
+      Engine ──► Platform, Renderer, ECS, Core   (niets hangt van Engine af)
+
+      (Sandbox linkt ook Math, voor `Translation`; Sandbox gebruikt Engine en ECS nog niet)
 ```
 
 | Module | Bevat | Hangt af van |
@@ -91,6 +93,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -225,6 +228,11 @@ Regels die de Renderer herbruikbaar houden:
 | 97 | `System::Update` | `virtual void Update(World& world, float deltaTime) = 0;`: pure virtual, dus `System` is abstract en elk system moet hem schrijven (met `override`). `protected`: alleen afgeleide systems en de `SystemManager` (friend) komen erbij; van buitenaf roept niemand een system los aan. Een system krijgt de `World` als parameter (geen global zoals Morlan, besluit 70), omdat hij zelf alleen ids heeft en de components via de `World` ophaalt. `deltaTime` in seconden |
 | 98 | `World` in `System.h` | een forward declaration `class World;` binnen `namespace ezse`: `World.h` include via `SystemManager.h` al `System.h`, en voor een `World&` is een incomplete type genoeg. Een concreet system include `World.h` in zijn eigen bestand |
 | 99 | Systems aanroepen | `SystemManager::Update(World&, float)` loopt in volgorde van toevoegen over `m_systems`; `World::Update(float deltaTime)` geeft door met `*this`. Niet `const`: systems veranderen components |
+| 100 | Module `Engine` | statische library `EZSE::Engine` (`EZSEEngine`), hangt `PUBLIC` af van Platform, Renderer en ECS (hun types staan in `Engine.h`) en `PRIVATE` van Core. Geen andere module hangt van `Engine` af, zodat Renderer en ECS los bruikbaar blijven. Aanleiding: venster, Renderer, loop, klok en viewport zou elk spel anders zelf schrijven |
+| 101 | Hoe het spel code kwijt kan | de engine bezit de loop (zoals Unity, Godot en Bevy): het spel registreert components en voegt systems toe via `GetWorld()` en roept één keer `Run()` aan, dat pas terugkeert als het spel stopt. Geen basisklasse `Application` met virtual functions: al het gedrag zit in systems. Een function voor één frame (voor een editor of de browser) komt pas bij aanleiding |
+| 102 | `Engine` | `static std::unique_ptr<Engine> Create(const WindowDesc&)` maakt venster en Renderer en logt wat mislukt; de constructor is `private` (dus `new Engine(...)` in `Create`, geen `make_unique`) en neemt beide `unique_ptr`'s over in de initializer list. Members in de volgorde `m_window`, `m_renderer`, `m_world`, `m_quitRequested`: opruimen gaat andersom, dus eerst de world met zijn systems (die een `Renderer&` kunnen hebben), dan de Renderer, als laatste het venster met de OpenGL-context. Getters `GetWorld`, `GetWindow` en `GetRenderer` geven referenties: systems krijgen `Window&` en `Renderer&` als gereedschap via hun constructor (besluit 72). Geen `EngineDesc` zolang er alleen venster-instellingen zijn |
+| 103 | De loop | `Run`: viewport op de framebuffer-grootte, `lastFrame` (lokaal, `steady_clock::time_point`) vóór de loop; dan per frame `PollEvents`, `SetViewport` bij `FramebufferResized` (behalve bij grootte 0), `deltaTime` als `std::chrono::duration<float>` (seconden), `World::Update` en `SwapBuffers`. Tekenen (`Clear`, `SetCamera`, `DrawMesh`) en de projectie bij een andere venstergrootte zijn voor systems van het spel. De klok staat in `Run` zelf; een class `Clock` komt bij een tweede gebruiker (vervolg op besluit 48) |
+| 104 | Stoppen | `Engine::Quit()` zet `m_quitRequested`; de loop maakt het lopende frame af en stopt, net als bij het sluiten van het venster. Een system dat mag stoppen (Escape) krijgt een `Engine&` via zijn constructor. `Window` krijgt geen function om zichzelf te sluiten |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -249,7 +257,9 @@ Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de
 `ComponentManager`. Deel 18e: `EntitySet`. Deel 18f: `MakeSignature`, `System` en
 `SystemManager`. Deel 18g: de `World`, die de managers verbindt. Deel 18h: `Update` op elk system en
 `World::Update`. `ECSTests` controleert alles met 100 controles
-(allemaal `[PASS]`, in Debug en Release). Sandbox gebruikt de ECS nog niet.
+(allemaal `[PASS]`, in Debug en Release). Deel 18i: de module `Engine` met de class `Engine`,
+die venster, Renderer en `World` bezit en de loop draait. Die bouwt, maar is nog niet gedraaid:
+Sandbox gebruikt Engine en ECS nog niet.
 
 Publieke interface van `Renderer`:
 
@@ -319,8 +329,12 @@ Bekende beperkingen, bewust zo gelaten:
   verwijderen) waardoor een entity in of uit zijn eigen `EntitySet` gaat: de span uit
   `GetEntities()` wordt dan ongeldig terwijl hij erover loopt. Componentwaarden veranderen mag
   wel. Een command buffer (wijzigingen na de loop uitvoeren) komt bij de eerste aanleiding.
+- `Engine::Run` zet de viewport bij de start zonder te controleren op grootte 0 (de loop doet
+  dat wel).
+- De `Engine` is nog niet gedraaid of getest: hij opent een venster, dus een testprogramma
+  zoals `ECSTests` kan niet. Hij wordt pas zichtbaar gecontroleerd in 18j.
 
-## Volgende stap: 18i, de module `Engine`
+## Volgende stap: 18j, Sandbox ombouwen
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -335,15 +349,15 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18f | `System`, `MakeSignature<...>()` en `SystemManager` (besluiten 90 tot en met 93) | af |
 | 18g | de `World`: de managers verbinden (besluiten 94 tot en met 96) | af |
 | 18h | `virtual Update(World&, float)` op `System` en `World::Update` (besluiten 97 tot en met 99) | af |
-| 18i | de module `Engine` met de game loop en een klok | volgende |
-| 18j | Sandbox ombouwen naar entities en systems | |
+| 18i | de module `Engine` met de game loop en een klok (besluiten 100 tot en met 104) | af |
+| 18j | Sandbox ombouwen naar entities en systems | volgende |
 
-Open punten voor 18i: wat de module `Engine` bezit (`Window`, `Renderer`, `World`) en waar hij
-van afhangt (alle andere modules); wie de loop schrijft en hoe het spel er code in kwijt kan
-(systems toevoegen vóór de start, of een basisklasse voor het spel); de klok (besluit 48: niet
-via `Window`; `std::chrono::steady_clock` in een eigen kleine class of in de loop zelf); wie
-`PollEvents`, `Clear` en `SwapBuffers` aanroept en hoe systems bij de events en de `Renderer`
-komen; Escape en het sluiten van het venster.
+Open punten voor 18j: welke components Sandbox nodig heeft (een `Transform` met positie en
+draaiing, iets voor de mesh en shader, iets voor de camera; botst met de tijdelijke `Transform`
+in Sandbox, zie de bekende beperkingen) en waar ze staan (in Sandbox, of al in `Engine`); welke
+systems (draaien van de kubus, camera met WASD, tekenen, Escape) en in welke volgorde; de
+projectie bij een andere venstergrootte in het camera- of render-system; Sandbox linkt
+`EZSE::Engine`. Waarschijnlijk in meerdere kleine stappen.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
