@@ -58,11 +58,12 @@ cmake --build build
 ./build/Sandbox/Debug/Sandbox.exe
 ./build/Math/Debug/MathTests.exe
 ./build/ECS/Debug/ECSTests.exe
+./build/Engine/Debug/EngineTests.exe
 ```
 
-`MathTests` en `ECSTests` openen geen venster, printen per controle `[PASS]` of `[FAIL]` en
-eindigen met exit code `0` als alles klopt. Claude draait ze zelf na elke wijziging in `Math`
-of `ECS`.
+`MathTests`, `ECSTests` en `EngineTests` openen geen venster, printen per controle `[PASS]` of
+`[FAIL]` en eindigen met exit code `0` als alles klopt. Claude draait ze zelf na elke wijziging
+in `Math`, `ECS` of `Engine`. `EngineTests` test alleen wat zonder venster kan.
 
 Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
 In Visual Studio: open `build/EZSE.sln`. Bij een nieuw gegenereerde `build/` is Sandbox al
@@ -93,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; components in `Components/`: `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma dat de modules verbindt | alle vier |
@@ -121,6 +122,8 @@ Regels die de Renderer herbruikbaar houden:
 - `#pragma once`. Membervariabelen met `m_`. Constanten op namespace-niveau met `c_`
   (`c_cameraBindingPoint`); een lokale `const` in een function krijgt geen voorvoegsel.
   Geen hoofdletters met underscores: die zijn voor macro's.
+- Een module met meerdere soorten bestanden krijgt submappen per soort, zowel in `include/` als
+  in `src/` (in `Engine`: `Components/`, straks `Systems/`). Modules met één soort blijven plat.
 - Hulpfuncties die alleen in één `.cpp` nodig zijn staan in een naamloze namespace.
 - Een macro alleen als een functie het niet kan (asserts, platform-schakelaars).
 - Iets dat kan mislukken krijgt een `Create`-functie die een lege `unique_ptr` of een handle
@@ -233,6 +236,12 @@ Regels die de Renderer herbruikbaar houden:
 | 102 | `Engine` | `static std::unique_ptr<Engine> Create(const WindowDesc&)` maakt venster en Renderer en logt wat mislukt; de constructor is `private` (dus `new Engine(...)` in `Create`, geen `make_unique`) en neemt beide `unique_ptr`'s over in de initializer list. Members in de volgorde `m_window`, `m_renderer`, `m_world`, `m_quitRequested`: opruimen gaat andersom, dus eerst de world met zijn systems (die een `Renderer&` kunnen hebben), dan de Renderer, als laatste het venster met de OpenGL-context. Getters `GetWorld`, `GetWindow` en `GetRenderer` geven referenties: systems krijgen `Window&` en `Renderer&` als gereedschap via hun constructor (besluit 72). Geen `EngineDesc` zolang er alleen venster-instellingen zijn |
 | 103 | De loop | `Run`: viewport op de framebuffer-grootte, `lastFrame` (lokaal, `steady_clock::time_point`) vóór de loop; dan per frame `PollEvents`, `SetViewport` bij `FramebufferResized` (behalve bij grootte 0), `deltaTime` als `std::chrono::duration<float>` (seconden), `World::Update` en `SwapBuffers`. Tekenen (`Clear`, `SetCamera`, `DrawMesh`) en de projectie bij een andere venstergrootte zijn voor systems van het spel. De klok staat in `Run` zelf; een class `Clock` komt bij een tweede gebruiker (vervolg op besluit 48) |
 | 104 | Stoppen | `Engine::Quit()` zet `m_quitRequested`; de loop maakt het lopende frame af en stopt, net als bij het sluiten van het venster. Een system dat mag stoppen (Escape) krijgt een `Engine&` via zijn constructor. `Window` krijgt geen function om zichzelf te sluiten |
+| 105 | Opsplitsing van 18j | 18j de components, 18k `CameraSystem` en `RenderSystem` en Sandbox op de `Engine` met een stilstaande kubus, 18l de systems van het spel (draaien, camera besturen, Escape) |
+| 106 | Plek van de components | in de module `Engine`, een header per component in `Components/` (submappen per soort, zie de conventies). Wat specifiek is voor het spel blijft in Sandbox. `EZSE/Engine/Components/Transform.h` naast `EZSE/Math/Transform.h`: de bouwstenen (`Translation`, `RotationY` en dergelijke) blijven in `Math`, de component en de functions die hem omzetten naar een matrix staan in `Engine`, omdat `Math` geen components kent |
+| 107 | `Transform` | `Vec3 position`, `Vec3 rotation` (drie hoeken in radialen, Euler angles) en `Vec3 scale` (default `{1, 1, 1}`). Geen quaternion: dat komt bij vrije rotaties of animatie (gimbal lock). Vaste volgorde (vervolg op besluit 43): `ModelMatrix = Translation * RotationY * RotationX * RotationZ * Scale` (yaw, pitch, roll). `ViewMatrix(const Transform&)` is het omgekeerde zonder schaal: `RotationZ(-z) * RotationX(-x) * RotationY(-y) * Translation(-position)` (vervolg op besluit 49). Beide als losse functions in `Transform.cpp` |
+| 108 | `MeshRenderer` | `MeshHandle mesh` en `ShaderHandle shader`; alleen handles (regel 4) |
+| 109 | `Camera` | `fovY` (radialen, default 45 graden), `nearPlane` en `farPlane`. De plaatsing staat in de `Transform` van dezelfde entity; de `aspect` komt elk frame uit het venster (18k) |
+| 110 | `EngineTests` | eigen testprogramma zoals `MathTests` (besluit 34), voor wat zonder venster te testen is; verwachte matrices met de hand opgebouwd of gecontroleerd op wat ze met een punt doen |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -259,7 +268,9 @@ Deel 18b: `ComponentArray<T>` als sparse set. Deel 18c: `ComponentType<T>()`, de
 `World::Update`. `ECSTests` controleert alles met 100 controles
 (allemaal `[PASS]`, in Debug en Release). Deel 18i: de module `Engine` met de class `Engine`,
 die venster, Renderer en `World` bezit en de loop draait. Die bouwt, maar is nog niet gedraaid:
-Sandbox gebruikt Engine en ECS nog niet.
+Sandbox gebruikt Engine en ECS nog niet. Deel 18j: de components `Transform` (met `ModelMatrix`
+en `ViewMatrix`), `MeshRenderer` en `Camera`, gecontroleerd door `EngineTests` (11 controles,
+allemaal `[PASS]`, in Debug en Release).
 
 Publieke interface van `Renderer`:
 
@@ -334,7 +345,10 @@ Bekende beperkingen, bewust zo gelaten:
 - De `Engine` is nog niet gedraaid of getest: hij opent een venster, dus een testprogramma
   zoals `ECSTests` kan niet. Hij wordt pas zichtbaar gecontroleerd in 18j.
 
-## Volgende stap: 18j, Sandbox ombouwen
+- Rotaties als drie hoeken hebben gimbal lock: bij een kanteling van een kwartslag om X vallen
+  de draaiingen om Y en Z samen. Voor de camera en de kubus van nu speelt dat niet.
+
+## Volgende stap: 18k, `CameraSystem`, `RenderSystem` en Sandbox op de `Engine`
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -350,14 +364,16 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18g | de `World`: de managers verbinden (besluiten 94 tot en met 96) | af |
 | 18h | `virtual Update(World&, float)` op `System` en `World::Update` (besluiten 97 tot en met 99) | af |
 | 18i | de module `Engine` met de game loop en een klok (besluiten 100 tot en met 104) | af |
-| 18j | Sandbox ombouwen naar entities en systems | volgende |
+| 18j | de components `Transform`, `MeshRenderer` en `Camera` (besluiten 105 tot en met 110) | af |
+| 18k | `CameraSystem` en `RenderSystem` in `Engine/Systems/`, Sandbox op de `Engine` met een stilstaande kubus | volgende |
+| 18l | de systems van het spel: de kubus draaien, de camera besturen, Escape | |
 
-Open punten voor 18j: welke components Sandbox nodig heeft (een `Transform` met positie en
-draaiing, iets voor de mesh en shader, iets voor de camera; botst met de tijdelijke `Transform`
-in Sandbox, zie de bekende beperkingen) en waar ze staan (in Sandbox, of al in `Engine`); welke
-systems (draaien van de kubus, camera met WASD, tekenen, Escape) en in welke volgorde; de
-projectie bij een andere venstergrootte in het camera- of render-system; Sandbox linkt
-`EZSE::Engine`. Waarschijnlijk in meerdere kleine stappen.
+Open punten voor 18k: het `CameraSystem` (signature `Transform` en `Camera`; wat als er meer
+dan één camera is; de `aspect` elk frame uit `Window::GetFramebufferSize`, grootte 0 overslaan;
+`SetCamera` met `ViewMatrix` en `Perspective`); het `RenderSystem` (signature `Transform` en
+`MeshRenderer`; `Clear` met welke kleur, en wie die kiest; `DrawMesh` met `ModelMatrix`); de
+volgorde (camera vóór tekenen); Sandbox linkt `EZSE::Engine`, maakt mesh en shader, een kubus-
+en een camera-entity, en roept `Run` aan. De tijdelijke `Transform` in Sandbox verdwijnt.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
