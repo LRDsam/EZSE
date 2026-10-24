@@ -10,6 +10,8 @@ namespace ezse {
 
 class Engine {
 public:
+    // Registers the built-in components (Transform, MeshRenderer, Camera)
+    // in its World; the game registers only its own components.
     static std::unique_ptr<Engine> Create(const WindowDesc& windowDesc);
 
     void Run();

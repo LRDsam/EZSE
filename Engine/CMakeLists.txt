@@ -3,8 +3,12 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Components/MeshRenderer.h
     include/EZSE/Engine/Components/Transform.h
     include/EZSE/Engine/Engine.h
+    include/EZSE/Engine/Systems/CameraSystem.h
+    include/EZSE/Engine/Systems/RenderSystem.h
     src/Components/Transform.cpp
     src/Engine.cpp
+    src/Systems/CameraSystem.cpp
+    src/Systems/RenderSystem.cpp
 )
 add_library(EZSE::Engine ALIAS EZSEEngine)
 
