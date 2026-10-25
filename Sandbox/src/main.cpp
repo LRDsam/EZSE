@@ -8,7 +8,42 @@
 #include "EZSE/Core/Log.h"
 #include "EZSE/Renderer/Mesh.h"
 
+#include "EZSE/Platform/Window.h"
+#include "EZSE/Platform/Key.h"
+#include "EZSE/Platform/WindowEvent.h"
+
 #include <cstdint>
+#include <variant>
+
+namespace {
+
+class GameControlSystem : public ezse::System {
+public:
+    GameControlSystem(ezse::Window& window, ezse::Engine& engine);
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+
+private:
+    ezse::Window& m_window;
+    ezse::Engine& m_engine;
+};
+
+GameControlSystem::GameControlSystem(ezse::Window& window, ezse::Engine& engine) :
+    m_window(window), m_engine(engine) {}
+
+void GameControlSystem::Update(ezse::World&, float) {
+    for (const ezse::WindowEvent& event : m_window.GetEvents()) {
+        if (const ezse::KeyPressed* pressed =
+            std::get_if<ezse::KeyPressed>(&event)) {
+            if (pressed->key == ezse::Key::Escape) {
+                m_engine.Quit();
+            }
+        }
+    }
+}
+
+} // namespace
 
 int main() {
     const ezse::Vertex cubeVertices[] = {
@@ -104,11 +139,16 @@ void main() {
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
     world.AddComponent(camera, ezse::Camera{});
 
+    // Registing the systems
+    world.AddSystem<GameControlSystem>(ezse::MakeSignature<>(),
+        engine->GetWindow(), *engine);
     // The engine systems come last, the camera before the drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
+
+
 
     engine->Run();
 

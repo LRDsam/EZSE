@@ -14,6 +14,7 @@ namespace ezse {
 
 class SystemManager {
 public:
+    // Empty signature means the system will have no entities.
     template <typename T, typename... Args>
     T& Add(Signature signature, Args&&... args);
 
@@ -28,7 +29,6 @@ private:
 
 template <typename T, typename... Args>
 T& SystemManager::Add(Signature signature, Args&&... args) {
-    EZSE_ASSERT(!signature.none(), "Signature can't be empty");
     std::unique_ptr<T> system = std::make_unique<T>(std::forward<Args>(args)...);
     system->m_signature = signature;
     T& systemRef = *system;

@@ -517,6 +517,37 @@ void TestWorldUpdateComponents() {
     Check(!world.HasComponent<Health>(fast), "World Update: an entity outside the system is left alone");
 }
 
+void TestEmptySignatureSystem() {
+    ezse::SystemManager systems;
+    PlainSystem& globalSystem = systems.Add<PlainSystem>(ezse::MakeSignature<>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
+
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
+    systems.EntitySignatureChanged(ezse::Entity{2}, ezse::Signature{});
+    Check(globalSystem.GetEntities().empty(), "Empty signature: the system gets no entities");
+    Check(SystemHas(healthSystem, ezse::Entity{1}), "Empty signature: other systems still get their entities");
+
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::Signature{});
+    Check(!SystemHas(healthSystem, ezse::Entity{1}),
+          "Empty signature: an entity that loses its last component leaves its systems");
+}
+
+void TestWorldEmptySignatureSystem() {
+    ezse::World world;
+    world.RegisterComponent<Health>();
+    const ezse::Entity entity = world.CreateEntity();
+    world.AddComponent(entity, Health{10});
+
+    std::vector<int> numbers;
+    std::vector<float> deltaTimes;
+    LoggingSystem& logging =
+        world.AddSystem<LoggingSystem>(ezse::MakeSignature<>(), 7, numbers, deltaTimes);
+    Check(logging.GetEntities().empty(), "World AddSystem: a later system with an empty signature gets no entities");
+
+    world.Update(0.1f);
+    Check(numbers == std::vector<int>{7}, "World Update: a system with an empty signature still runs");
+}
+
 } // namespace
 
 int main() {
@@ -548,6 +579,8 @@ int main() {
     TestWorldAddSystemLater();
     TestWorldUpdateOrder();
     TestWorldUpdateComponents();
+    TestEmptySignatureSystem();
+    TestWorldEmptySignatureSystem();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

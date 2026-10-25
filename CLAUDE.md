@@ -223,7 +223,7 @@ Regels die de Renderer herbruikbaar houden:
 | 89 | Uitlezen van een `EntitySet` | `std::span<const Entity> GetEntities() const`, zoals `Window::GetEvents`; geldig tot de volgende `Insert` of `Remove` |
 | 90 | `MakeSignature` | `template <typename... Ts> Signature MakeSignature()` in `Signature.h` (dat daarvoor `ComponentType.h` include): een fold expression `(signature.set(ComponentType<Ts>()), ...)`. Zonder types een lege signature. `std::bitset::set` gooit `std::out_of_range` bij een nummer van 64 of hoger; de assert in `Register` vangt dat eerder af |
 | 91 | `System` | basisklasse in `System.h` (geen `.cpp`): `virtual ~System() = default` (systems worden via `std::unique_ptr<System>` verwijderd), een public `GetEntities()` (binnen de class gedefinieerd, dus vanzelf `inline`), en private `m_signature` en `m_entities` (een `EntitySet`). `friend class SystemManager;`: alleen de manager mag die veranderen, ook afgeleide systems niet |
-| 92 | `SystemManager::Add` | `template <typename T, typename... Args> T& Add(Signature, Args&&... args)`: assert op een lege signature (die zou elke entity krijgen), het system met `std::make_unique<T>(std::forward<Args>(args)...)` (perfect forwarding naar de constructor), signature zetten, de `T&` bewaren en dan met `std::move` achteraan in `std::vector<std::unique_ptr<System>> m_systems`. De volgorde van toevoegen wordt straks de volgorde van `Update`. De teruggegeven `T&` blijft geldig: het system zelf verhuist niet als de vector groeit. Twee systems van hetzelfde type mogen; niets zoekt op type |
+| 92 | `SystemManager::Add` | `template <typename T, typename... Args> T& Add(Signature, Args&&... args)`: het system met `std::make_unique<T>(std::forward<Args>(args)...)` (perfect forwarding naar de constructor), signature zetten, de `T&` bewaren en dan met `std::move` achteraan in `std::vector<std::unique_ptr<System>> m_systems`. De volgorde van toevoegen wordt straks de volgorde van `Update`. De teruggegeven `T&` blijft geldig: het system zelf verhuist niet als de vector groeit. Twee systems van hetzelfde type mogen; niets zoekt op type. (Eerst stond hier een assert op een lege signature; vervangen door besluit 119) |
 | 93 | Bijwerken van de systems | `EntitySignatureChanged(Entity, Signature)`: per system `Insert` als `(signature & system) == system` (de entity heeft minstens alle components van het system), anders `Remove`. `EntityDestroyed(Entity)`: `Remove` uit elk system. Beide in `SystemManager.cpp`. Een system dat wordt toegevoegd terwijl er al entities zijn, kent die niet; dat lost de `World` op (18g) |
 | 94 | `World` | in `World.h`/`.cpp`: bezit `EntityManager`, `ComponentManager` en `SystemManager` by value (geen `unique_ptr` en geen `Init()` zoals Morlan; niets kan mislukken). Kan vanzelf niet gekopieerd worden. Geen getters voor de managers: de `World` is de enige ingang, zodat ze niet uit de pas kunnen lopen. De managers blijven publieke headers, omdat `World.h` ze by value bevat. De gebruiker schrijft de `World` zelf, omdat dit de code is die het meest gebruikt gaat worden |
 | 95 | Functions van de `World` | `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent<T>`, `AddComponent<T>`, `RemoveComponent<T>`, `GetComponent<T>`, `HasComponent<T>` en `AddSystem<T>(signature, args...)`, mét "Component" in de naam (besluit 81). `DestroyEntity`, `AddComponent`, `RemoveComponent` en `GetComponent` assert dat de entity leeft; `HasComponent` niet (vragen is geen fout). `DestroyEntity` ruimt eerst components en systems op en verwijdert de entity als laatste. `AddComponent` en `RemoveComponent` geven daarna `GetSignature` door aan `EntitySignatureChanged` |
@@ -248,6 +248,11 @@ Regels die de Renderer herbruikbaar houden:
 | 114 | `RenderSystem` | `RenderSystem(Renderer&, Vec3 clearColor)` (rood, groen en blauw in `x`, `y` en `z`), signature `Transform` + `MeshRenderer`. Eerst `Clear`, dan per entity `DrawMesh(mesh, shader, ModelMatrix(transform))`. De achtergrondkleur is een parameter van de constructor; in `Camera` pas bij meerdere camera's met een eigen achtergrond |
 | 115 | Volgorde van de systems van de engine | het spel voegt `CameraSystem` en `RenderSystem` zelf toe, als laatste en in die volgorde, zodat ze na de systems van het spel lopen. De engine voegt ze niet zelf toe (dan zouden ze vooraan staan). Een aparte fase voor tekenen komt pas als deze afspraak knelt |
 | 116 | Components ophalen | `GetComponent` geeft een `T&`; ophalen met `const T&` (of `const auto&`) om te lezen en `T&` om te veranderen. Met `auto` zonder `&` krijg je een kopie, en een wijziging daarop gaat stil verloren |
+| 117 | Opsplitsing van 18l | 18l systems zonder entities en Escape, 18m `Vec3 * float` en de kubus draait, 18n `TransformDirection` en de camera met WASD en de pijltjes |
+| 118 | Code van Sandbox | eigen systems en components van Sandbox staan in `main.cpp`, in een naamloze namespace (internal linkage: geen botsing met een gelijke naam in een andere `.cpp`, wat bij classes met virtual functions stil ongedefinieerd gedrag geeft). Verhuizen naar eigen bestanden als `main.cpp` te lang wordt |
+| 119 | Systems zonder entities | een lege signature betekent dat het system geen entities krijgt: `SystemManager::EntitySignatureChanged` slaat systems met `m_signature.none()` over, en de assert in `Add` is weg. Zo'n system draait wel elk frame. Toevoegen met `MakeSignature<>()`. Geen nep-component om de regel te omzeilen |
+| 120 | `GameControlSystem` | in Sandbox, `(Window&, Engine&)`, lege signature: bij `KeyPressed` met `Key::Escape` roept hij `Engine::Quit()` aan. Een system per verantwoordelijkheid, niet per toets: spel-brede toetsen (straks pauze, debug) komen hier ook bij. Toegevoegd vóór de systems van de engine |
+| 121 | Gebeurtenissen in een ECS | invoer van het venster wordt gelezen met polling (`IsKeyDown`, `GetEvents`), zoals nu. Invoer vertalen naar acties (een input-system dat toetsen omzet naar betekenis) komt bij instelbare toetsen of een tweede invoerapparaat. Gebeurtenissen binnen het spel (besluit 60) worden waarschijnlijk event-queues per soort, zoals Bevy; event-components en callbacks zijn de alternatieven. Alles pas bij de eerste aanleiding |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -276,7 +281,9 @@ die venster, Renderer en `World` bezit en de loop draait. Deel 18j: de component
 `RenderSystem`, en Sandbox draait nu op de `Engine`: een kubus-entity en een camera-entity op
 `(0, 0, 3)`, met de twee systems. De kubus staat stil en wordt recht van voren getekend; het
 venster van formaat veranderen werkt (door de gebruiker gezien). Draaien, WASD, de pijltjes en
-Escape zijn tijdelijk weg en komen terug in 18l; sluiten gaat met het kruisje.
+Escape zijn tijdelijk weg en komen terug in 18l tot en met 18n. Deel 18l: een lege signature
+betekent "geen entities" (systems zonder entities), en het `GameControlSystem` in Sandbox sluit
+af met Escape (door de gebruiker gezien). `ECSTests` heeft nu 105 controles.
 
 Publieke interface van `Renderer`:
 
@@ -353,8 +360,9 @@ Bekende beperkingen, bewust zo gelaten:
   (de volgorde in een `EntitySet` ligt niet vast). Een veld `active` komt bij de tweede camera.
 - Dat het `CameraSystem` vóór het `RenderSystem` en beide na de systems van het spel worden
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
+- De kubus draait nog niet en de camera beweegt nog niet (18m en 18n).
 
-## Volgende stap: 18l, de systems van het spel
+## Volgende stap: 18m, `Vec3 * float` en de kubus draait
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -372,16 +380,20 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18i | de module `Engine` met de game loop en een klok (besluiten 100 tot en met 104) | af |
 | 18j | de components `Transform`, `MeshRenderer` en `Camera` (besluiten 105 tot en met 110) | af |
 | 18k | `CameraSystem` en `RenderSystem` in `Engine/Systems/`, Sandbox op de `Engine` met een stilstaande kubus (besluiten 111 tot en met 116) | af |
-| 18l | de systems van het spel: de kubus draaien, de camera besturen, Escape | volgende |
+| 18l | systems zonder entities (lege signature) en Escape in een `GameControlSystem` (besluiten 117 tot en met 121) | af |
+| 18m | `Vec3 * float` in `Math`, een eigen component voor de draaisnelheid en een system dat de kubus laat draaien | volgende |
+| 18n | `TransformDirection` in `Math` en de camera met WASD en de pijltjes | |
 
-Open punten voor 18l: welke eigen components Sandbox nodig heeft om aan te geven wat er draait
-en wat bestuurd wordt (bijvoorbeeld een draaisnelheid, en iets dat de camera bestuurbaar maakt),
-en dat Sandbox die zelf registreert (besluit 111); een system dat de kubus om twee assen laat
-draaien met `deltaTime`; een system dat de camera bestuurt met WASD en de pijltjes via
-`Window::IsKeyDown` (richting langs de eigen assen van de camera: besluit 68 kiest dan tussen
-`TransformDirection` en `Vec3`/`Vec4` omzetten); een system dat bij `KeyPressed` Escape
-`Engine::Quit()` aanroept (krijgt `Engine&`, besluit 104); waar die systems staan (Sandbox) en
-de volgorde (vóór `CameraSystem` en `RenderSystem`, besluit 115).
+Open punten voor 18m: `Vec3 operator*(const Vec3&, float)` (en `float * Vec3`?) in `Math`,
+met controles in `MathTests` (besluit 63: operators komen erbij als iets ze nodig heeft); een
+component van Sandbox voor de draaisnelheid (per as in radialen per seconde), door Sandbox zelf
+geregistreerd (besluit 111); een system dat `rotation += speed * deltaTime` doet. De oude kubus
+draaide met 0,25 rad/s om Y en 0,175 rad/s om X.
+
+Open punten voor 18n: `Vec3 TransformDirection(const Mat4&, const Vec3&)` in `Math` (besluit 68)
+of omzetten tussen `Vec3` en `Vec4`; een component dat de camera bestuurbaar maakt (snelheid
+lopen en draaien); een system met `Window&` en `IsKeyDown`; diagonaal lopen gaat 1,4 keer zo
+snel zonder `Normalize`.
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
@@ -418,4 +430,8 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
 model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), de
 muis als nieuwe soort `WindowEvent` (daarna de camera ook met de muis besturen), shaders en modellen uit bestanden laden,
-en de Engine-module met de game loop en een resource manager (de ECS is stap 18).
+een resource manager in de Engine-module, gebeurtenissen binnen het spel (besluit 121), en pauze
+en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
+toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen
+`World` (scene) die de `Engine` als actieve wereld kan wisselen; beide vragen een interface over
+het beeld (tekst, knoppen) in de Renderer.
