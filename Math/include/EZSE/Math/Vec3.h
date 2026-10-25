@@ -9,8 +9,7 @@ struct Vec3 {
 };
 
 Vec3 operator+(const Vec3& a, const Vec3& b);
-
 Vec3 operator-(const Vec3& a);
-
+Vec3 operator*(const Vec3& vec, float scalar);
 
 } // namespace ezse

@@ -92,7 +92,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+` en unary `operator-`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
@@ -253,6 +253,8 @@ Regels die de Renderer herbruikbaar houden:
 | 119 | Systems zonder entities | een lege signature betekent dat het system geen entities krijgt: `SystemManager::EntitySignatureChanged` slaat systems met `m_signature.none()` over, en de assert in `Add` is weg. Zo'n system draait wel elk frame. Toevoegen met `MakeSignature<>()`. Geen nep-component om de regel te omzeilen |
 | 120 | `GameControlSystem` | in Sandbox, `(Window&, Engine&)`, lege signature: bij `KeyPressed` met `Key::Escape` roept hij `Engine::Quit()` aan. Een system per verantwoordelijkheid, niet per toets: spel-brede toetsen (straks pauze, debug) komen hier ook bij. Toegevoegd vóór de systems van de engine |
 | 121 | Gebeurtenissen in een ECS | invoer van het venster wordt gelezen met polling (`IsKeyDown`, `GetEvents`), zoals nu. Invoer vertalen naar acties (een input-system dat toetsen omzet naar betekenis) komt bij instelbare toetsen of een tweede invoerapparaat. Gebeurtenissen binnen het spel (besluit 60) worden waarschijnlijk event-queues per soort, zoals Bevy; event-components en callbacks zijn de alternatieven. Alles pas bij de eerste aanleiding |
+| 122 | `Vec3 * float` | `Vec3 operator*(const Vec3& vec, float scalar)` in `Vec3.h`/`.cpp` (vervolg op besluit 63), met controles in `MathTests`. Nog geen `float * Vec3`, `+=` of `*=`: niemand gebruikt ze |
+| 123 | Draaien in Sandbox | component `Spin { Vec3 speed; }` (radialen per seconde per as, zelfde volgorde als `Transform::rotation`) en `SpinSystem` (signature `Transform` + `Spin`): `rotation = rotation + speed * deltaTime`, met de `Transform` opgehaald als `Transform&`. Beide in de naamloze namespace van `main.cpp`; Sandbox registreert `Spin` zelf. De kubus draait met `{0.175, 0.25, 0}`, gelijk aan de oude Sandbox |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -261,7 +263,7 @@ Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en 
 zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) en
 stap 16 (events uit het venster, eerst alleen de grootte) zijn ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 44 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b` en `-a`, `Vec4` met `Mat4 * Vec4`,
+alles met 49 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b`, `-a` en `a * f`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
 model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`
@@ -283,7 +285,9 @@ die venster, Renderer en `World` bezit en de loop draait. Deel 18j: de component
 venster van formaat veranderen werkt (door de gebruiker gezien). Draaien, WASD, de pijltjes en
 Escape zijn tijdelijk weg en komen terug in 18l tot en met 18n. Deel 18l: een lege signature
 betekent "geen entities" (systems zonder entities), en het `GameControlSystem` in Sandbox sluit
-af met Escape (door de gebruiker gezien). `ECSTests` heeft nu 105 controles.
+af met Escape (door de gebruiker gezien). `ECSTests` heeft nu 105 controles. Deel 18m:
+`Vec3 * float`, en de kubus draait weer met een `Spin`-component en een `SpinSystem` in
+Sandbox (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -360,9 +364,12 @@ Bekende beperkingen, bewust zo gelaten:
   (de volgorde in een `EntitySet` ligt niet vast). Een veld `active` komt bij de tweede camera.
 - Dat het `CameraSystem` vóór het `RenderSystem` en beide na de systems van het spel worden
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
-- De kubus draait nog niet en de camera beweegt nog niet (18m en 18n).
+- De camera beweegt nog niet (18n).
+- De hoeken in `Transform::rotation` worden bij het draaien steeds groter; na lange tijd wordt
+  een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
+  tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 18m, `Vec3 * float` en de kubus draait
+## Volgende stap: 18n, de camera met WASD en de pijltjes
 
 Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
 de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
@@ -381,14 +388,8 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18j | de components `Transform`, `MeshRenderer` en `Camera` (besluiten 105 tot en met 110) | af |
 | 18k | `CameraSystem` en `RenderSystem` in `Engine/Systems/`, Sandbox op de `Engine` met een stilstaande kubus (besluiten 111 tot en met 116) | af |
 | 18l | systems zonder entities (lege signature) en Escape in een `GameControlSystem` (besluiten 117 tot en met 121) | af |
-| 18m | `Vec3 * float` in `Math`, een eigen component voor de draaisnelheid en een system dat de kubus laat draaien | volgende |
-| 18n | `TransformDirection` in `Math` en de camera met WASD en de pijltjes | |
-
-Open punten voor 18m: `Vec3 operator*(const Vec3&, float)` (en `float * Vec3`?) in `Math`,
-met controles in `MathTests` (besluit 63: operators komen erbij als iets ze nodig heeft); een
-component van Sandbox voor de draaisnelheid (per as in radialen per seconde), door Sandbox zelf
-geregistreerd (besluit 111); een system dat `rotation += speed * deltaTime` doet. De oude kubus
-draaide met 0,25 rad/s om Y en 0,175 rad/s om X.
+| 18m | `Vec3 * float` in `Math`, `Spin` en `SpinSystem` in Sandbox (besluiten 122 en 123) | af |
+| 18n | `TransformDirection` in `Math` en de camera met WASD en de pijltjes | volgende |
 
 Open punten voor 18n: `Vec3 TransformDirection(const Mat4&, const Vec3&)` in `Math` (besluit 68)
 of omzetten tussen `Vec3` en `Vec4`; een component dat de camera bestuurbaar maakt (snelheid

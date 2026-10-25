@@ -17,6 +17,14 @@
 
 namespace {
 
+// Components
+// Turns an entity at a fixed speed
+// Turns an entity at a fixed speed.
+struct Spin {
+    ezse::Vec3 speed; // Radians per second around X, Y, Z
+};
+
+// Systems
 class GameControlSystem : public ezse::System {
 public:
     GameControlSystem(ezse::Window& window, ezse::Engine& engine);
@@ -40,6 +48,21 @@ void GameControlSystem::Update(ezse::World&, float) {
                 m_engine.Quit();
             }
         }
+    }
+}
+
+// Turns an entity at fixed speed.
+// Adds the Spin speed of each entity to the rotation of its Transform.
+class SpinSystem : public ezse::System {
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+};
+
+void SpinSystem::Update(ezse::World& world, float deltaTime) {
+    for (ezse::Entity entity : GetEntities()) {
+        ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
+        const Spin& spin = world.GetComponent<Spin>(entity);
+        transform.rotation = transform.rotation + spin.speed * deltaTime;
     }
 }
 
@@ -130,10 +153,14 @@ void main() {
 
     ezse::World& world = engine->GetWorld();
 
+    //Registering components
+    world.RegisterComponent<Spin>();
+
+    // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{});
     world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, shader});
-
+    world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
@@ -142,12 +169,12 @@ void main() {
     // Registing the systems
     world.AddSystem<GameControlSystem>(ezse::MakeSignature<>(),
         engine->GetWindow(), *engine);
+    world.AddSystem<SpinSystem>(ezse::MakeSignature<ezse::Transform, Spin>());
     // The engine systems come last, the camera before the drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
-
 
 
     engine->Run();

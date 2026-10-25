@@ -100,6 +100,21 @@ void TestVec3Negate() {
         "a Vec3 plus its negation is zero");
 }
 
+void TestVec3Scale() {
+    const ezse::Vec3 vec{ 1.0f, -2.0f, 3.0f };
+
+    Check(NearlyEqual(vec * 2.0f, ezse::Vec3{ 2.0f, -4.0f, 6.0f }),
+        "Vec3 * 2 doubles each coordinate");
+    Check(NearlyEqual(vec * 0.0f, ezse::Vec3{}),
+        "Vec3 * 0 is zero");
+    Check(NearlyEqual(vec * -1.0f, -vec),
+        "Vec3 * -1 is the same as negating");
+    Check(NearlyEqual(vec * 0.5f, ezse::Vec3{ 0.5f, -1.0f, 1.5f }),
+        "Vec3 * 0.5 halves each coordinate");
+    Check(NearlyEqual(vec, ezse::Vec3{ 1.0f, -2.0f, 3.0f }),
+        "Vec3 * float leaves the original Vec3 unchanged");
+}
+
 void TestMultiply() {
     const ezse::Mat4 identity;
     const ezse::Mat4 distinct{{
@@ -284,6 +299,7 @@ int main() {
     TestDefaultValue();
     TestVec3Add();
     TestVec3Negate();
+    TestVec3Scale();
     TestMultiply();
     TestTranslation();
     TestScale();
