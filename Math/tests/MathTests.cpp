@@ -236,6 +236,26 @@ void TestRotationZ() {
         "RotationZ by an angle and its opposite is the identity");
 }
 
+void TestTransformDirection() {
+    const ezse::Vec3 forward{ 0.0f, 0.0f, -1.0f };
+    const float quarterTurn = std::numbers::pi_v<float> / 2.0f;
+
+    Check(NearlyEqual(ezse::TransformDirection(ezse::Mat4{}, forward), forward),
+        "TransformDirection: the identity matrix leaves a direction unchanged");
+    Check(NearlyEqual(ezse::TransformDirection(MakeTranslation(5.0f, 6.0f, 7.0f), forward), forward),
+        "TransformDirection: a translation does not move a direction");
+    // A quarter turn to the left around Y takes forward (-Z) to -X.
+    Check(NearlyEqual(ezse::TransformDirection(ezse::RotationY(quarterTurn), forward),
+                      ezse::Vec3{ -1.0f, 0.0f, 0.0f }),
+        "TransformDirection: a quarter turn around Y takes -Z to -X");
+    Check(NearlyEqual(ezse::TransformDirection(MakeScale(ezse::Vec3{ 2.0f, 2.0f, 2.0f }), forward),
+                      ezse::Vec3{ 0.0f, 0.0f, -2.0f }),
+        "TransformDirection: a scale changes the length of a direction");
+    Check(NearlyEqual(ezse::TransformDirection(MakeTranslation(1.0f, 0.0f, 0.0f) * ezse::RotationY(quarterTurn), forward),
+                      ezse::Vec3{ -1.0f, 0.0f, 0.0f }),
+        "TransformDirection: rotation and translation together only rotate");
+}
+
 void TestRotationOrder() {
     Check(!NearlyEqual(ezse::RotationX(c_quarterTurn) * ezse::RotationY(c_quarterTurn),
                        ezse::RotationY(c_quarterTurn) * ezse::RotationX(c_quarterTurn)),
@@ -308,6 +328,7 @@ int main() {
     TestRotationZ();
     TestRotationOrder();
     TestTransformVector();
+    TestTransformDirection();
     TestPerspective();
 
     std::cout << failureCount << " check(s) failed\n";

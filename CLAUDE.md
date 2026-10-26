@@ -92,7 +92,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ` en `Perspective` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
@@ -258,6 +258,9 @@ Regels die de Renderer herbruikbaar houden:
 | 124 | Kijken met de muis in plaats van de pijltjes | eerst de muis in `Platform` (18n), daarna de camera met WASD en de muis (18o); de pijltjes komen niet terug. De muis geeft een afstand per frame en wordt dus met een gevoeligheid (radialen per pixel) vermenigvuldigd, niet met `deltaTime`. Kijken omhoog en omlaag (`rotation.x`) wordt begrensd op ongeveer ±89 graden |
 | 125 | Muisbeweging | een toestand, geen event (zoals `IsKeyDown`): `MouseDelta Window::GetMouseDelta() const` met `struct MouseDelta { float x, y; }` in `Window.h` (geen `Vec2`: `Platform` hangt niet van `Math` af), in pixels, `x` naar rechts en `y` naar beneden. `PollEvents` vraagt na `glfwPollEvents` de positie op met `glfwGetCursorPos` en rekent het verschil met de vorige positie uit (in `double`, daarna `float`); geen callback. De constructor zet de beginpositie, zodat het eerste frame geen sprong geeft |
 | 126 | Cursor vastzetten | `void Window::SetCursorCaptured(bool)`: `GLFW_CURSOR_DISABLED` (onzichtbaar, vast in het venster, virtuele positie zonder grens) of `GLFW_CURSOR_NORMAL`, en raw mouse motion als `glfwRawMouseMotionSupported()`. Zet daarna de vorige positie opnieuw, zodat het wisselen geen sprong geeft. Standaard uit. Muisknoppen, scrollen en de absolute positie komen pas als iets ze nodig heeft |
+| 127 | `TransformDirection` | `Vec3 TransformDirection(const Mat4& mat, const Vec3& direction)` in `Math/Transform.h`/`.cpp` (vervolg op besluit 68): `mat * Vec4{x, y, z, 0}`, dus draaien en schalen zonder verplaatsing; met controles in `MathTests`. Geen omzetting tussen `Vec3` en `Vec4` zoals in GLSL: dan moet de aanroeper zelf weten dat `w = 0` een richting is |
+| 128 | `CameraController` | component in Sandbox: `moveSpeed` (eenheden per seconde, default 1) en `lookSensitivity` (radialen per pixel, default 0,002); Sandbox registreert hem zelf |
+| 129 | `CameraControlSystem` | in Sandbox, `explicit CameraControlSystem(Window&)`, signature `Transform` + `CameraController`. Kijken: `rotation.y -= delta.x * gevoeligheid` en `rotation.x -= delta.y * gevoeligheid` (besluit 42: positief om Y is naar links, positief om X is omhoog; `y` van de muis is naar beneden), zonder `deltaTime`, en `rotation.x` begrensd op ±89 graden met `std::clamp`. Lopen: WASD opgeteld in de eigen assen (W en S heffen elkaar op), gedraaid met `TransformDirection(RotationY(rotation.y), move)` zodat lopen horizontaal blijft, maal `moveSpeed * deltaTime`. Toegevoegd vóór het `CameraSystem`; Sandbox zet `SetCursorCaptured(true)` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -266,8 +269,9 @@ Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en 
 zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) en
 stap 16 (events uit het venster, eerst alleen de grootte) zijn ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 49 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b`, `-a` en `a * f`, `Vec4` met `Mat4 * Vec4`,
-`Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, en `Perspective`.
+alles met 54 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b`, `-a` en `a * f`, `Vec4` met `Mat4 * Vec4`,
+`Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, `Perspective` en
+`TransformDirection`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
 model-matrix door aan de uniform `u_model`. De dieptetest en face culling staan aan en `Clear`
 maakt kleur en diepte leeg. Stap 17 (het toetsenbord) is ook af: `Window` geeft
@@ -291,8 +295,10 @@ betekent "geen entities" (systems zonder entities), en het `GameControlSystem` i
 af met Escape (door de gebruiker gezien). `ECSTests` heeft nu 105 controles. Deel 18m:
 `Vec3 * float`, en de kubus draait weer met een `Spin`-component en een `SpinSystem` in
 Sandbox (door de gebruiker gezien). Deel 18n: `Window` geeft de muisbeweging per frame
-(`GetMouseDelta`) en kan de cursor vastzetten (`SetCursorCaptured`); dat bouwt, maar is nog
-niet gebruikt of gezien.
+(`GetMouseDelta`) en kan de cursor vastzetten (`SetCursorCaptured`). Deel 18o: `TransformDirection`
+in `Math`, en de camera in Sandbox loopt met WASD en kijkt rond met de muis (door de gebruiker
+gezien). Daarmee is stap 18 af: Sandbox doet weer alles wat hij voor de ECS deed (draaiende
+kubus, lopen, rondkijken, Escape), nu volledig met entities en systems.
 
 Publieke interface van `Renderer`:
 
@@ -371,16 +377,16 @@ Bekende beperkingen, bewust zo gelaten:
   (de volgorde in een `EntitySet` ligt niet vast). Een veld `active` komt bij de tweede camera.
 - Dat het `CameraSystem` vóór het `RenderSystem` en beide na de systems van het spel worden
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
-- De camera beweegt nog niet (18o). De muis in `Window` is nog niet gebruikt en dus nog niet
-  gecontroleerd; dat gebeurt in 18o.
+- Diagonaal lopen in Sandbox (W en D samen) gaat ongeveer 1,4 keer zo snel als rechtdoor: de
+  beweging wordt niet genormaliseerd. `Normalize` op `Vec3` komt met `LookAt` (besluit 49).
 - De hoeken in `Transform::rotation` worden bij het draaien steeds groter; na lange tijd wordt
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 18o, de camera met WASD en de muis
+## Volgende stap: nog te kiezen
 
-Stap 18 bouwt de ECS op in de volgorde van het artikel van Morlan (besluit 70). Per deel eerst
-de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit 70.
+Stap 18 (de ECS, de module `Engine` en Sandbox daarop) is af. De volgende stap is nog niet
+gekozen; leg de gebruiker de lijst onder **Daarna** voor. Stap 18 ging in deze delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|
@@ -398,17 +404,7 @@ de keuzes bespreken; de punten uit zijn code die we anders doen staan in besluit
 | 18l | systems zonder entities (lege signature) en Escape in een `GameControlSystem` (besluiten 117 tot en met 121) | af |
 | 18m | `Vec3 * float` in `Math`, `Spin` en `SpinSystem` in Sandbox (besluiten 122 en 123) | af |
 | 18n | de muis in `Platform`: `GetMouseDelta` en `SetCursorCaptured` (besluiten 124 tot en met 126) | af |
-| 18o | `TransformDirection` in `Math` en de camera met WASD en de muis | volgende |
-
-Open punten voor 18o (de keuzes zijn al besproken): `Vec3 TransformDirection(const Mat4&, const
-Vec3&)` in `Math/Transform.h` (`mat * Vec4{x, y, z, 0}`), met controles in `MathTests`; de
-beweging draait alleen met `RotationY(rotation.y)`, zodat lopen horizontaal blijft; component
-`CameraController { moveSpeed = 1.0f, lookSensitivity }` in Sandbox, door Sandbox geregistreerd;
-`CameraControlSystem(Window&)` met `explicit`, signature `Transform` + `CameraController`: WASD
-opgeteld (W en S heffen elkaar op), de muis zonder `deltaTime` naar `rotation.y` (links en rechts)
-en `rotation.x` (omhoog en omlaag, met `y` van de muis omgedraaid en begrensd met `std::clamp`);
-toegevoegd vóór het `CameraSystem`; Sandbox roept `SetCursorCaptured(true)` aan. Diagonaal lopen
-blijft 1,4 keer zo snel tot `Normalize` er is (komt met `LookAt`).
+| 18o | `TransformDirection` in `Math`, `CameraController` en `CameraControlSystem` in Sandbox (besluiten 127 tot en met 129) | af |
 
 Stap 14 (de draaiende 3D-kubus, besluiten 26 tot en met 62) ging in deze delen:
 
@@ -443,8 +439,8 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 ## Daarna
 
 Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
-model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), de
-muis als nieuwe soort `WindowEvent` (daarna de camera ook met de muis besturen), shaders en modellen uit bestanden laden,
+model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), muisknoppen en scrollen
+als `WindowEvent`, shaders en modellen uit bestanden laden,
 een resource manager in de Engine-module, gebeurtenissen binnen het spel (besluit 121), en pauze
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
 toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen

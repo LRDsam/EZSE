@@ -12,16 +12,25 @@
 #include "EZSE/Platform/Key.h"
 #include "EZSE/Platform/WindowEvent.h"
 
+#include "EZSE/Math/Transform.h"
+
+#include <algorithm>
 #include <cstdint>
+#include <numbers>
 #include <variant>
 
 namespace {
 
 // Components
 // Turns an entity at a fixed speed
-// Turns an entity at a fixed speed.
 struct Spin {
     ezse::Vec3 speed; // Radians per second around X, Y, Z
+};
+
+// Lets the keyboard and the mouse move and turn an entity.
+struct CameraController {
+    float moveSpeed = 1.0f; // units per second.
+    float lookSensitivity = 0.002f; // radians per pixel of mouse movement.
 };
 
 // Systems
@@ -51,7 +60,6 @@ void GameControlSystem::Update(ezse::World&, float) {
     }
 }
 
-// Turns an entity at fixed speed.
 // Adds the Spin speed of each entity to the rotation of its Transform.
 class SpinSystem : public ezse::System {
 protected:
@@ -63,6 +71,55 @@ void SpinSystem::Update(ezse::World& world, float deltaTime) {
         ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
         const Spin& spin = world.GetComponent<Spin>(entity);
         transform.rotation = transform.rotation + spin.speed * deltaTime;
+    }
+}
+
+
+// Enables control of the entity by user input.
+// Mouse movement to look around and WASD to move.
+class CameraControlSystem : public ezse::System {
+public:
+    explicit CameraControlSystem(ezse::Window& window);
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+
+private:
+    ezse::Window& m_window;
+};
+
+CameraControlSystem::CameraControlSystem(ezse::Window& window) :
+    m_window(window) {}
+
+void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
+    const float maxPitch = 89.0f * (std::numbers::pi_v<float> / 180.0f);
+
+    ezse::Vec3 move;
+    if (m_window.IsKeyDown(ezse::Key::W)) {
+        move.z -= 1.0f;
+    }
+    if (m_window.IsKeyDown(ezse::Key::S)) {
+        move.z += 1.0f;
+    }
+    if (m_window.IsKeyDown(ezse::Key::D)) {
+        move.x += 1.0f;
+    }
+    if (m_window.IsKeyDown(ezse::Key::A)) {
+        move.x -= 1.0f;
+    }
+
+    const ezse::MouseDelta mouseDelta = m_window.GetMouseDelta();
+    for (ezse::Entity entity : GetEntities()) {
+        ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
+        const CameraController& cameraController = world.GetComponent<CameraController>(entity);
+        transform.rotation.y -= (mouseDelta.x * cameraController.lookSensitivity);
+        transform.rotation.x -= (mouseDelta.y * cameraController.lookSensitivity);
+        transform.rotation.x = std::clamp(transform.rotation.x, -maxPitch, maxPitch);
+        const ezse::Vec3 moveEntity = ezse::TransformDirection(
+            ezse::RotationY(transform.rotation.y),
+            move);
+        transform.position =
+            transform.position + (moveEntity * (cameraController.moveSpeed * deltaTime));
     }
 }
 
@@ -155,6 +212,7 @@ void main() {
 
     //Registering components
     world.RegisterComponent<Spin>();
+    world.RegisterComponent<CameraController>();
 
     // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
@@ -165,18 +223,22 @@ void main() {
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
     world.AddComponent(camera, ezse::Camera{});
+    world.AddComponent(camera, CameraController{});
 
     // Registing the systems
     world.AddSystem<GameControlSystem>(ezse::MakeSignature<>(),
         engine->GetWindow(), *engine);
     world.AddSystem<SpinSystem>(ezse::MakeSignature<ezse::Transform, Spin>());
+    world.AddSystem<CameraControlSystem>(
+        ezse::MakeSignature<ezse::Transform, CameraController>(),
+        engine->GetWindow());
     // The engine systems come last, the camera before the drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
 
-
+    engine->GetWindow().SetCursorCaptured(true);
     engine->Run();
 
     ezse::LogInfo("Sandbox closed");

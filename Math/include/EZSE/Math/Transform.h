@@ -13,4 +13,7 @@ Mat4 RotationZ(float angle);
 
 Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane);
 
+// Turns a direction with the rotation (and scale) of the matrix; the translation is left out.
+Vec3 TransformDirection(const Mat4& mat, const Vec3& direction);
+
 } // namespace ezse
