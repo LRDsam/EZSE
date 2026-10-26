@@ -29,8 +29,18 @@ public:
     ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
     void DestroyShader(ShaderHandle shader);
 
-    void SetCamera(const Mat4& view, const Mat4& projection);
+    // The camera for all shaders. Stays until the next call.
+    // position: where the camera stands in the world; the shaders need it for specular light.
+    void SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
+
+    // The light that shines in one direction everywhere, like the sun. Stays until the next call.
+    // direction: where the light goes (from the light to the surface); does not need length 1.
+    // color: red, green and blue, usually 0 to 1.
     void SetDirectionalLight(const Vec3& direction, const Vec3& color);
+
+    // The light that reaches every surface from all sides, so the side away from the light is
+    // not black. color: red, green and blue, usually small (0.1 to 0.2). Stays until the next call.
+    void SetAmbientLight(const Vec3& color);
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -56,7 +66,7 @@ private:
     MeshData& GetMeshData(MeshHandle mesh);
     ShaderData& GetShaderData(ShaderHandle shader);
 
-    unsigned int m_viewProjectionBuffer = 0;
+    unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
     std::vector<MeshData> m_meshData;
     std::vector<ShaderData> m_shaderData;

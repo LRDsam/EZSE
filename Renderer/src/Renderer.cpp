@@ -56,9 +56,19 @@ struct LightData {
     float padding0 = 0.0f;
     float color[3];
     float padding1 = 0.0f;
+    float ambient[3];
+    float padding2 = 0.0f;
 };
+static_assert(sizeof(LightData) == 48);
 
-static_assert(sizeof(LightData) == 32);
+// The Camera block in the shaders, laid out as std140: the mat4 takes 64 bytes, and the vec3 after
+// it takes the room of a vec4, so it is followed by one float of padding.
+struct CameraData {
+    Mat4 viewProjection;
+    float position[3];
+    float padding0 = 0.0f;
+};
+static_assert(sizeof(CameraData) == 80);
 
 } // namespace
 
@@ -82,9 +92,9 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     LogInfo("Driver: {}", GetString(GL_VERSION));
 
     std::unique_ptr<Renderer> renderer(new Renderer());
-    glCreateBuffers(1, &renderer->m_viewProjectionBuffer);
-    glNamedBufferStorage(renderer->m_viewProjectionBuffer, sizeof(Mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
-    glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_viewProjectionBuffer);
+    glCreateBuffers(1, &renderer->m_cameraBuffer);
+    glNamedBufferStorage(renderer->m_cameraBuffer, sizeof(CameraData), nullptr, GL_DYNAMIC_STORAGE_BIT);
+    glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_cameraBuffer);
 
     glCreateBuffers(1, &renderer->m_lightBuffer);
     glNamedBufferStorage(renderer->m_lightBuffer, sizeof(LightData), nullptr, GL_DYNAMIC_STORAGE_BIT);
@@ -197,7 +207,7 @@ ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_v
 
     m_shaderData.push_back(shaderData);
     return ShaderHandle{ static_cast<std::uint32_t>(m_shaderData.size()) };
-    
+
 }
 
 void Renderer::DestroyShader(ShaderHandle shader) {
@@ -207,9 +217,11 @@ void Renderer::DestroyShader(ShaderHandle shader) {
 
 }
 
-void Renderer::SetCamera(const Mat4& view, const Mat4& projection) {
-    const Mat4 viewProjection = projection * view;
-    glNamedBufferSubData(m_viewProjectionBuffer, 0, sizeof(Mat4), &viewProjection.m[0][0]);
+void Renderer::SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position) {
+    const CameraData cameraData = {
+        .viewProjection = projection * view,
+        .position{position.x, position.y, position.z}};
+    glNamedBufferSubData(m_cameraBuffer, 0, sizeof(CameraData), &cameraData);
 }
 
 void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color) {
@@ -217,7 +229,20 @@ void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color) {
     const LightData lightData = {
         .direction{lightDirection.x, lightDirection.y, lightDirection.z},
         .color{color.x, color.y, color.z}};
-    glNamedBufferSubData(m_lightBuffer, 0, sizeof(LightData), &lightData);
+    glNamedBufferSubData(
+        m_lightBuffer,
+        0,
+        offsetof(LightData, ambient),
+        &lightData);
+}
+
+void Renderer::SetAmbientLight(const Vec3& color) {
+    const float ambient[3] = {color.x, color.y, color.z};
+    glNamedBufferSubData(
+        m_lightBuffer,
+        offsetof(LightData, ambient),
+        sizeof(ambient),
+        ambient);
 }
 
 Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
@@ -248,13 +273,12 @@ Renderer::~Renderer() {
         glDeleteBuffers(1, &meshData.indexBufferObj);
         glDeleteVertexArrays(1, &meshData.vertexArrayObj);
     }
-    
+
     for (auto& shaderData : m_shaderData) {
         glDeleteProgram(shaderData.shaderProgram);
-        
     }
 
-    glDeleteBuffers(1, &m_viewProjectionBuffer);
+    glDeleteBuffers(1, &m_cameraBuffer);
     glDeleteBuffers(1, &m_lightBuffer);
 
 }

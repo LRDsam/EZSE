@@ -28,8 +28,10 @@ void CameraSystem::Update(World& world, float) {
                          static_cast<float>(framebufferSize.height);
     const Camera& camera = world.GetComponent<Camera>(cameraEntity);
     const Transform& transform = world.GetComponent<Transform>(cameraEntity);
-    m_renderer.SetCamera(ViewMatrix(transform),
-                         Perspective(camera.fovY, aspect, camera.nearPlane, camera.farPlane));
+    m_renderer.SetCamera(
+        ViewMatrix(transform),
+        Perspective(camera.fovY, aspect, camera.nearPlane, camera.farPlane),
+        transform.position);
 }
 
 } // namespace ezse

@@ -276,6 +276,10 @@ Regels die de Renderer herbruikbaar houden:
 | 142 | Licht naar de shader | een tweede uniform buffer op bindpunt 1 (`c_lightBindingPoint`), zoals de camera (besluit 52): `layout(std140, binding = 1) uniform Light { vec3 u_lightDirection; vec3 u_lightColor; };`. In `Renderer.cpp` een `LightData` met na elke `vec3` een `float` padding (in `std140` neemt een `vec3` 16 bytes in) en `static_assert(sizeof(LightData) == 32)`. `void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color)` normaliseert de richting (van het licht naar het oppervlak) en vult de buffer; het licht blijft tot de volgende aanroep. De destructor ruimt de buffer op |
 | 143 | Bron van het licht | Sandbox zet één richtingslicht vóór `Run()`: richting `(-0.5, -1, -0.7)`, wit. Een component `DirectionalLight` met een `LightSystem` (richting uit de `Transform`) komt als het licht moet bewegen of bij een eigen scene |
 | 144 | Shader `lit` | `Sandbox/shaders/lit.vert` en `.frag` naast `basic` en `normals`: diffuse belichting (Lambert), `max(dot(n, -u_lightDirection), 0.0) * u_lightColor * color`, in wereldruimte. Zonder ambient zijn vlakken die van het licht af wijzen zwart (21c). Sandbox gebruikt `lit` |
+| 145 | Ambient | een kleur in het blok `Light` (na richting en kleur, offset 32; `LightData` wordt 48 bytes), gezet met `Renderer::SetAmbientLight(const Vec3& color)`. Elke setter schrijft alleen zijn eigen deel van de buffer (`glNamedBufferSubData` met offset en grootte), zodat richtingslicht en ambient los te zetten zijn. Waarden worden eerst naar `float[3]` gekopieerd, niet als `Vec3` aan OpenGL gegeven (geen aanname over de indeling van `Vec3`). Sandbox: `(0.15, 0.15, 0.15)` |
+| 146 | Camerapositie naar de shader | `SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position)`; het blok `Camera` krijgt `vec3 u_cameraPosition` na `u_viewProjection` (`CameraData` van 80 bytes, met padding en `static_assert`). Het `CameraSystem` geeft `transform.position` mee. De buffer heet nu `m_cameraBuffer`. Shaders die alleen `u_viewProjection` declareren (`basic`, `normals`) werken ongewijzigd: een blok mag kleiner zijn dan de buffer |
+| 147 | Specular | Blinn-Phong in wereldruimte in `lit.frag`: `halfway = normalize(-u_lightDirection + normalize(u_cameraPosition - worldPosition))`, `specular = pow(max(dot(n, halfway), 0), shininess) * specularStrength`, alleen maal de lichtkleur (een glans heeft de kleur van het licht). `lit.vert` geeft `worldPosition` door. Totaal: `color * (ambient + diffuse * lightColor) + specular * lightColor` |
+| 148 | Glans van het oppervlak | `const float shininess = 128.0` en `specularStrength = 0.5` in `lit.frag`; alle belichte voorwerpen glanzen dus hetzelfde. Een materiaal (per voorwerp) wordt een eigen stap, waarschijnlijk samen met texturen |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -323,8 +327,8 @@ een fout in de shader stopt Sandbox netjes (door de gebruiker gezien). Stap 21 (
 begonnen met 21a: `Vertex` heeft een normaal op attribuut 2, de kubus heeft per vlak een normaal,
 en de normalen-shader toont ze als kleur (door de gebruiker gezien). Deel 21b: de Renderer
 heeft een richtingslicht in een tweede uniform buffer (`SetDirectionalLight`), en Sandbox tekent
-met de shader `lit` (diffuse belichting). Dat bouwt; het beeld is in deze stap niet door de
-gebruiker bevestigd.
+met de shader `lit` (diffuse belichting). Deel 21c: ambient en specular (Blinn-Phong), met de
+camerapositie in het blok `Camera` (door de gebruiker gezien). Daarmee is stap 21 af.
 
 Publieke interface van `Renderer`:
 
@@ -335,8 +339,9 @@ void         DestroyMesh(MeshHandle mesh);
 ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
 void         DestroyShader(ShaderHandle shader);
 void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
-void         SetCamera(const Mat4& view, const Mat4& projection);
+void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
 void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
+void         SetAmbientLight(const Vec3& color);
 void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
 ```
@@ -366,6 +371,9 @@ Bekende beperkingen, bewust zo gelaten:
   `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
   shader.
+- Alle belichte voorwerpen hebben hetzelfde materiaal: `shininess` en `specularStrength` zijn
+  constanten in `lit.frag` (besluit 148).
+- De normal matrix wordt per hoekpunt in de shader uitgerekend (besluit 141).
 - Face culling staat altijd aan: een los vlak is van achteren gezien onzichtbaar, en een
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
@@ -412,17 +420,13 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 21c, ambient en specular
+## Volgende stap: nog te kiezen
 
-De route (besluit 130): stap 19 en 20 zijn af, stap 21 belichting (besluit 137): 21a normalen
-en 21b diffuse zijn af, 21c ambient en specular volgt. Open punten voor 21c: ambient als een
-vaste kleine hoeveelheid licht (een `float` of kleur in het blok `Light`, met de `std140`-regels)
-zodat de schaduwkant niet zwart is; specular volgens Blinn-Phong (het halfway-vector tussen de
-richting naar het licht en naar de camera, `pow(max(dot(n, h), 0), shininess)`); daarvoor moet
-de positie van de camera naar de shader (het blok `Camera` uitbreiden met `vec3` plus padding, en
-`SetCamera` laten meesturen, of een eigen veld); waar `shininess` vandaan komt (een uniform per
-shader, een vaste waarde, of later een materiaal); de wereldpositie van een fragment doorgeven
-vanuit de vertex shader (`u_model * vec4(a_position, 1.0)`).
+De route van besluit 130 (19 `Length` en `Normalize`, 20 shaders uit bestanden, 21 belichting) is
+af. Leg de gebruiker de lijst onder **Daarna** voor. Volgens besluit 130 liggen texturen voor de
+hand (het vrije vertex-formaat, besluit 24, met UV's; plaatjes inladen; samen met materialen,
+besluit 148). Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse
+(141 tot en met 144), 21c ambient en specular (145 tot en met 148).
 
 Stap 18 (de ECS, de module `Engine` en Sandbox daarop) ging in deze delen:
 
@@ -476,8 +480,10 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
 
-Op de lijst, zonder vaste volgorde: `LookAt` met de bewerkingen op `Vec3` (besluit 49), belichting (vraagt normalen en de
-model-matrix los, besluit 50), texturen (met het vrije vertex-formaat), muisknoppen en scrollen
+Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `Vec3` (besluit 49),
+texturen (met het vrije vertex-formaat) en materialen (besluit 148), meer lichten of een
+puntlicht, het licht als entity met een `LightSystem` (besluit 143), de normal matrix in C++
+(vraagt `Inverse`), muisknoppen en scrollen
 als `WindowEvent`, shaders en modellen uit bestanden laden,
 een resource manager in de Engine-module, gebeurtenissen binnen het spel (besluit 121), en pauze
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
