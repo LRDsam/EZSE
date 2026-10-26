@@ -6,6 +6,8 @@
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
 #include "EZSE/Core/Log.h"
+#include "EZSE/Core/File.h"
+
 #include "EZSE/Renderer/Mesh.h"
 
 #include "EZSE/Platform/Window.h"
@@ -16,7 +18,10 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <numbers>
+#include <optional>
+#include <string>
 #include <variant>
 
 namespace {
@@ -172,32 +177,16 @@ int main() {
         20, 21, 22,  20, 22, 23,   // bottom
     };
 
-    const char* vertShaderSource = R"(#version 460 core
+    const std::filesystem::path shaderDir{ EZSE_SANDBOX_SHADER_DIR };
 
-layout(location = 0) in vec3 a_position;
-layout(location = 1) in vec3 a_color;
-layout(std140, binding = 0) uniform Camera {
-    mat4 u_viewProjection;
-};
-uniform mat4 u_model;
-
-out vec3 color;
-
-void main() {
-    gl_Position = u_viewProjection * u_model * vec4(a_position, 1.0);
-    color = a_color;
-}
-)";
-
-    const char* fragShaderSource = R"(#version 460 core
-
-in  vec3 color;
-out vec4 fragColor;
-
-void main() {
-    fragColor = vec4(color, 1.0);
-}
-)";
+    const std::optional<std::string> vertexSource = ezse::ReadTextFile(
+        shaderDir / "basic.vert");
+    const std::optional<std::string> fragmentSource = ezse::ReadTextFile(
+        shaderDir / "basic.frag");
+    if (!vertexSource.has_value() || !fragmentSource.has_value()) {
+        ezse::LogError("Reading vertex and/or fragment source failed.");
+        return 1;
+    }
 
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
@@ -206,11 +195,16 @@ void main() {
 
     ezse::Renderer& renderer = engine->GetRenderer();
     const ezse::MeshHandle cubeMesh = renderer.CreateMesh(cubeVertices, cubeIndices);
-    const ezse::ShaderHandle shader = renderer.CreateShader(vertShaderSource, fragShaderSource);
+    const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
+        *fragmentSource);
+    if (shader.id == 0) {
+        ezse::LogError("Failed to compile shader.");
+        return 1;
+    }
 
     ezse::World& world = engine->GetWorld();
 
-    //Registering components
+    // Registering components
     world.RegisterComponent<Spin>();
     world.RegisterComponent<CameraController>();
 

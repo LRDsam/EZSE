@@ -91,7 +91,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 
 | Module | Bevat | Hangt af van |
 |---|---|---|
-| `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
+| `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
@@ -264,6 +264,10 @@ Regels die de Renderer herbruikbaar houden:
 | 130 | Route na stap 18 | 19 `Length` en `Normalize` (en diagonaal lopen oplossen), 20 shaders uit bestanden (prettiger werken aan shaders, en de eerste foutafhandeling voor een ontbrekend bestand), 21 belichting (het vrije vertex-formaat met normalen, diffuse, daarna specular). Texturen volgen na belichting, omdat het vrije vertex-formaat er dan al is |
 | 131 | `Length` en `Normalize` | losse functions in `Vec3.h`/`.cpp`, namen zoals in GLSL. Alleen deze twee, omdat het `CameraControlSystem` ze nu nodig heeft; `Dot`, `Cross` en `a - b` komen met `LookAt` of zodra C++-code ze gebruikt (belichting rekent `dot` in de shader) |
 | 132 | Nulvector normaliseren | `Normalize` geeft de nulvector terug als de lengte kleiner is dan `1e-6f` (een lokale `const`), in plaats van `NaN` (zoals glm) of een assert (dan zou `Math` van `Core` afhangen). Aanleiding: de beweging van de camera is meestal nul. Zoals Unity met `normalized` |
+| 133 | Plek van de shaders | `Sandbox/shaders/basic.vert` en `basic.frag` (de shaders van het spel); ze staan in `add_executable` zodat ze in Visual Studio te openen zijn. Shaders van de engine krijgen later een eigen map in `Engine` |
+| 134 | Shaders vinden (tijdelijk, moet worden aangepast) | een vast pad, ingebakken door CMake: `target_compile_definitions(Sandbox PRIVATE EZSE_SANDBOX_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")`. Werkt hoe je ook start, en een aangepaste shader is meteen actief zonder bouwen; maar het pad bestaat alleen op deze computer. Een macro omdat de waarde van CMake komt. Moet vervangen worden door assets naast de executable met een assetsysteem in de engine (zie Daarna) |
+| 135 | `ReadTextFile` | `std::optional<std::string> ReadTextFile(const std::filesystem::path&)` in `Core/File.h`/`.cpp`: een `std::ifstream` in binaire modus en de hele inhoud via `std::istreambuf_iterator`; kan het bestand niet geopend worden, dan `LogError` met het pad en `std::nullopt`. Een `std::optional` omdat een lege string niet te onderscheiden is van een leeg bestand. In `Core`, zodat ook de resource manager en het laden van modellen hem kunnen gebruiken |
+| 136 | Fouten bij shaders in Sandbox | Sandbox leest de shaderbestanden vóór `Engine::Create` (geen venster bij een ontbrekend bestand) en stopt met `return 1` als een bestand niet gelezen kan worden of `CreateShader` een handle met id `0` geeft |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -305,7 +309,9 @@ gezien). Daarmee is stap 18 af: Sandbox doet weer alles wat hij voor de ECS deed
 kubus, lopen, rondkijken, Escape), nu volledig met entities en systems.
 
 Stap 19 is ook af: `Length` en `Normalize` op `Vec3`, en het `CameraControlSystem` normaliseert de
-beweging, zodat diagonaal lopen even snel gaat als rechtdoor.
+beweging, zodat diagonaal lopen even snel gaat als rechtdoor. Stap 20 ook: de shaders staan in
+`Sandbox/shaders/` en worden met `ReadTextFile` (in `Core`) ingelezen; een ontbrekend bestand of
+een fout in de shader stopt Sandbox netjes (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -347,7 +353,9 @@ Bekende beperkingen, bewust zo gelaten:
 - Face culling staat altijd aan: een los vlak is van achteren gezien onzichtbaar, en een
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
-- Sandbox controleert de handle van `CreateShader` niet (testcode).
+- **Moet worden aangepast:** het pad naar de shaders van Sandbox is door CMake ingebakken als
+  absoluut pad (`EZSE_SANDBOX_SHADER_DIR`, besluit 134) en bestaat alleen op deze computer. Een
+  gebouwde Sandbox werkt dus niet op een andere computer of na het verplaatsen van de map.
 - `Key` bevat geen numeriek toetsenblok, en de modifiers (Shift, Ctrl) gaan niet met het
   event mee.
 - De `static_assert`s bij `ToKey` merken een tussengevoegde toets in een reeks op, maar niet
@@ -388,15 +396,16 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 20, shaders uit bestanden
+## Volgende stap: 21, belichting
 
-De route (besluit 130): stap 19 `Length` en `Normalize` (af), stap 20 shaders uit bestanden,
-stap 21 belichting. Open punten voor 20: waar de bestanden staan (een map `Sandbox/shaders/` of
-`assets/`) en hoe het programma ze vindt (het pad van de executable, de werkmap van Visual Studio,
-of CMake die ze naast de executable kopieert); wie leest (een function in `Core` of `Engine` die
-een bestand als tekst teruggeeft, want de Renderer kent geen bestanden, regel 3); foutafhandeling
-voor een ontbrekend of onleesbaar bestand (gewone foutafhandeling met een log, geen assert); de
-extensies (`.vert` en `.frag`).
+De route (besluit 130): stap 19 `Length` en `Normalize` (af), stap 20 shaders uit bestanden (af),
+stap 21 belichting. Open punten voor 21, waarschijnlijk in delen: het vrije vertex-formaat
+(besluit 24; normalen op attribuut 2, of een beschrijving van de indeling die `CreateMesh`
+meekrijgt); normalen voor de kubus (per vlak, de 24 hoekpunten van besluit 54 maken dat al
+mogelijk); de normal matrix (de model-matrix zonder verplaatsing; bij ongelijke schaal de
+inverse-transpose) of eerst alleen gelijke schaal; een lichtrichting en -kleur naar de shader
+(een uniform buffer zoals de camera, besluit 52, of een uniform); eerst diffuse (Lambert), daarna
+ambient en specular (Phong of Blinn-Phong, die de camerapositie in de shader nodig heeft).
 
 Stap 18 (de ECS, de module `Engine` en Sandbox daarop) ging in deze delen:
 
@@ -457,4 +466,7 @@ een resource manager in de Engine-module, gebeurtenissen binnen het spel (beslui
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
 toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen
 `World` (scene) die de `Engine` als actieve wereld kan wisselen; beide vragen een interface over
-het beeld (tekst, knoppen) in de Renderer.
+het beeld (tekst, knoppen) in de Renderer. **Assets naast de executable** (vervangt het
+ingebakken pad van besluit 134): CMake kopieert shaders en later andere bestanden naast de
+executable, en de engine vindt ze ten opzichte van zijn eigen map, als begin van een
+assetsysteem; eventueel shaders opnieuw laden terwijl het programma draait.

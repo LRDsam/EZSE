@@ -1,6 +1,8 @@
 add_library(EZSECore STATIC
     include/EZSE/Core/Assert.h
+    include/EZSE/Core/File.h
     include/EZSE/Core/Log.h
+    src/File.cpp
     src/Log.cpp
 )
 add_library(EZSE::Core ALIAS EZSECore)
