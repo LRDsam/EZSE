@@ -92,6 +92,9 @@ Window::Window(GLFWwindow* handle) : m_handle(handle) {
     glfwSetWindowUserPointer(m_handle, this);
     glfwSetFramebufferSizeCallback(m_handle, OnFramebufferResized);
     glfwSetKeyCallback(m_handle, OnKey);
+
+    // Setting the start position of the mouse.
+    glfwGetCursorPos(m_handle, &m_lastCursorX, &m_lastCursorY);
 }
 
 Window::~Window() {
@@ -102,6 +105,13 @@ Window::~Window() {
 void Window::PollEvents() {
     m_events.clear();
     glfwPollEvents();
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    glfwGetCursorPos(m_handle, &cursorX, &cursorY);
+    m_mouseDelta.x = static_cast<float>(cursorX - m_lastCursorX);
+    m_mouseDelta.y = static_cast<float>(cursorY - m_lastCursorY);
+    m_lastCursorX = static_cast<float>(cursorX);
+    m_lastCursorY = static_cast<float>(cursorY);
 }
 
 void Window::SwapBuffers() {
@@ -125,6 +135,20 @@ FramebufferSize Window::GetFramebufferSize() const {
 bool Window::IsKeyDown(Key key) const {
     EZSE_ASSERT(key < Key::Count, "IsKeyDown needs a real key");
     return m_keysDown[static_cast<std::size_t>(key)];
+}
+
+MouseDelta Window::GetMouseDelta() const {
+    return m_mouseDelta;
+}
+
+void Window::SetCursorCaptured(bool captured) {
+    glfwSetInputMode(m_handle, GLFW_CURSOR,
+        captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    if (glfwRawMouseMotionSupported()) {
+        glfwSetInputMode(m_handle, GLFW_RAW_MOUSE_MOTION,
+            captured ? GLFW_TRUE : GLFW_FALSE);
+    }
+    glfwGetCursorPos(m_handle, &m_lastCursorX, &m_lastCursorY);
 }
 
 Window::GLLoadFunction Window::GetGLLoadFunction() const {

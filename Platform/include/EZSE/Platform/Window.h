@@ -25,6 +25,13 @@ struct FramebufferSize {
     int height = 0;
 };
 
+// How far the mouse moved since the previous PollEvents, in pixels.
+// Positive x is to the right, positive y is down (screen coordinates).
+struct MouseDelta {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
 class Window {
 public:
     static std::unique_ptr<Window> Create(const WindowDesc& desc);
@@ -50,6 +57,13 @@ public:
     // Whether the key is held down right now.
     bool IsKeyDown(Key key) const;
 
+    // How far the mouse moved during last PollEvents.
+    MouseDelta GetMouseDelta() const;
+
+    // Hides the cursor and keeps it in the window,
+    // so the mouse can turn without limits.
+    void SetCursorCaptured(bool captured);
+
     GLLoadFunction GetGLLoadFunction() const;
 
 private:
@@ -61,6 +75,9 @@ private:
     GLFWwindow* m_handle = nullptr;
     std::vector<WindowEvent> m_events;
     std::array<bool, static_cast<std::size_t>(Key::Count)> m_keysDown{};
+    double m_lastCursorX = 0.0;
+    double m_lastCursorY = 0.0;
+    MouseDelta m_mouseDelta;
 };
 
 } // namespace ezse
