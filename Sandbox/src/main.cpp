@@ -107,7 +107,7 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
     if (m_window.IsKeyDown(ezse::Key::A)) {
         move.x -= 1.0f;
     }
-
+    move = ezse::Normalize(move);
     const ezse::MouseDelta mouseDelta = m_window.GetMouseDelta();
     for (ezse::Entity entity : GetEntities()) {
         ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);

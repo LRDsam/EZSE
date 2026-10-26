@@ -92,7 +92,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
 | `Platform` | `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
@@ -261,6 +261,9 @@ Regels die de Renderer herbruikbaar houden:
 | 127 | `TransformDirection` | `Vec3 TransformDirection(const Mat4& mat, const Vec3& direction)` in `Math/Transform.h`/`.cpp` (vervolg op besluit 68): `mat * Vec4{x, y, z, 0}`, dus draaien en schalen zonder verplaatsing; met controles in `MathTests`. Geen omzetting tussen `Vec3` en `Vec4` zoals in GLSL: dan moet de aanroeper zelf weten dat `w = 0` een richting is |
 | 128 | `CameraController` | component in Sandbox: `moveSpeed` (eenheden per seconde, default 1) en `lookSensitivity` (radialen per pixel, default 0,002); Sandbox registreert hem zelf |
 | 129 | `CameraControlSystem` | in Sandbox, `explicit CameraControlSystem(Window&)`, signature `Transform` + `CameraController`. Kijken: `rotation.y -= delta.x * gevoeligheid` en `rotation.x -= delta.y * gevoeligheid` (besluit 42: positief om Y is naar links, positief om X is omhoog; `y` van de muis is naar beneden), zonder `deltaTime`, en `rotation.x` begrensd op ±89 graden met `std::clamp`. Lopen: WASD opgeteld in de eigen assen (W en S heffen elkaar op), gedraaid met `TransformDirection(RotationY(rotation.y), move)` zodat lopen horizontaal blijft, maal `moveSpeed * deltaTime`. Toegevoegd vóór het `CameraSystem`; Sandbox zet `SetCursorCaptured(true)` |
+| 130 | Route na stap 18 | 19 `Length` en `Normalize` (en diagonaal lopen oplossen), 20 shaders uit bestanden (prettiger werken aan shaders, en de eerste foutafhandeling voor een ontbrekend bestand), 21 belichting (het vrije vertex-formaat met normalen, diffuse, daarna specular). Texturen volgen na belichting, omdat het vrije vertex-formaat er dan al is |
+| 131 | `Length` en `Normalize` | losse functions in `Vec3.h`/`.cpp`, namen zoals in GLSL. Alleen deze twee, omdat het `CameraControlSystem` ze nu nodig heeft; `Dot`, `Cross` en `a - b` komen met `LookAt` of zodra C++-code ze gebruikt (belichting rekent `dot` in de shader) |
+| 132 | Nulvector normaliseren | `Normalize` geeft de nulvector terug als de lengte kleiner is dan `1e-6f` (een lokale `const`), in plaats van `NaN` (zoals glm) of een assert (dan zou `Math` van `Core` afhangen). Aanleiding: de beweging van de camera is meestal nul. Zoals Unity met `normalized` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -269,7 +272,8 @@ Stappen 1 tot en met 12 zijn af en gecommit. Stap 13 (transformaties) is af, en 
 zijn 14a tot en met 14f af; daarmee is stap 14 compleet. Stap 15 (face culling) en
 stap 16 (events uit het venster, eerst alleen de grootte) zijn ook af: de module `Math` bevat de
 struct `Mat4` met de eenheidsmatrix als beginwaarde en `operator*`, en `MathTests` controleert
-alles met 54 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b`, `-a` en `a * f`, `Vec4` met `Mat4 * Vec4`,
+alles met 62 controles (allemaal `[PASS]`). Verder zijn er `Vec3` met `a + b`, `-a`, `a * f`,
+`Length` en `Normalize`, `Vec4` met `Mat4 * Vec4`,
 `Translation`, `Scale`, de draaiingen `RotationX`, `RotationY` en `RotationZ`, `Perspective` en
 `TransformDirection`.
 De Renderer bewaart de camera in een uniform buffer (`SetCamera`) en `DrawMesh` geeft de
@@ -299,6 +303,9 @@ Sandbox (door de gebruiker gezien). Deel 18n: `Window` geeft de muisbeweging per
 in `Math`, en de camera in Sandbox loopt met WASD en kijkt rond met de muis (door de gebruiker
 gezien). Daarmee is stap 18 af: Sandbox doet weer alles wat hij voor de ECS deed (draaiende
 kubus, lopen, rondkijken, Escape), nu volledig met entities en systems.
+
+Stap 19 is ook af: `Length` en `Normalize` op `Vec3`, en het `CameraControlSystem` normaliseert de
+beweging, zodat diagonaal lopen even snel gaat als rechtdoor.
 
 Publieke interface van `Renderer`:
 
@@ -377,16 +384,21 @@ Bekende beperkingen, bewust zo gelaten:
   (de volgorde in een `EntitySet` ligt niet vast). Een veld `active` komt bij de tweede camera.
 - Dat het `CameraSystem` vóór het `RenderSystem` en beide na de systems van het spel worden
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
-- Diagonaal lopen in Sandbox (W en D samen) gaat ongeveer 1,4 keer zo snel als rechtdoor: de
-  beweging wordt niet genormaliseerd. `Normalize` op `Vec3` komt met `LookAt` (besluit 49).
 - De hoeken in `Transform::rotation` worden bij het draaien steeds groter; na lange tijd wordt
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: 20, shaders uit bestanden
 
-Stap 18 (de ECS, de module `Engine` en Sandbox daarop) is af. De volgende stap is nog niet
-gekozen; leg de gebruiker de lijst onder **Daarna** voor. Stap 18 ging in deze delen:
+De route (besluit 130): stap 19 `Length` en `Normalize` (af), stap 20 shaders uit bestanden,
+stap 21 belichting. Open punten voor 20: waar de bestanden staan (een map `Sandbox/shaders/` of
+`assets/`) en hoe het programma ze vindt (het pad van de executable, de werkmap van Visual Studio,
+of CMake die ze naast de executable kopieert); wie leest (een function in `Core` of `Engine` die
+een bestand als tekst teruggeeft, want de Renderer kent geen bestanden, regel 3); foutafhandeling
+voor een ontbrekend of onleesbaar bestand (gewone foutafhandeling met een log, geen assert); de
+extensies (`.vert` en `.frag`).
+
+Stap 18 (de ECS, de module `Engine` en Sandbox daarop) ging in deze delen:
 
 | Deel | Onderwerp | Stand |
 |---|---|---|

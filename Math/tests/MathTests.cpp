@@ -115,6 +115,32 @@ void TestVec3Scale() {
         "Vec3 * float leaves the original Vec3 unchanged");
 }
 
+void TestVec3Length() {
+    Check(std::abs(ezse::Length(ezse::Vec3{ 3.0f, 4.0f, 0.0f }) - 5.0f) < 0.0001f,
+        "Length of (3, 4, 0) is 5");
+    Check(std::abs(ezse::Length(ezse::Vec3{ 1.0f, 0.0f, -1.0f }) - std::sqrt(2.0f)) < 0.0001f,
+        "Length of (1, 0, -1) is the square root of 2");
+    Check(ezse::Length(ezse::Vec3{}) == 0.0f,
+        "Length of the zero vector is 0");
+}
+
+void TestVec3Normalize() {
+    const ezse::Vec3 diagonal{ 1.0f, 0.0f, -1.0f };
+    const ezse::Vec3 normalized = ezse::Normalize(diagonal);
+    const float half = std::sqrt(0.5f);
+
+    Check(std::abs(ezse::Length(normalized) - 1.0f) < 0.0001f,
+        "Normalize gives length 1");
+    Check(NearlyEqual(normalized, ezse::Vec3{ half, 0.0f, -half }),
+        "Normalize keeps the direction");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{ 0.0f, 0.0f, -5.0f }), ezse::Vec3{ 0.0f, 0.0f, -1.0f }),
+        "Normalize of a vector along an axis gives the unit vector of that axis");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{}), ezse::Vec3{}),
+        "Normalize of the zero vector gives the zero vector");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{ 1e-8f, 0.0f, 0.0f }), ezse::Vec3{}),
+        "Normalize of a nearly zero vector gives the zero vector");
+}
+
 void TestMultiply() {
     const ezse::Mat4 identity;
     const ezse::Mat4 distinct{{
@@ -320,6 +346,8 @@ int main() {
     TestVec3Add();
     TestVec3Negate();
     TestVec3Scale();
+    TestVec3Length();
+    TestVec3Normalize();
     TestMultiply();
     TestTranslation();
     TestScale();
