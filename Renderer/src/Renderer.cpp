@@ -103,10 +103,13 @@ MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices, std::span<cons
     glVertexArrayVertexBuffer(meshData.vertexArrayObj, 0, meshData.vertexBufferObj, 0,sizeof(Vertex));
     glVertexArrayAttribFormat(meshData.vertexArrayObj, 0, 3, GL_FLOAT, GL_FALSE, 0);
     glVertexArrayAttribFormat(meshData.vertexArrayObj, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex,color));
+    glVertexArrayAttribFormat(meshData.vertexArrayObj, 2, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, normal));
     glEnableVertexArrayAttrib(meshData.vertexArrayObj, 0);
     glEnableVertexArrayAttrib(meshData.vertexArrayObj, 1);
+    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 2);
     glVertexArrayAttribBinding(meshData.vertexArrayObj, 0, 0);
     glVertexArrayAttribBinding(meshData.vertexArrayObj, 1, 0);
+    glVertexArrayAttribBinding(meshData.vertexArrayObj, 2, 0);
     LogInfo("OpenGL: Vertex Array {} created", meshData.vertexArrayObj);
 
     glCreateBuffers(1, &meshData.indexBufferObj);

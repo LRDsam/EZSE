@@ -2,6 +2,8 @@ add_executable(Sandbox
     src/main.cpp
     shaders/basic.vert
     shaders/basic.frag
+    shaders/normals.vert
+    shaders/normals.frag
 )
 
 target_link_libraries(Sandbox PRIVATE EZSE::Engine)

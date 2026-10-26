@@ -155,7 +155,7 @@ Regels die de Renderer herbruikbaar houden:
 | 19 | Stijl | Direct State Access |
 | 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing. Opgelost in stap 16 (besluiten 58 tot en met 62) |
 | 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
-| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
+| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1, en sinds besluit 138 de normaal op 2); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
 | 25 | Indices | altijd verplicht, 32 bits (`std::uint32_t`); `CreateMesh` controleert met asserts dat het aantal een veelvoud van drie is en dat elke index naar een bestaand hoekpunt wijst |
 | 26 | Wiskunde | zelf geschreven, geen glm. De gebruiker schrijft de code zoals bij rendering: Claude geeft opdracht, signaturen en achtergrond en loopt na. Elke functie controleren met bekende uitkomsten voordat hij de shader in gaat |
 | 27 | Module `Math` | eigen statische library `EZSE::Math` met `.cpp`-bestanden (niet header-only); hangt van niets af, `Core` komt erbij bij de eerste `EZSE_ASSERT` |
@@ -268,6 +268,10 @@ Regels die de Renderer herbruikbaar houden:
 | 134 | Shaders vinden (tijdelijk, moet worden aangepast) | een vast pad, ingebakken door CMake: `target_compile_definitions(Sandbox PRIVATE EZSE_SANDBOX_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")`. Werkt hoe je ook start, en een aangepaste shader is meteen actief zonder bouwen; maar het pad bestaat alleen op deze computer. Een macro omdat de waarde van CMake komt. Moet vervangen worden door assets naast de executable met een assetsysteem in de engine (zie Daarna) |
 | 135 | `ReadTextFile` | `std::optional<std::string> ReadTextFile(const std::filesystem::path&)` in `Core/File.h`/`.cpp`: een `std::ifstream` in binaire modus en de hele inhoud via `std::istreambuf_iterator`; kan het bestand niet geopend worden, dan `LogError` met het pad en `std::nullopt`. Een `std::optional` omdat een lege string niet te onderscheiden is van een leeg bestand. In `Core`, zodat ook de resource manager en het laden van modellen hem kunnen gebruiken |
 | 136 | Fouten bij shaders in Sandbox | Sandbox leest de shaderbestanden vóór `Engine::Create` (geen venster bij een ontbrekend bestand) en stopt met `return 1` als een bestand niet gelezen kan worden of `CreateShader` een handle met id `0` geeft |
+| 137 | Opdeling van stap 21 | 21a normalen in het vertex-formaat en de kubus, gecontroleerd met een normalen-shader; 21b een lichtrichting naar de shader, de normal matrix en diffuse belichting (Lambert); 21c ambient en specular (Blinn-Phong), waarvoor de camerapositie naar de shader moet |
+| 138 | Normalen in `Vertex` | het vaste formaat wordt groter in plaats van vrij (besluit 24 blijft staan): `Vertex { position[3], color[3], normal[3] }`, attribuut 2 in `CreateMesh` (`glVertexArrayAttribFormat` met `offsetof(Vertex, normal)`, aanzetten en koppelen aan binding 0). Er is nog geen tweede formaat naast het eerste; het vrije formaat komt bij texturen. De kleur blijft, als eigen kleur van het oppervlak |
+| 139 | Normalen van de kubus | per vlak één normaal, op alle vier de hoekpunten van dat vlak (kan dankzij de 24 hoekpunten van besluit 54): voor `+Z`, achter `-Z`, rechts `+X`, links `-X`, boven `+Y`, onder `-Y` |
+| 140 | Normalen-shader | `Sandbox/shaders/normals.vert` en `.frag` tonen de normaal als kleur (`normal * 0.5 + 0.5`), om normalen te controleren; ze blijven staan als gereedschap om fouten te zoeken. Wisselen gaat door de bestandsnamen in `main.cpp` aan te passen. De normaal is nog die van de mesh, niet gedraaid naar de wereld |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -311,7 +315,10 @@ kubus, lopen, rondkijken, Escape), nu volledig met entities en systems.
 Stap 19 is ook af: `Length` en `Normalize` op `Vec3`, en het `CameraControlSystem` normaliseert de
 beweging, zodat diagonaal lopen even snel gaat als rechtdoor. Stap 20 ook: de shaders staan in
 `Sandbox/shaders/` en worden met `ReadTextFile` (in `Core`) ingelezen; een ontbrekend bestand of
-een fout in de shader stopt Sandbox netjes (door de gebruiker gezien).
+een fout in de shader stopt Sandbox netjes (door de gebruiker gezien). Stap 21 (belichting) is
+begonnen met 21a: `Vertex` heeft een normaal op attribuut 2, de kubus heeft per vlak een normaal,
+en de normalen-shader toont ze als kleur (door de gebruiker gezien). Sandbox gebruikt weer
+`basic`.
 
 Publieke interface van `Renderer`:
 
@@ -396,16 +403,16 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 21, belichting
+## Volgende stap: 21b, diffuse belichting
 
-De route (besluit 130): stap 19 `Length` en `Normalize` (af), stap 20 shaders uit bestanden (af),
-stap 21 belichting. Open punten voor 21, waarschijnlijk in delen: het vrije vertex-formaat
-(besluit 24; normalen op attribuut 2, of een beschrijving van de indeling die `CreateMesh`
-meekrijgt); normalen voor de kubus (per vlak, de 24 hoekpunten van besluit 54 maken dat al
-mogelijk); de normal matrix (de model-matrix zonder verplaatsing; bij ongelijke schaal de
-inverse-transpose) of eerst alleen gelijke schaal; een lichtrichting en -kleur naar de shader
-(een uniform buffer zoals de camera, besluit 52, of een uniform); eerst diffuse (Lambert), daarna
-ambient en specular (Phong of Blinn-Phong, die de camerapositie in de shader nodig heeft).
+De route (besluit 130): stap 19 en 20 zijn af, stap 21 belichting is begonnen (besluit 137: 21a
+normalen af, 21b diffuse, 21c ambient en specular). Open punten voor 21b: de normal matrix (de
+model-matrix zonder verplaatsing; bij ongelijke schaal de inverse-transpose, die een `Inverse`
+op `Mat4` vraagt) of eerst `mat3(u_model)` met de afspraak van gelijke schaal; uitrekenen in de
+shader of in C++; een lichtrichting en -kleur naar de shader (een tweede uniform buffer op
+bindpunt 1 zoals de camera, besluit 52, of een uniform per shader); waar het licht vandaan komt
+(een component `DirectionalLight` en een system, of een vaste waarde in de Renderer); een nieuwe
+shader `lit` naast `basic`; diffuse (Lambert): `max(dot(normal, -lightDirection), 0)`.
 
 Stap 18 (de ECS, de module `Engine` en Sandbox daarop) ging in deze delen:
 
