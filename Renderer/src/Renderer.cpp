@@ -13,6 +13,7 @@ namespace ezse {
 namespace {
 
 constexpr GLuint c_cameraBindingPoint = 0;
+constexpr GLuint c_lightBindingPoint = 1;
 
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
@@ -48,6 +49,17 @@ GLuint CompileShader(GLenum type, std::string_view source) {
     return shader;
 }
 
+// The Light block in the shaders, laid out as std140: a vec3 takes the room of a vec4 (16 bytes),
+// so each vec3 is followed by one float of padding.
+struct LightData {
+    float direction[3];
+    float padding0 = 0.0f;
+    float color[3];
+    float padding1 = 0.0f;
+};
+
+static_assert(sizeof(LightData) == 32);
+
 } // namespace
 
 std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
@@ -73,6 +85,10 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glCreateBuffers(1, &renderer->m_viewProjectionBuffer);
     glNamedBufferStorage(renderer->m_viewProjectionBuffer, sizeof(Mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_UNIFORM_BUFFER, c_cameraBindingPoint, renderer->m_viewProjectionBuffer);
+
+    glCreateBuffers(1, &renderer->m_lightBuffer);
+    glNamedBufferStorage(renderer->m_lightBuffer, sizeof(LightData), nullptr, GL_DYNAMIC_STORAGE_BIT);
+    glBindBufferBase(GL_UNIFORM_BUFFER, c_lightBindingPoint, renderer->m_lightBuffer);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -196,6 +212,14 @@ void Renderer::SetCamera(const Mat4& view, const Mat4& projection) {
     glNamedBufferSubData(m_viewProjectionBuffer, 0, sizeof(Mat4), &viewProjection.m[0][0]);
 }
 
+void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color) {
+    const Vec3 lightDirection = Normalize(direction);
+    const LightData lightData = {
+        .direction{lightDirection.x, lightDirection.y, lightDirection.z},
+        .color{color.x, color.y, color.z}};
+    glNamedBufferSubData(m_lightBuffer, 0, sizeof(LightData), &lightData);
+}
+
 Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
     EZSE_ASSERT(mesh.id > 0 && mesh.id <= m_meshData.size(), "Mesh handle is out of range");
 
@@ -231,6 +255,8 @@ Renderer::~Renderer() {
     }
 
     glDeleteBuffers(1, &m_viewProjectionBuffer);
+    glDeleteBuffers(1, &m_lightBuffer);
+
 }
 
 } // namespace ezse

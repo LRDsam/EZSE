@@ -180,9 +180,9 @@ int main() {
     const std::filesystem::path shaderDir{ EZSE_SANDBOX_SHADER_DIR };
 
     const std::optional<std::string> vertexSource = ezse::ReadTextFile(
-        shaderDir / "basic.vert");
+        shaderDir / "lit.vert");
     const std::optional<std::string> fragmentSource = ezse::ReadTextFile(
-        shaderDir / "basic.frag");
+        shaderDir / "lit.frag");
     if (!vertexSource.has_value() || !fragmentSource.has_value()) {
         ezse::LogError("Reading vertex and/or fragment source failed.");
         return 1;
@@ -201,6 +201,9 @@ int main() {
         ezse::LogError("Failed to compile shader.");
         return 1;
     }
+    renderer.SetDirectionalLight(
+        ezse::Vec3{ -0.5f, -1.0f, -0.7f },
+        ezse::Vec3{ 1.0f, 1.0f, 1.0f });
 
     ezse::World& world = engine->GetWorld();
 

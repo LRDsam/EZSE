@@ -2,7 +2,9 @@
 
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Shader.h"
+
 #include "EZSE/Math/Transform.h"
+#include "EZSE/Math/Vec3.h"
 
 #include <memory>
 #include <span>
@@ -28,6 +30,7 @@ public:
     void DestroyShader(ShaderHandle shader);
 
     void SetCamera(const Mat4& view, const Mat4& projection);
+    void SetDirectionalLight(const Vec3& direction, const Vec3& color);
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -54,8 +57,10 @@ private:
     ShaderData& GetShaderData(ShaderHandle shader);
 
     unsigned int m_viewProjectionBuffer = 0;
+    unsigned int m_lightBuffer = 0;
     std::vector<MeshData> m_meshData;
     std::vector<ShaderData> m_shaderData;
+
 };
 
 } // namespace ezse

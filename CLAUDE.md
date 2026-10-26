@@ -272,6 +272,10 @@ Regels die de Renderer herbruikbaar houden:
 | 138 | Normalen in `Vertex` | het vaste formaat wordt groter in plaats van vrij (besluit 24 blijft staan): `Vertex { position[3], color[3], normal[3] }`, attribuut 2 in `CreateMesh` (`glVertexArrayAttribFormat` met `offsetof(Vertex, normal)`, aanzetten en koppelen aan binding 0). Er is nog geen tweede formaat naast het eerste; het vrije formaat komt bij texturen. De kleur blijft, als eigen kleur van het oppervlak |
 | 139 | Normalen van de kubus | per vlak één normaal, op alle vier de hoekpunten van dat vlak (kan dankzij de 24 hoekpunten van besluit 54): voor `+Z`, achter `-Z`, rechts `+X`, links `-X`, boven `+Y`, onder `-Y` |
 | 140 | Normalen-shader | `Sandbox/shaders/normals.vert` en `.frag` tonen de normaal als kleur (`normal * 0.5 + 0.5`), om normalen te controleren; ze blijven staan als gereedschap om fouten te zoeken. Wisselen gaat door de bestandsnamen in `main.cpp` aan te passen. De normaal is nog die van de mesh, niet gedraaid naar de wereld |
+| 141 | Normal matrix | in de vertex shader: `transpose(inverse(mat3(u_model))) * a_normal`, juist ook bij ongelijke schaal; per hoekpunt uitgerekend, wat voor een paar voorwerpen niets uitmaakt. In C++ uitrekenen (vraagt `Inverse` in `Math` en een extra uniform) komt als het uitmaakt. In de fragment shader opnieuw `normalize`, omdat interpoleren de normaal korter maakt |
+| 142 | Licht naar de shader | een tweede uniform buffer op bindpunt 1 (`c_lightBindingPoint`), zoals de camera (besluit 52): `layout(std140, binding = 1) uniform Light { vec3 u_lightDirection; vec3 u_lightColor; };`. In `Renderer.cpp` een `LightData` met na elke `vec3` een `float` padding (in `std140` neemt een `vec3` 16 bytes in) en `static_assert(sizeof(LightData) == 32)`. `void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color)` normaliseert de richting (van het licht naar het oppervlak) en vult de buffer; het licht blijft tot de volgende aanroep. De destructor ruimt de buffer op |
+| 143 | Bron van het licht | Sandbox zet één richtingslicht vóór `Run()`: richting `(-0.5, -1, -0.7)`, wit. Een component `DirectionalLight` met een `LightSystem` (richting uit de `Transform`) komt als het licht moet bewegen of bij een eigen scene |
+| 144 | Shader `lit` | `Sandbox/shaders/lit.vert` en `.frag` naast `basic` en `normals`: diffuse belichting (Lambert), `max(dot(n, -u_lightDirection), 0.0) * u_lightColor * color`, in wereldruimte. Zonder ambient zijn vlakken die van het licht af wijzen zwart (21c). Sandbox gebruikt `lit` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -317,8 +321,10 @@ beweging, zodat diagonaal lopen even snel gaat als rechtdoor. Stap 20 ook: de sh
 `Sandbox/shaders/` en worden met `ReadTextFile` (in `Core`) ingelezen; een ontbrekend bestand of
 een fout in de shader stopt Sandbox netjes (door de gebruiker gezien). Stap 21 (belichting) is
 begonnen met 21a: `Vertex` heeft een normaal op attribuut 2, de kubus heeft per vlak een normaal,
-en de normalen-shader toont ze als kleur (door de gebruiker gezien). Sandbox gebruikt weer
-`basic`.
+en de normalen-shader toont ze als kleur (door de gebruiker gezien). Deel 21b: de Renderer
+heeft een richtingslicht in een tweede uniform buffer (`SetDirectionalLight`), en Sandbox tekent
+met de shader `lit` (diffuse belichting). Dat bouwt; het beeld is in deze stap niet door de
+gebruiker bevestigd.
 
 Publieke interface van `Renderer`:
 
@@ -330,6 +336,7 @@ ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragme
 void         DestroyShader(ShaderHandle shader);
 void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection);
+void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
 void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
 ```
@@ -355,8 +362,10 @@ Bekende beperkingen, bewust zo gelaten:
   afspraak die nergens wordt afgedwongen.
 - Hetzelfde geldt voor de naam `u_model` en voor het blok `Camera` op bindpunt 0: de Renderer
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
-- De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera`
-  aan te roepen, tekent met onbepaalde waarden.
+- De uniform buffers van de camera en het licht krijgen geen begininhoud: wie tekent zonder eerst
+  `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
+- Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
+  shader.
 - Face culling staat altijd aan: een los vlak is van achteren gezien onzichtbaar, en een
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
 - `EZSE_DEBUG_BREAK` gebruikt `__debugbreak()` en werkt dus alleen met MSVC.
@@ -403,16 +412,17 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 21b, diffuse belichting
+## Volgende stap: 21c, ambient en specular
 
-De route (besluit 130): stap 19 en 20 zijn af, stap 21 belichting is begonnen (besluit 137: 21a
-normalen af, 21b diffuse, 21c ambient en specular). Open punten voor 21b: de normal matrix (de
-model-matrix zonder verplaatsing; bij ongelijke schaal de inverse-transpose, die een `Inverse`
-op `Mat4` vraagt) of eerst `mat3(u_model)` met de afspraak van gelijke schaal; uitrekenen in de
-shader of in C++; een lichtrichting en -kleur naar de shader (een tweede uniform buffer op
-bindpunt 1 zoals de camera, besluit 52, of een uniform per shader); waar het licht vandaan komt
-(een component `DirectionalLight` en een system, of een vaste waarde in de Renderer); een nieuwe
-shader `lit` naast `basic`; diffuse (Lambert): `max(dot(normal, -lightDirection), 0)`.
+De route (besluit 130): stap 19 en 20 zijn af, stap 21 belichting (besluit 137): 21a normalen
+en 21b diffuse zijn af, 21c ambient en specular volgt. Open punten voor 21c: ambient als een
+vaste kleine hoeveelheid licht (een `float` of kleur in het blok `Light`, met de `std140`-regels)
+zodat de schaduwkant niet zwart is; specular volgens Blinn-Phong (het halfway-vector tussen de
+richting naar het licht en naar de camera, `pow(max(dot(n, h), 0), shininess)`); daarvoor moet
+de positie van de camera naar de shader (het blok `Camera` uitbreiden met `vec3` plus padding, en
+`SetCamera` laten meesturen, of een eigen veld); waar `shininess` vandaan komt (een uniform per
+shader, een vaste waarde, of later een materiaal); de wereldpositie van een fragment doorgeven
+vanuit de vertex shader (`u_model * vec4(a_position, 1.0)`).
 
 Stap 18 (de ECS, de module `Engine` en Sandbox daarop) ging in deze delen:
 
