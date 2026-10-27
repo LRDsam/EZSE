@@ -155,7 +155,7 @@ Regels die de Renderer herbruikbaar houden:
 | 19 | Stijl | Direct State Access |
 | 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing. Opgelost in stap 16 (besluiten 58 tot en met 62) |
 | 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
-| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1, en sinds besluit 138 de normaal op 2); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
+| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1, sinds besluit 138 de normaal op 2, sinds besluit 153 de UV op 3); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
 | 25 | Indices | altijd verplicht, 32 bits (`std::uint32_t`); `CreateMesh` controleert met asserts dat het aantal een veelvoud van drie is en dat elke index naar een bestaand hoekpunt wijst |
 | 26 | Wiskunde | zelf geschreven, geen glm. De gebruiker schrijft de code zoals bij rendering: Claude geeft opdracht, signaturen en achtergrond en loopt na. Elke functie controleren met bekende uitkomsten voordat hij de shader in gaat |
 | 27 | Module `Math` | eigen statische library `EZSE::Math` met `.cpp`-bestanden (niet header-only); hangt van niets af, `Core` komt erbij bij de eerste `EZSE_ASSERT` |
@@ -283,6 +283,10 @@ Regels die de Renderer herbruikbaar houden:
 | 149 | Route na stap 21 | 22 assets naast de executable (vervangt het ingebakken pad van besluit 134, vóór er plaatjes bijkomen), 23 texturen (in delen: het vrije vertex-formaat met UV's, een plaatje inladen, textures in de Renderer, de shader), 24 materialen |
 | 150 | Assets naast de executable | losse bestanden in `Sandbox/assets/` (nu `shaders/`, straks `textures/`), die CMake bij elke build naast de executable kopieert: een custom target `SandboxAssets` (`ALL`) met `cmake -E copy_directory` naar `${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/assets` (niet `$<TARGET_FILE_DIR:Sandbox>`: dat zou een kring geven), en `add_dependencies(Sandbox SandboxAssets)` zodat F5 ook kopieert. Een aangepaste shader is er na de volgende build. Geen combinatie met de bronmap in Debug. Uitbreidbaar: het `COMMAND` van dat target is de plek voor een latere stap die assets comprimeert of inpakt (zoals de cook-stap van grote engines). Het minimum blijft CMake 3.24 (`copy_directory_if_different` vraagt 3.26) |
 | 151 | Map van de executable | `std::filesystem::path GetExecutableDirectory()` in `Platform/FileSystem.h`/`.cpp`, met `GetModuleFileNameW` (de `W`-versie, zodat paden met bijzondere tekens kloppen) en `parent_path()`. `windows.h` achter `WIN32_LEAN_AND_MEAN` en `NOMINMAX`, alleen in de `.cpp`, met `#error` voor andere platforms. Bij een fout of een afgekapt pad (`MAX_PATH`) `LogError` met `GetLastError()` en een leeg pad. Sandbox bouwt zelf `GetExecutableDirectory() / "assets" / "shaders"`; een assetsysteem in de engine komt met de resource manager |
+| 152 | Opdeling van stap 23 | 23a UV-coördinaten in het vertex-formaat en de kubus, gecontroleerd met een UV-shader; 23b een plaatje inladen naar pixels; 23c textures in de Renderer; 23d tekenen met een texture |
+| 153 | UV in `Vertex` | het vaste formaat opnieuw uitgebreid (besluit 24 blijft staan): `float uv[2]` achter `normal`, attribuut 3 met 2 floats. Het vrije formaat komt pas bij de eerste mesh die echt iets anders nodig heeft (een model zonder kleuren, animatie-attributen, tangents) |
+| 154 | UV's van de kubus | per vlak het hele plaatje: `(0,0)`, `(1,0)`, `(1,1)`, `(0,1)` in de volgorde van de hoekpunten (tegen de klok in van buiten, beginnend linksonder). Het omdraaien van `v` (plaatjes beginnen bij de bovenste rij, OpenGL linksonder) gebeurt bij het laden (23b) |
+| 155 | UV-shader | `Sandbox/assets/shaders/uv.vert` en `.frag` tonen de UV als kleur (`vec4(uv, 0.0, 1.0)`: linksonder zwart, rechtsonder rood, rechtsboven geel, linksboven groen); blijven staan als gereedschap, net als `normals` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -334,7 +338,9 @@ met de shader `lit` (diffuse belichting). Deel 21c: ambient en specular (Blinn-P
 camerapositie in het blok `Camera` (door de gebruiker gezien). Daarmee is stap 21 af. Stap 22:
 de assets van Sandbox staan in `Sandbox/assets/` en worden bij elke build naast de executable
 gekopieerd; Sandbox vindt ze met `GetExecutableDirectory()`. Werkt ook als de executable buiten Visual Studio
-wordt gestart (door de gebruiker gezien).
+wordt gestart (door de gebruiker gezien). Stap 23 (texturen) is begonnen met 23a: `Vertex` heeft
+een UV op attribuut 3, de kubus heeft per vlak het hele plaatje als UV's, en de UV-shader toont
+ze als kleur (door de gebruiker gezien). Sandbox tekent weer met `lit`.
 
 Publieke interface van `Renderer`:
 
@@ -427,16 +433,29 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 23, texturen
+## Volgende stap: 23b, een plaatje inladen
 
-De route (besluit 149): 22 assets naast de executable (af), 23 texturen, 24 materialen. Open
-punten voor 23, in delen: het vrije vertex-formaat (besluit 24) met UV-coördinaten, en hoe
-`CreateMesh` de indeling krijgt; een plaatje inladen (een bibliotheek als stb_image in
-`ThirdParty`, of een eigen eenvoudige lader); een `TextureHandle` met `CreateTexture` en
-`DestroyTexture` in de Renderer (DSA: `glCreateTextures`, `glTextureStorage2D`,
-`glTextureSubImage2D`, `glGenerateTextureMipmap`); filtering, wrapping en mipmaps; hoe een
-texture bij het tekenen gekozen wordt (`DrawMesh` erbij, of via een materiaal in stap 24); een
-`sampler2D` in de shader; een plaatje voor de kubus in `Sandbox/assets/textures/`.
+De route (besluit 149): 22 assets naast de executable (af), 23 texturen (besluit 152: 23a UV's
+af, 23b laden, 23c textures in de Renderer, 23d tekenen met een texture), 24 materialen. Open
+punten voor 23b: welke bibliotheek (stb_image, één header, public domain) of een eigen lader voor
+een eenvoudig formaat; hoe hij in `ThirdParty` komt (de header vastleggen in git zoals glad,
+besluit 14–15, of FetchContent zoals GLFW) en welke versie; waar het laden staat (de Renderer
+kent geen bestanden, regel 3: dus in `Engine` of een eigen plek) en de vorm (een struct `Image`
+met breedte, hoogte en pixels in een `std::vector<std::uint8_t>`, en een function die een lege
+`std::optional` geeft bij een fout); altijd 4 kanalen (RGBA) of het aantal uit het bestand;
+`v` omdraaien bij het laden (`stbi_set_flip_vertically_on_load`); een test in `EngineTests` met
+een klein plaatje; een plaatje voor de kubus in `Sandbox/assets/textures/`.
+
+Open punten voor 23c en 23d: een `TextureHandle` met `CreateTexture` en `DestroyTexture` in de
+Renderer (DSA: `glCreateTextures`, `glTextureStorage2D`, `glTextureSubImage2D`,
+`glGenerateTextureMipmap`); filtering, wrapping en mipmaps; sRGB (`GL_SRGB8_ALPHA8`); hoe een
+texture bij het tekenen gekozen wordt (`DrawMesh` erbij, of via `MeshRenderer`); een `sampler2D`
+in de shader met `layout(binding = 0)`.
+
+Afgesproken voor stap 24 (materialen): de vertex-kleur (`color`, attribuut 1) gaat uit `Vertex`.
+De kleur komt dan uit het materiaal: een texture maal een tint, met een witte texture van 1 bij 1
+voor effen kleuren. Niet eerder, omdat er tot dan geen vervanging is en er anders tijdelijk een
+vaste kleur in de shaders zou moeten.
 
 Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse (141 tot en
 met 144), 21c ambient en specular (145 tot en met 148).

@@ -6,6 +6,8 @@ add_executable(Sandbox
     assets/shaders/lit.frag
     assets/shaders/normals.vert
     assets/shaders/normals.frag
+    assets/shaders/uv.vert
+    assets/shaders/uv.frag
 )
 
 target_link_libraries(Sandbox PRIVATE EZSE::Engine)
