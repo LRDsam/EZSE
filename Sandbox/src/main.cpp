@@ -13,6 +13,7 @@
 #include "EZSE/Platform/Window.h"
 #include "EZSE/Platform/Key.h"
 #include "EZSE/Platform/WindowEvent.h"
+#include "EZSE/Platform/FileSystem.h"
 
 #include "EZSE/Math/Transform.h"
 
@@ -177,7 +178,8 @@ int main() {
         20, 21, 22,  20, 22, 23,   // bottom
     };
 
-    const std::filesystem::path shaderDir{ EZSE_SANDBOX_SHADER_DIR };
+    const std::filesystem::path shaderDir =
+        ezse::GetExecutableDirectory() / "assets" / "shaders";
 
     const std::optional<std::string> vertexSource = ezse::ReadTextFile(
         shaderDir / "lit.vert");

@@ -1,17 +1,21 @@
 add_executable(Sandbox
     src/main.cpp
-    shaders/basic.vert
-    shaders/basic.frag
-    shaders/lit.vert
-    shaders/lit.frag
-    shaders/normals.vert
-    shaders/normals.frag
+    assets/shaders/basic.vert
+    assets/shaders/basic.frag
+    assets/shaders/lit.vert
+    assets/shaders/lit.frag
+    assets/shaders/normals.vert
+    assets/shaders/normals.frag
 )
 
 target_link_libraries(Sandbox PRIVATE EZSE::Engine)
 
-# Development only: the shaders are read from the source folder, so a changed shader is used
-# without rebuilding. This path only exists on this computer (see the known limitations).
-target_compile_definitions(Sandbox PRIVATE
-    EZSE_SANDBOX_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+# Copies Sandbox/assets next to the executable on every build, so a changed shader is used after
+# the next build. Later this step can pack or optimize the assets before they are copied.
+add_custom_target(SandboxAssets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/assets
+    COMMENT "Copying Sandbox assets"
 )
+add_dependencies(Sandbox SandboxAssets)
