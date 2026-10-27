@@ -1,0 +1,8 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+
+[*.{h,cpp}]
+cpp_indent_namespace_contents = false
