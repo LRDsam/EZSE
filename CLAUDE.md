@@ -96,7 +96,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
-| `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
+| `Renderer` | OpenGL laden, meshes, shaders, textures, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`) | |
 
@@ -291,7 +291,13 @@ Regels die de Renderer herbruikbaar houden:
 | 157 | Plek en vorm | `Engine/Resources/Image.h`/`.cpp` (niet in de Renderer: die kent geen bestanden, regel 3). `struct Image { int width; int height; std::vector<std::uint8_t> pixels; }`, bytes en geen struct per pixel, zodat later andere formaten (één kanaal, floats) in dezelfde vorm passen. `std::optional<Image> DecodeImage(std::span<const std::uint8_t>)` decodeert bytes uit het geheugen; `std::optional<Image> ReadImageFile(const std::filesystem::path&)` leest het bestand en decodeert. Bij een fout `LogError` (met `stbi_failure_reason()` of het pad) en `std::nullopt`. De naam `LoadImage` kan niet: dat is een macro in de Windows-headers |
 | 158 | Instellingen van stb_image | `STB_IMAGE_IMPLEMENTATION` alleen in `Image.cpp`, met `STBI_NO_STDIO`: stb opent zelf geen bestanden, onze code leest ze (paden met bijzondere tekens werken dan). Altijd 4 kanalen (RGBA) gevraagd, ongeacht het bestand. `stbi_set_flip_vertically_on_load(1)`: de eerste rij in het geheugen is de onderste rij van het plaatje, zoals OpenGL verwacht (vervolg op besluit 154). De grootte van de pixels wordt in `std::size_t` uitgerekend, zodat een groot plaatje geen `int`-overloop geeft |
 | 159 | Binair lezen | `std::optional<std::vector<std::uint8_t>> ReadBinaryFile(const std::filesystem::path&)` in `Core/File.h`/`.cpp`, naast `ReadTextFile` (besluit 135) en op dezelfde manier: `std::istreambuf_iterator<char>`, omgezet naar bytes door de range constructor van de vector |
-| 160 | Test van het decoderen | `EngineTests` decodeert een PNG van 2 bij 2 pixels die als bytes in de test staat (geen bestand nodig) en controleert breedte, hoogte, aantal bytes en de volgorde van de rijen na het omdraaien; bytes die geen plaatje zijn geven niets. `ReadBinaryFile` en `ReadImageFile` worden pas met een echt bestand gebruikt in 23d |
+| 160 | Test van het decoderen | `EngineTests` decodeert een PNG van 2 bij 2 pixels die als bytes in de test staat (geen bestand nodig) en controleert breedte, hoogte, aantal bytes en de volgorde van de rijen na het omdraaien; bytes die geen plaatje zijn geven niets. `ReadBinaryFile` en `ReadImageFile` worden pas met een echt bestand gebruikt in 23d (sinds 23c leest Sandbox er al een) |
+| 161 | Omvang van 23c | alleen `CreateTexture` en `DestroyTexture`, nog niet tekenen (besluit 152). Gecontroleerd doordat Sandbox een texture maakt en de debug-callback niets meldt |
+| 162 | `TextureHandle` | in `Renderer/Texture.h`, zoals `MeshHandle` en `ShaderHandle`; privé `TextureData { unsigned int textureObj; }` in `m_textureData` met `GetTextureData`, opgeruimd door `DestroyTexture` en de destructor |
+| 163 | `CreateTexture` | `TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels)`: ruwe gegevens, de Renderer kent `Image` niet (regel 3). Altijd RGBA8; asserts op een breedte of hoogte van 0 of kleiner en op `pixels.size() != width * height * 4` (programmeerfouten). Kan niet mislukken. Een `TextureDesc` komt bij het eerste tweede formaat of de eerste tweede filtering |
+| 164 | Kleurruimte | `GL_RGBA8`, niet `GL_SRGB8_ALPHA8`: de waarden gaan ongewijzigd naar de shader, zoals de vertex-kleuren, de achtergrond en het licht nu ook. Gamma-correctie (sRGB-texturen, `GL_FRAMEBUFFER_SRGB` en een sRGB-venster) wordt een eigen stap, omdat die alle kleuren en lichtwaarden verandert (zie Daarna) |
+| 165 | Mipmaps, filtering en wrapping | immutable storage met `glTextureStorage2D` en alle niveaus (`std::bit_width` van de grootste zijde: 256 geeft 9), niveau 0 vullen en dan `glGenerateTextureMipmap`. Min-filter `GL_LINEAR_MIPMAP_LINEAR` (trilinear), mag-filter `GL_LINEAR`, wrapping `GL_REPEAT` op S en T, expliciet gezet. De instellingen staan op de texture zelf (`glTextureParameteri`); sampler objects komen bij een texture die op twee manieren gelezen moet worden. Nearest, anisotrope filtering en `GL_CLAMP_TO_EDGE` bij aanleiding |
+| 166 | Plaatje in Sandbox | `Sandbox/assets/textures/checker.png`, door een script gemaakt: een schaakbord van 256 bij 256 pixels met vakken van 32 en een rood vak linksboven, zodat in 23d te zien is of het plaatje omgedraaid of gespiegeld is. Sandbox leest het vóór `Engine::Create` (stopt met `return 1` als dat mislukt, zoals bij de shaders) en maakt er na `Create` een texture van |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -347,7 +353,10 @@ wordt gestart (door de gebruiker gezien). Stap 23 (texturen) is begonnen met 23a
 een UV op attribuut 3, de kubus heeft per vlak het hele plaatje als UV's, en de UV-shader toont
 ze als kleur (door de gebruiker gezien). Sandbox tekent weer met `lit`. Deel 23b: plaatjes
 decoderen met stb_image (`DecodeImage` en `ReadImageFile` in `Engine/Resources/`, altijd RGBA,
-omgedraaid voor OpenGL) en `ReadBinaryFile` in `Core`. `EngineTests` heeft nu 17 controles.
+omgedraaid voor OpenGL) en `ReadBinaryFile` in `Core`. `EngineTests` heeft nu 17 controles. Deel
+23c: de Renderer heeft textures (`CreateTexture`, `DestroyTexture`: RGBA8, mipmaps, trilinear,
+repeat), en Sandbox maakt er een van `checker.png`, zonder debug-meldingen (door de gebruiker
+gezien). Getekend wordt hij nog niet.
 
 Publieke interface van `Renderer`:
 
@@ -356,6 +365,8 @@ static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
 MeshHandle   CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
 void         DestroyMesh(MeshHandle mesh);
 ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
+TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
+void         DestroyTexture(TextureHandle texture);
 void         DestroyShader(ShaderHandle shader);
 void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
@@ -440,16 +451,18 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 23c, textures in de Renderer
+## Volgende stap: 23d, tekenen met een texture
 
 De route (besluit 149): 22 assets naast de executable (af), 23 texturen (besluit 152: 23a UV's
-af, 23b laden af, 23c textures in de Renderer, 23d tekenen met een texture), 24 materialen.
+af, 23b laden af, 23c textures in de Renderer af, 23d tekenen met een texture), 24 materialen.
 
-Open punten voor 23c en 23d: een `TextureHandle` met `CreateTexture` en `DestroyTexture` in de
-Renderer (DSA: `glCreateTextures`, `glTextureStorage2D`, `glTextureSubImage2D`,
-`glGenerateTextureMipmap`); filtering, wrapping en mipmaps; sRGB (`GL_SRGB8_ALPHA8`); hoe een
-texture bij het tekenen gekozen wordt (`DrawMesh` erbij, of via `MeshRenderer`); een `sampler2D`
-in de shader met `layout(binding = 0)`.
+Open punten voor 23d: hoe een texture bij het tekenen gekozen wordt (`DrawMesh` met een extra
+`TextureHandle`, of een veld in `MeshRenderer` dat het `RenderSystem` doorgeeft); binden aan een
+texture unit met `glBindTextureUnit` (DSA; klassiek `glActiveTexture` en `glBindTexture`); een
+`sampler2D` in `lit.frag` met `layout(binding = 0)` en de UV uit de vertex shader; hoe de
+texture-kleur met de vertex-kleur samengaat tot stap 24 (vermenigvuldigen, of de vertex-kleur
+negeren); de kubus in Sandbox met `checkerTexture`, en aan het rode vak controleren dat het
+plaatje niet omgedraaid of gespiegeld is.
 
 Afgesproken voor stap 24 (materialen): de vertex-kleur (`color`, attribuut 1) gaat uit `Vertex`.
 De kleur komt dan uit het materiaal: een texture maal een tint, met een witte texture van 1 bij 1
@@ -522,5 +535,6 @@ toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een h
 `World` (scene) die de `Engine` als actieve wereld kan wisselen; beide vragen een interface over
 het beeld (tekst, knoppen) in de Renderer. Assets verder: een assetsysteem in de engine,
 voorbewerken (texturen comprimeren) en inpakken in archieven met een virtual file system,
-shaders opnieuw laden terwijl het programma draait, en een aparte map voor instellingen en
+shaders opnieuw laden terwijl het programma draait, gamma-correctie (sRGB-texturen en een
+sRGB-framebuffer, besluit 164), en een aparte map voor instellingen en
 opgeslagen spellen (`AppData`).

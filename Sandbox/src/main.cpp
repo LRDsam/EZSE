@@ -2,6 +2,7 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
+#include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
@@ -180,6 +181,8 @@ int main() {
 
     const std::filesystem::path shaderDir =
         ezse::GetExecutableDirectory() / "assets" / "shaders";
+    const std::filesystem::path textureDir =
+        ezse::GetExecutableDirectory() / "assets" / "textures";
 
     const std::optional<std::string> vertexSource = ezse::ReadTextFile(
         shaderDir / "lit.vert");
@@ -190,12 +193,20 @@ int main() {
         return 1;
     }
 
+    const std::optional<ezse::Image> checkerImage = ezse::ReadImageFile(textureDir / "checker.png");
+    if (!checkerImage.has_value()) {
+        return 1;
+    }
+
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
         return 1;
     }
 
     ezse::Renderer& renderer = engine->GetRenderer();
+
+    const ezse::TextureHandle checkerTexture = renderer.CreateTexture(
+        checkerImage->width, checkerImage->height, checkerImage->pixels);
     const ezse::MeshHandle cubeMesh = renderer.CreateMesh(cubeVertices, cubeIndices);
     const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
         *fragmentSource);

@@ -2,6 +2,7 @@
 
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Shader.h"
+#include "EZSE/Renderer/Texture.h"
 
 #include "EZSE/Math/Transform.h"
 #include "EZSE/Math/Vec3.h"
@@ -25,6 +26,11 @@ public:
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
     void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
+
+    // Creates a texture from RGBA pixels, 4 bytes per pixel, row by row (the first row is the bottom).
+    // width, height: in pixels, both larger than 0. pixels: exactly width * height * 4 bytes.
+    TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
+    void DestroyTexture(TextureHandle texture);
 
     ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
     void DestroyShader(ShaderHandle shader);
@@ -63,13 +69,19 @@ private:
         int modelLocation = -1;
     };
 
+    struct TextureData {
+        unsigned int textureObj = 0;
+    };
+
     MeshData& GetMeshData(MeshHandle mesh);
     ShaderData& GetShaderData(ShaderHandle shader);
+    TextureData& GetTextureData(TextureHandle texture);
 
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
     std::vector<MeshData> m_meshData;
     std::vector<ShaderData> m_shaderData;
+    std::vector<TextureData> m_textureData;
 
 };
 

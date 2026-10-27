@@ -5,8 +5,9 @@
 
 #include <glad/gl.h>
 
+#include <algorithm>
+#include <bit>
 #include <cstddef>
-
 
 namespace ezse {
 
@@ -176,6 +177,36 @@ void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model)
     glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
+TextureHandle Renderer::CreateTexture(int width, int height, std::span<const std::uint8_t> pixels) {
+    EZSE_ASSERT(width > 0 && height > 0, "CreateTexture needs a width and height larger than 0");
+    EZSE_ASSERT(pixels.size() == static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4,
+        "CreateTexture needs exactly width * height * 4 bytes (RGBA)");
+
+    // One level for every halving of the largest side, down to 1 pixel: 256 gives 9 levels.
+    const int levels = static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(width, height))));
+
+    TextureData textureData;
+    glCreateTextures(GL_TEXTURE_2D, 1, &textureData.textureObj);
+    glTextureStorage2D(textureData.textureObj, levels, GL_RGBA8, width, height);
+    glTextureSubImage2D(textureData.textureObj, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glGenerateTextureMipmap(textureData.textureObj);
+
+    glTextureParameteri(textureData.textureObj, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTextureParameteri(textureData.textureObj, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(textureData.textureObj, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(textureData.textureObj, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    LogInfo("OpenGL: Texture {} created ({}x{}, {} levels)", textureData.textureObj, width, height, levels);
+
+    m_textureData.push_back(textureData);
+    return TextureHandle{ static_cast<std::uint32_t>(m_textureData.size()) };
+}
+
+void Renderer::DestroyTexture(TextureHandle texture) {
+    TextureData& textureData = GetTextureData(texture);
+    glDeleteTextures(1, &textureData.textureObj);
+    textureData = TextureData{};
+}
+
 ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_view fragmentSource) {
     auto vertShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
     if (vertShader == 0) {
@@ -264,6 +295,12 @@ Renderer::ShaderData& Renderer::GetShaderData(ShaderHandle shader) {
     return shaderData;
 }
 
+Renderer::TextureData& Renderer::GetTextureData(TextureHandle texture) {
+    EZSE_ASSERT(texture.id > 0 && texture.id <= m_textureData.size(), "Texture handle is out of range");
+    TextureData& textureData = m_textureData[texture.id - 1];
+    EZSE_ASSERT(textureData.textureObj != 0, "Texture handle refers to a destroyed texture");
+    return textureData;
+}
 
 void Renderer::Clear(float red, float green, float blue) {
     glClearColor(red, green, blue, 1.0f);
@@ -279,6 +316,10 @@ Renderer::~Renderer() {
 
     for (auto& shaderData : m_shaderData) {
         glDeleteProgram(shaderData.shaderProgram);
+    }
+
+    for (auto& textureData : m_textureData) {
+        glDeleteTextures(1, &textureData.textureObj);
     }
 
     glDeleteBuffers(1, &m_cameraBuffer);
