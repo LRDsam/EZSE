@@ -15,6 +15,7 @@ namespace {
 
 constexpr GLuint c_cameraBindingPoint = 0;
 constexpr GLuint c_lightBindingPoint = 1;
+constexpr GLuint c_textureUnit = 0;
 
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
@@ -162,12 +163,15 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     meshData = MeshData{};
 }
 
-void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model) {
+void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model) {
     const MeshData& meshData = GetMeshData(mesh);
     const ShaderData& shaderData = GetShaderData(shader);
 
     glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
+    // Id 0 binds no texture, so a texture from an earlier draw does not stay bound.
+    const GLuint textureObj = texture.id == 0 ? 0 : GetTextureData(texture).textureObj;
+    glBindTextureUnit(c_textureUnit, textureObj);
     glProgramUniformMatrix4fv(
         shaderData.shaderProgram,
         shaderData.modelLocation,

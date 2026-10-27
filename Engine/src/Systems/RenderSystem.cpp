@@ -16,7 +16,8 @@ void RenderSystem::Update(World& world, float) {
     for (const Entity entity : GetEntities()) {
         const Transform& transform = world.GetComponent<Transform>(entity);
         const MeshRenderer& meshRenderer = world.GetComponent<MeshRenderer>(entity);
-        m_renderer.DrawMesh(meshRenderer.mesh, meshRenderer.shader, ModelMatrix(transform));
+        m_renderer.DrawMesh(meshRenderer.mesh, meshRenderer.shader, meshRenderer.texture,
+            ModelMatrix(transform));
     }
 }
 

@@ -1,8 +1,8 @@
 #version 460 core
 
-in  vec3 color;
 in  vec3 normal;
 in  vec3 worldPosition;
+in  vec2 uv;
 
 layout(std140, binding = 0) uniform Camera {
     mat4 u_viewProjection;
@@ -13,6 +13,8 @@ layout(std140, binding = 1) uniform Light {
     vec3 u_lightColor;       // offset 16
     vec3 u_ambientColor;     // offset 32
 };
+
+layout(binding = 0) uniform sampler2D u_texture;
 
 const float shininess = 128.0;
 const float specularStrength = 0.5;
@@ -30,6 +32,7 @@ void main() {
     float specular = pow(max(dot(worldNormal, halfway), 0.0), shininess) *
         specularStrength;
 
-    fragColor = vec4(color * (u_ambientColor + diffuse * u_lightColor) +
+    vec3 surfaceColor = texture(u_texture, uv).rgb;
+    fragColor = vec4(surfaceColor * (u_ambientColor + diffuse * u_lightColor) +
         specular * u_lightColor, 1.0);
 }

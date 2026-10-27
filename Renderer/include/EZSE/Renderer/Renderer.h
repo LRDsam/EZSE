@@ -24,7 +24,8 @@ public:
     void SetViewport(int width, int height);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
-    void DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
+    // texture: bound to texture unit 0 for this draw; id 0 binds no texture.
+    void DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
 
     // Creates a texture from RGBA pixels, 4 bytes per pixel, row by row (the first row is the bottom).

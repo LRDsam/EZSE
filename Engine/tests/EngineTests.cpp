@@ -116,8 +116,8 @@ void TestComponentDefaults() {
     Check(camera.nearPlane < camera.farPlane, "Camera: the near plane lies before the far plane");
 
     const ezse::MeshRenderer meshRenderer;
-    Check(meshRenderer.mesh.id == 0 && meshRenderer.shader.id == 0,
-          "MeshRenderer: a default MeshRenderer has no mesh and no shader");
+    Check(meshRenderer.mesh.id == 0 && meshRenderer.shader.id == 0 && meshRenderer.texture.id == 0,
+          "MeshRenderer: a default MeshRenderer has no mesh, shader or texture");
 }
 
 // A PNG of 2 by 2 pixels, made by a script. In the file the top row is red, green and the

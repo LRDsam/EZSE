@@ -228,7 +228,7 @@ int main() {
     // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
-    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, shader});
+    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, shader, checkerTexture});
     //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();

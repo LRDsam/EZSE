@@ -239,7 +239,7 @@ Regels die de Renderer herbruikbaar houden:
 | 105 | Opsplitsing van 18j | 18j de components, 18k `CameraSystem` en `RenderSystem` en Sandbox op de `Engine` met een stilstaande kubus, 18l de systems van het spel (draaien, camera besturen, Escape) |
 | 106 | Plek van de components | in de module `Engine`, een header per component in `Components/` (submappen per soort, zie de conventies). Wat specifiek is voor het spel blijft in Sandbox. `EZSE/Engine/Components/Transform.h` naast `EZSE/Math/Transform.h`: de bouwstenen (`Translation`, `RotationY` en dergelijke) blijven in `Math`, de component en de functions die hem omzetten naar een matrix staan in `Engine`, omdat `Math` geen components kent |
 | 107 | `Transform` | `Vec3 position`, `Vec3 rotation` (drie hoeken in radialen, Euler angles) en `Vec3 scale` (default `{1, 1, 1}`). Geen quaternion: dat komt bij vrije rotaties of animatie (gimbal lock). Vaste volgorde (vervolg op besluit 43): `ModelMatrix = Translation * RotationY * RotationX * RotationZ * Scale` (yaw, pitch, roll). `ViewMatrix(const Transform&)` is het omgekeerde zonder schaal: `RotationZ(-z) * RotationX(-x) * RotationY(-y) * Translation(-position)` (vervolg op besluit 49). Beide als losse functions in `Transform.cpp` |
-| 108 | `MeshRenderer` | `MeshHandle mesh` en `ShaderHandle shader`; alleen handles (regel 4) |
+| 108 | `MeshRenderer` | `MeshHandle mesh` en `ShaderHandle shader`, sinds besluit 167 ook `TextureHandle texture`; alleen handles (regel 4) |
 | 109 | `Camera` | `fovY` (radialen, default 45 graden), `nearPlane` en `farPlane`. De plaatsing staat in de `Transform` van dezelfde entity; de `aspect` komt elk frame uit het venster (18k) |
 | 110 | `EngineTests` | eigen testprogramma zoals `MathTests` (besluit 34), voor wat zonder venster te testen is; verwachte matrices met de hand opgebouwd of gecontroleerd op wat ze met een punt doen |
 | 111 | Ingebouwde components | `Transform`, `MeshRenderer` en `Camera` komen altijd met de engine mee: de `Engine` registreert ze zelf in de body van zijn constructor (vermeld in `Engine.h`), zoals hij ook zelf venster en Renderer maakt. Het spel registreert alleen zijn eigen components. Nieuwe ingebouwde components worden op dezelfde plek geregistreerd |
@@ -298,6 +298,12 @@ Regels die de Renderer herbruikbaar houden:
 | 164 | Kleurruimte | `GL_RGBA8`, niet `GL_SRGB8_ALPHA8`: de waarden gaan ongewijzigd naar de shader, zoals de vertex-kleuren, de achtergrond en het licht nu ook. Gamma-correctie (sRGB-texturen, `GL_FRAMEBUFFER_SRGB` en een sRGB-venster) wordt een eigen stap, omdat die alle kleuren en lichtwaarden verandert (zie Daarna) |
 | 165 | Mipmaps, filtering en wrapping | immutable storage met `glTextureStorage2D` en alle niveaus (`std::bit_width` van de grootste zijde: 256 geeft 9), niveau 0 vullen en dan `glGenerateTextureMipmap`. Min-filter `GL_LINEAR_MIPMAP_LINEAR` (trilinear), mag-filter `GL_LINEAR`, wrapping `GL_REPEAT` op S en T, expliciet gezet. De instellingen staan op de texture zelf (`glTextureParameteri`); sampler objects komen bij een texture die op twee manieren gelezen moet worden. Nearest, anisotrope filtering en `GL_CLAMP_TO_EDGE` bij aanleiding |
 | 166 | Plaatje in Sandbox | `Sandbox/assets/textures/checker.png`, door een script gemaakt: een schaakbord van 256 bij 256 pixels met vakken van 32 en een rood vak linksboven, zodat in 23d te zien is of het plaatje omgedraaid of gespiegeld is. Sandbox leest het vóór `Engine::Create` (stopt met `return 1` als dat mislukt, zoals bij de shaders) en maakt er na `Create` een texture van |
+| 167 | Texture kiezen bij het tekenen | een parameter: `DrawMesh(MeshHandle, ShaderHandle, TextureHandle, const Mat4& model)`, alles voor één draw in één aanroep. `MeshRenderer` krijgt `TextureHandle texture` en het `RenderSystem` geeft die door. Geen `BindTexture` die blijft staan (verborgen toestand). In stap 24 wordt de texture een materiaal |
+| 168 | Geen texture | id `0` mag: `DrawMesh` bindt dan `0` (`texture.id == 0 ? 0 : GetTextureData(texture).textureObj`), zodat er geen texture van een eerder voorwerp blijft hangen. Een shader die dan toch leest, krijgt zwart. Voor de shaders `basic`, `normals` en `uv`. In stap 24 komt de witte texture van 1 bij 1 hiervoor in de plaats |
+| 169 | Texture unit | unit 0, als `c_textureUnit` in `Renderer.cpp` naast de bindpunten, gebonden met `glBindTextureUnit` (DSA; klassiek `glActiveTexture` en `glBindTexture`). In de shader `layout(binding = 0) uniform sampler2D u_texture;`. Namen per rol (`u_baseColor`, `u_normalMap`) bij materialen met meer textures |
+| 170 | Shader | `lit` aangepast, geen aparte shader: `lit.vert` neemt `a_uv` op location 3 aan en geeft `uv` door; `lit.frag` leest `vec3 surfaceColor = texture(u_texture, uv).rgb` (alfa genegeerd) op de plek van de vertex-kleur |
+| 171 | Vertex-kleur tot stap 24 | `lit` gebruikt alleen de texture-kleur en leest `a_color` niet meer (vermenigvuldigen zou het rode controlevak op een blauw vlak zwart maken). Het attribuut blijft in `Vertex` en in `CreateMesh` tot stap 24 het weghaalt |
+| 172 | Controle | in Sandbox zit het rode vak van `checker.png` op elk zijvlak, van buiten bekeken, linksboven: niet omgedraaid en niet gespiegeld (door de gebruiker gezien). `EngineTests` controleert dat een standaard `MeshRenderer` ook geen texture heeft |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -356,7 +362,9 @@ decoderen met stb_image (`DecodeImage` en `ReadImageFile` in `Engine/Resources/`
 omgedraaid voor OpenGL) en `ReadBinaryFile` in `Core`. `EngineTests` heeft nu 17 controles. Deel
 23c: de Renderer heeft textures (`CreateTexture`, `DestroyTexture`: RGBA8, mipmaps, trilinear,
 repeat), en Sandbox maakt er een van `checker.png`, zonder debug-meldingen (door de gebruiker
-gezien). Getekend wordt hij nog niet.
+gezien). Deel 23d: `DrawMesh` neemt een `TextureHandle` (id 0 is geen texture), `MeshRenderer`
+heeft een `texture`, en `lit` tekent met de texture-kleur in plaats van de vertex-kleur. De kubus
+toont het schaakbord, goed om (door de gebruiker gezien). Daarmee is stap 23 af.
 
 Publieke interface van `Renderer`:
 
@@ -368,7 +376,7 @@ ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragme
 TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
 void         DestroyTexture(TextureHandle texture);
 void         DestroyShader(ShaderHandle shader);
-void         DrawMesh(MeshHandle mesh, ShaderHandle shader, const Mat4& model);
+void         DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
 void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
 void         SetAmbientLight(const Vec3& color);
@@ -397,6 +405,10 @@ Bekende beperkingen, bewust zo gelaten:
   afspraak die nergens wordt afgedwongen.
 - Hetzelfde geldt voor de naam `u_model` en voor het blok `Camera` op bindpunt 0: de Renderer
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
+  Ook texture unit 0 (`c_textureUnit`) en `binding = 0` van `u_texture` zijn zo'n afspraak.
+- `lit` met een texture van id 0 tekent zwart (besluit 168), zonder waarschuwing.
+- `a_color` (attribuut 1) staat nog in `Vertex` en in de kubus, maar `lit` gebruikt hem niet
+  meer; hij gaat weg in stap 24.
 - De uniform buffers van de camera en het licht krijgen geen begininhoud: wie tekent zonder eerst
   `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
@@ -451,18 +463,17 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 23d, tekenen met een texture
+## Volgende stap: 24, materialen
 
-De route (besluit 149): 22 assets naast de executable (af), 23 texturen (besluit 152: 23a UV's
-af, 23b laden af, 23c textures in de Renderer af, 23d tekenen met een texture), 24 materialen.
+De route (besluit 149): 22 assets naast de executable (af), 23 texturen (af, besluiten 152 tot en
+met 172), 24 materialen. Opdeling en keuzes voor stap 24 moeten nog besproken worden.
 
-Open punten voor 23d: hoe een texture bij het tekenen gekozen wordt (`DrawMesh` met een extra
-`TextureHandle`, of een veld in `MeshRenderer` dat het `RenderSystem` doorgeeft); binden aan een
-texture unit met `glBindTextureUnit` (DSA; klassiek `glActiveTexture` en `glBindTexture`); een
-`sampler2D` in `lit.frag` met `layout(binding = 0)` en de UV uit de vertex shader; hoe de
-texture-kleur met de vertex-kleur samengaat tot stap 24 (vermenigvuldigen, of de vertex-kleur
-negeren); de kubus in Sandbox met `checkerTexture`, en aan het rode vak controleren dat het
-plaatje niet omgedraaid of gespiegeld is.
+Open punten voor 24: wat een materiaal is (een texture, een tint, `shininess` en
+`specularStrength` uit `lit.frag`, besluit 148) en waar het staat (een `MaterialHandle` in de
+Renderer, of een struct in `Engine` die de `MeshRenderer` bevat); hoe de waarden naar de shader
+gaan (uniforms per draw, of een uniform buffer per materiaal); de witte texture van 1 bij 1 voor
+effen kleuren (wie maakt hem, en vervangt hij id 0 uit besluit 168); `color` uit `Vertex`, uit
+`CreateMesh` en uit de kubus halen, en de shaders `basic`, `normals` en `uv` daarop aanpassen.
 
 Afgesproken voor stap 24 (materialen): de vertex-kleur (`color`, attribuut 1) gaat uit `Vertex`.
 De kleur komt dan uit het materiaal: een texture maal een tint, met een witte texture van 1 bij 1
@@ -525,7 +536,7 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 ## Daarna
 
 Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `Vec3` (besluit 49),
-texturen (met het vrije vertex-formaat) en materialen (besluit 148), meer lichten of een
+het vrije vertex-formaat (besluit 153), meer lichten of een
 puntlicht, het licht als entity met een `LightSystem` (besluit 143), de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
 als `WindowEvent`, shaders en modellen uit bestanden laden,
