@@ -15,3 +15,8 @@ FetchContent_MakeAvailable(glfw)
 
 add_library(glad STATIC glad/src/gl.c)
 target_include_directories(glad PUBLIC glad/include)
+
+# stb_image: one header kept in git (see stb/README.md for the version). The code that uses it
+# defines STB_IMAGE_IMPLEMENTATION in exactly one .cpp.
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE stb)

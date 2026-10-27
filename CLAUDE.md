@@ -91,14 +91,14 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 
 | Module | Bevat | Hangt af van |
 |---|---|---|
-| `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile` | niets |
+| `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
-| `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/` | |
+| `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`) | |
 
 Regels die de Renderer herbruikbaar houden:
 
@@ -287,6 +287,11 @@ Regels die de Renderer herbruikbaar houden:
 | 153 | UV in `Vertex` | het vaste formaat opnieuw uitgebreid (besluit 24 blijft staan): `float uv[2]` achter `normal`, attribuut 3 met 2 floats. Het vrije formaat komt pas bij de eerste mesh die echt iets anders nodig heeft (een model zonder kleuren, animatie-attributen, tangents) |
 | 154 | UV's van de kubus | per vlak het hele plaatje: `(0,0)`, `(1,0)`, `(1,1)`, `(0,1)` in de volgorde van de hoekpunten (tegen de klok in van buiten, beginnend linksonder). Het omdraaien van `v` (plaatjes beginnen bij de bovenste rij, OpenGL linksonder) gebeurt bij het laden (23b) |
 | 155 | UV-shader | `Sandbox/assets/shaders/uv.vert` en `.frag` tonen de UV als kleur (`vec4(uv, 0.0, 1.0)`: linksonder zwart, rechtsonder rood, rechtsboven geel, linksboven groen); blijven staan als gereedschap, net als `normals` |
+| 156 | Plaatjes decoderen | stb_image (één header, public domain of MIT), geen eigen lader. Versie 2.30 (commit `003501f`), de header vastgelegd in git in `ThirdParty/stb/` zoals glad (besluit 14–15), met een `README.md` met bron, versie en licentie. In CMake een `INTERFACE`-library `stb` met alleen de include-map; `Engine` linkt hem `PRIVATE` |
+| 157 | Plek en vorm | `Engine/Resources/Image.h`/`.cpp` (niet in de Renderer: die kent geen bestanden, regel 3). `struct Image { int width; int height; std::vector<std::uint8_t> pixels; }`, bytes en geen struct per pixel, zodat later andere formaten (één kanaal, floats) in dezelfde vorm passen. `std::optional<Image> DecodeImage(std::span<const std::uint8_t>)` decodeert bytes uit het geheugen; `std::optional<Image> ReadImageFile(const std::filesystem::path&)` leest het bestand en decodeert. Bij een fout `LogError` (met `stbi_failure_reason()` of het pad) en `std::nullopt`. De naam `LoadImage` kan niet: dat is een macro in de Windows-headers |
+| 158 | Instellingen van stb_image | `STB_IMAGE_IMPLEMENTATION` alleen in `Image.cpp`, met `STBI_NO_STDIO`: stb opent zelf geen bestanden, onze code leest ze (paden met bijzondere tekens werken dan). Altijd 4 kanalen (RGBA) gevraagd, ongeacht het bestand. `stbi_set_flip_vertically_on_load(1)`: de eerste rij in het geheugen is de onderste rij van het plaatje, zoals OpenGL verwacht (vervolg op besluit 154). De grootte van de pixels wordt in `std::size_t` uitgerekend, zodat een groot plaatje geen `int`-overloop geeft |
+| 159 | Binair lezen | `std::optional<std::vector<std::uint8_t>> ReadBinaryFile(const std::filesystem::path&)` in `Core/File.h`/`.cpp`, naast `ReadTextFile` (besluit 135) en op dezelfde manier: `std::istreambuf_iterator<char>`, omgezet naar bytes door de range constructor van de vector |
+| 160 | Test van het decoderen | `EngineTests` decodeert een PNG van 2 bij 2 pixels die als bytes in de test staat (geen bestand nodig) en controleert breedte, hoogte, aantal bytes en de volgorde van de rijen na het omdraaien; bytes die geen plaatje zijn geven niets. `ReadBinaryFile` en `ReadImageFile` worden pas met een echt bestand gebruikt in 23d |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -340,7 +345,9 @@ de assets van Sandbox staan in `Sandbox/assets/` en worden bij elke build naast 
 gekopieerd; Sandbox vindt ze met `GetExecutableDirectory()`. Werkt ook als de executable buiten Visual Studio
 wordt gestart (door de gebruiker gezien). Stap 23 (texturen) is begonnen met 23a: `Vertex` heeft
 een UV op attribuut 3, de kubus heeft per vlak het hele plaatje als UV's, en de UV-shader toont
-ze als kleur (door de gebruiker gezien). Sandbox tekent weer met `lit`.
+ze als kleur (door de gebruiker gezien). Sandbox tekent weer met `lit`. Deel 23b: plaatjes
+decoderen met stb_image (`DecodeImage` en `ReadImageFile` in `Engine/Resources/`, altijd RGBA,
+omgedraaid voor OpenGL) en `ReadBinaryFile` in `Core`. `EngineTests` heeft nu 17 controles.
 
 Publieke interface van `Renderer`:
 
@@ -433,18 +440,10 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 23b, een plaatje inladen
+## Volgende stap: 23c, textures in de Renderer
 
 De route (besluit 149): 22 assets naast de executable (af), 23 texturen (besluit 152: 23a UV's
-af, 23b laden, 23c textures in de Renderer, 23d tekenen met een texture), 24 materialen. Open
-punten voor 23b: welke bibliotheek (stb_image, één header, public domain) of een eigen lader voor
-een eenvoudig formaat; hoe hij in `ThirdParty` komt (de header vastleggen in git zoals glad,
-besluit 14–15, of FetchContent zoals GLFW) en welke versie; waar het laden staat (de Renderer
-kent geen bestanden, regel 3: dus in `Engine` of een eigen plek) en de vorm (een struct `Image`
-met breedte, hoogte en pixels in een `std::vector<std::uint8_t>`, en een function die een lege
-`std::optional` geeft bij een fout); altijd 4 kanalen (RGBA) of het aantal uit het bestand;
-`v` omdraaien bij het laden (`stbi_set_flip_vertically_on_load`); een test in `EngineTests` met
-een klein plaatje; een plaatje voor de kubus in `Sandbox/assets/textures/`.
+af, 23b laden af, 23c textures in de Renderer, 23d tekenen met een texture), 24 materialen.
 
 Open punten voor 23c en 23d: een `TextureHandle` met `CreateTexture` en `DestroyTexture` in de
 Renderer (DSA: `glCreateTextures`, `glTextureStorage2D`, `glTextureSubImage2D`,

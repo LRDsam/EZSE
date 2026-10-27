@@ -1,12 +1,14 @@
 #include "EZSE/Engine/Components/Camera.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Resources/Image.h"
 
 #include "EZSE/Math/Mat4.h"
 #include "EZSE/Math/Vec3.h"
 #include "EZSE/Math/Vec4.h"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <numbers>
 
@@ -118,12 +120,53 @@ void TestComponentDefaults() {
           "MeshRenderer: a default MeshRenderer has no mesh and no shader");
 }
 
+// A PNG of 2 by 2 pixels, made by a script. In the file the top row is red, green and the
+// bottom row is blue, white (all fully opaque).
+const std::uint8_t c_testPng[] = {
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+    0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x72, 0xB6, 0x0D, 0x24, 0x00, 0x00, 0x00,
+    0x12, 0x49, 0x44, 0x41, 0x54, 0x78, 0xDA, 0x63, 0xF8, 0xCF, 0xC0, 0xF0,
+    0x1F, 0x0C, 0x81, 0x34, 0x18, 0x00, 0x00, 0x49, 0xC8, 0x09, 0xF7, 0x03,
+    0xD9, 0x64, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+    0x42, 0x60, 0x82,
+};
+
+// The 4 bytes of the pixel at (column, row) of an Image; row 0 is the first row in memory.
+bool PixelIs(const ezse::Image& image, int column, int row,
+             std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint8_t alpha) {
+    const std::size_t index = (static_cast<std::size_t>(row) * static_cast<std::size_t>(image.width) +
+                               static_cast<std::size_t>(column)) * 4;
+    return image.pixels[index] == red && image.pixels[index + 1] == green &&
+           image.pixels[index + 2] == blue && image.pixels[index + 3] == alpha;
+}
+
+void TestDecodeImage() {
+    const std::optional<ezse::Image> image = ezse::DecodeImage(c_testPng);
+    Check(image.has_value(), "DecodeImage: a valid PNG decodes");
+    if (!image) {
+        return;
+    }
+
+    Check(image->width == 2 && image->height == 2, "DecodeImage: width and height are 2");
+    Check(image->pixels.size() == 16, "DecodeImage: 4 bytes per pixel");
+    // Flipped: the bottom row of the file comes first in memory.
+    Check(PixelIs(*image, 0, 0, 0, 0, 255, 255) && PixelIs(*image, 1, 0, 255, 255, 255, 255),
+          "DecodeImage: the first row in memory is the bottom row of the file (blue, white)");
+    Check(PixelIs(*image, 0, 1, 255, 0, 0, 255) && PixelIs(*image, 1, 1, 0, 255, 0, 255),
+          "DecodeImage: the second row in memory is the top row of the file (red, green)");
+
+    const std::uint8_t notAnImage[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    Check(!ezse::DecodeImage(notAnImage).has_value(), "DecodeImage: bytes that are not an image give nothing");
+}
+
 } // namespace
 
 int main() {
     TestModelMatrix();
     TestViewMatrix();
     TestComponentDefaults();
+    TestDecodeImage();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

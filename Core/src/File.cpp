@@ -18,4 +18,15 @@ std::optional<std::string> ReadTextFile(const std::filesystem::path& path) {
         std::istreambuf_iterator<char>());
 }
 
+std::optional<std::vector<std::uint8_t>> ReadBinaryFile(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+
+    if (!file) {
+        LogError("Cannot open file '{}'", path.string());
+        return std::nullopt;
+    }
+    return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(file),
+        std::istreambuf_iterator<char>());
+}
+
 } // namespace ezse
