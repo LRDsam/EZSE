@@ -299,7 +299,7 @@ Regels die de Renderer herbruikbaar houden:
 | 165 | Mipmaps, filtering en wrapping | immutable storage met `glTextureStorage2D` en alle niveaus (`std::bit_width` van de grootste zijde: 256 geeft 9), niveau 0 vullen en dan `glGenerateTextureMipmap`. Min-filter `GL_LINEAR_MIPMAP_LINEAR` (trilinear), mag-filter `GL_LINEAR`, wrapping `GL_REPEAT` op S en T, expliciet gezet. De instellingen staan op de texture zelf (`glTextureParameteri`); sampler objects komen bij een texture die op twee manieren gelezen moet worden. Nearest, anisotrope filtering en `GL_CLAMP_TO_EDGE` bij aanleiding |
 | 166 | Plaatje in Sandbox | `Sandbox/assets/textures/checker.png`, door een script gemaakt: een schaakbord van 256 bij 256 pixels met vakken van 32 en een rood vak linksboven, zodat in 23d te zien is of het plaatje omgedraaid of gespiegeld is. Sandbox leest het vóór `Engine::Create` (stopt met `return 1` als dat mislukt, zoals bij de shaders) en maakt er na `Create` een texture van |
 | 167 | Texture kiezen bij het tekenen | een parameter: `DrawMesh(MeshHandle, ShaderHandle, TextureHandle, const Mat4& model)`, alles voor één draw in één aanroep. `MeshRenderer` krijgt `TextureHandle texture` en het `RenderSystem` geeft die door. Geen `BindTexture` die blijft staan (verborgen toestand). In stap 24 wordt de texture een materiaal |
-| 168 | Geen texture | id `0` mag: `DrawMesh` bindt dan `0` (`texture.id == 0 ? 0 : GetTextureData(texture).textureObj`), zodat er geen texture van een eerder voorwerp blijft hangen. Een shader die dan toch leest, krijgt zwart. Voor de shaders `basic`, `normals` en `uv`. In stap 24 komt de witte texture van 1 bij 1 hiervoor in de plaats |
+| 168 | Geen texture (vervangen door besluit 178 in 24b) | id `0` mag: `DrawMesh` bindt dan `0` (`texture.id == 0 ? 0 : GetTextureData(texture).textureObj`), zodat er geen texture van een eerder voorwerp blijft hangen. Een shader die dan toch leest, krijgt zwart. Voor de shaders `basic`, `normals` en `uv`. In stap 24 komt de witte texture van 1 bij 1 hiervoor in de plaats |
 | 169 | Texture unit | unit 0, als `c_textureUnit` in `Renderer.cpp` naast de bindpunten, gebonden met `glBindTextureUnit` (DSA; klassiek `glActiveTexture` en `glBindTexture`). In de shader `layout(binding = 0) uniform sampler2D u_texture;`. Namen per rol (`u_baseColor`, `u_normalMap`) bij materialen met meer textures |
 | 170 | Shader | `lit` aangepast, geen aparte shader: `lit.vert` neemt `a_uv` op location 3 aan en geeft `uv` door; `lit.frag` leest `vec3 surfaceColor = texture(u_texture, uv).rgb` (alfa genegeerd) op de plek van de vertex-kleur |
 | 171 | Vertex-kleur tot stap 24 | `lit` gebruikt alleen de texture-kleur en leest `a_color` niet meer (vermenigvuldigen zou het rode controlevak op een blauw vlak zwart maken). Het attribuut blijft in `Vertex` en in `CreateMesh` tot stap 24 het weghaalt |
@@ -309,7 +309,7 @@ Regels die de Renderer herbruikbaar houden:
 | 175 | Plek van `Material` | `Renderer/Material.h`: de Renderer moet de velden kennen om ze naar de shader te sturen; alleen handles en `Vec3` |
 | 176 | Waarden naar de shader | gewone uniforms per draw: `u_tint`, `u_shininess` en `u_specularStrength`, opgezocht in `CreateShader` zoals `u_model` en gezet met `glProgramUniform...`. Geen waarschuwing als ze ontbreken (`basic`, `normals` en `uv` hebben geen glans; OpenGL negeert locatie -1); alleen `u_model` blijft verplicht. Geen uniform buffer per materiaal: dat vraagt een handle |
 | 177 | Standaardwaarden | tint wit, `shininess = 128`, `specularStrength = 0.5`: de constanten uit `lit.frag` (besluit 148), zodat een standaardmateriaal er uitziet zoals voor stap 24 |
-| 178 | Witte texture | de Renderer maakt zelf een witte texture van 1 bij 1 in `Create` (privé); `DrawMesh` bindt die bij texture-id 0. Vervangt besluit 168: een shader heeft altijd een texture, en een materiaal met alleen een tint tekent die kleur |
+| 178 | Witte texture | de Renderer maakt zelf een witte texture van 1 bij 1 in `Create`, na de uniform buffers, met zijn eigen `CreateTexture`, en bewaart de handle in het privé member `m_whiteTexture` (de destructor ruimt hem op met de andere textures; hij krijgt id 1, de textures van het spel tellen daarna verder). `DrawMesh` kiest eerst de handle (`texture.id == 0 ? m_whiteTexture : texture`) en bindt die. Vervangt besluit 168: een shader heeft altijd een texture, en een materiaal met alleen een tint tekent die kleur |
 | 179 | Vertex-kleur weg | `Vertex { position[3], normal[3], uv[2] }`; attributen opnieuw genummerd zonder gat: positie 0, normaal 1, UV 2, in `CreateMesh` en alle shaders. De kubus heeft geen kleur per vlak meer |
 | 180 | `basic` | wordt unlit: texture maal tint (de tint vanaf 24c), zonder licht; voor debug-vormen en later de interface |
 | 181 | Controle van 24c | een tweede kubus in Sandbox met dezelfde mesh, zonder texture, een oranje tint en een andere glans (bijvoorbeeld `shininess = 16`, `specularStrength = 1`) |
@@ -376,7 +376,8 @@ heeft een `texture`, en `lit` tekent met de texture-kleur in plaats van de verte
 toont het schaakbord, goed om (door de gebruiker gezien). Daarmee is stap 23 af. Stap 24
 (materialen) is begonnen met 24a: `Vertex` heeft geen kleur meer (positie 0, normaal 1, UV 2), en
 `basic` is een unlit shader die de texture toont. Sandbox ziet er ongewijzigd uit (door de
-gebruiker gezien).
+gebruiker gezien). Deel 24b: de Renderer maakt een witte texture van 1 bij 1, en een texture
+met id 0 tekent daarmee; met id 0 is de kubus wit en belicht (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -418,7 +419,6 @@ Bekende beperkingen, bewust zo gelaten:
 - Hetzelfde geldt voor de naam `u_model` en voor het blok `Camera` op bindpunt 0: de Renderer
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
   Ook texture unit 0 (`c_textureUnit`) en `binding = 0` van `u_texture` zijn zo'n afspraak.
-- `lit` met een texture van id 0 tekent zwart (besluit 168), zonder waarschuwing.
 - De uniform buffers van de camera en het licht krijgen geen begininhoud: wie tekent zonder eerst
   `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
@@ -473,14 +473,18 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 24b, de witte texture
+## Volgende stap: 24c, het materiaal
 
 De route (besluit 149): 22 assets naast de executable (af), 23 texturen (af, besluiten 152 tot en
-met 172), 24 materialen (besluit 173: 24a de vertex-kleur eruit af, 24b de witte texture, 24c het
-materiaal). Voor 24b (besluit 178): de Renderer maakt in `Create` een witte texture van 1 bij 1
-(met `CreateTexture` of rechtstreeks) en bewaart hem privé; `DrawMesh` bindt hem bij texture-id 0.
-Controle: tijdelijk de texture van de kubus op id 0 zetten geeft een witte, belichte kubus. Daarna
-24c (besluiten 174 tot en met 177, 180 en 181).
+met 172), 24 materialen (besluit 173: 24a de vertex-kleur eruit af, 24b de witte texture af, 24c
+het materiaal). Voor 24c (besluiten 174 tot en met 177, 180 en 181): `Renderer/Material.h` met
+de struct `Material` en de standaardwaarden; `DrawMesh(MeshHandle, const Material&, const Mat4&
+model)`; `CreateShader` zoekt `u_tint`, `u_shininess` en `u_specularStrength` op (zonder
+waarschuwing als ze ontbreken) en `DrawMesh` zet ze met `glProgramUniform...`; `lit.frag` krijgt
+die drie uniforms in plaats van de constanten, `basic.frag` de tint; `MeshRenderer` wordt `{ mesh,
+material }` en het `RenderSystem` geeft het materiaal door; `EngineTests` controleert de
+standaardwaarden; in Sandbox een tweede kubus met dezelfde mesh, zonder texture, oranje en met een
+andere glans.
 
 Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse (141 tot en
 met 144), 21c ambient en specular (145 tot en met 148).

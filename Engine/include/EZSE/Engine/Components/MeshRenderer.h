@@ -9,7 +9,7 @@ namespace ezse {
 struct MeshRenderer {
     MeshHandle mesh;
     ShaderHandle shader;
-    TextureHandle texture; // id 0: draw without a texture
+    TextureHandle texture; // id 0: the Renderer draws with a 1x1 white texture
 };
 
 } // namespace ezse

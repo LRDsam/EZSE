@@ -24,7 +24,7 @@ public:
     void SetViewport(int width, int height);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
-    // texture: bound to texture unit 0 for this draw; id 0 binds no texture.
+    // texture: bound to texture unit 0 for this draw; id 0 binds a 1x1 white texture.
     void DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
 
@@ -80,6 +80,9 @@ private:
 
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
+    // 1x1 white, drawn when a draw call has no texture
+    TextureHandle m_whiteTexture;
+
     std::vector<MeshData> m_meshData;
     std::vector<ShaderData> m_shaderData;
     std::vector<TextureData> m_textureData;

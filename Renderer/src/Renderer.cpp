@@ -102,6 +102,9 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glNamedBufferStorage(renderer->m_lightBuffer, sizeof(LightData), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_UNIFORM_BUFFER, c_lightBindingPoint, renderer->m_lightBuffer);
 
+    const std::uint8_t whitePixel[] = { 255, 255, 255, 255 };
+    renderer->m_whiteTexture = renderer->CreateTexture(1, 1, whitePixel);
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
@@ -166,9 +169,9 @@ void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle text
 
     glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
-    // Id 0 binds no texture, so a texture from an earlier draw does not stay bound.
-    const GLuint textureObj = texture.id == 0 ? 0 : GetTextureData(texture).textureObj;
-    glBindTextureUnit(c_textureUnit, textureObj);
+    // Id 0 draws with the white texture, so a shader always has a texture to read.
+    const TextureHandle drawTexture = texture.id == 0 ? m_whiteTexture : texture;
+    glBindTextureUnit(c_textureUnit, GetTextureData(drawTexture).textureObj);
     glProgramUniformMatrix4fv(
         shaderData.shaderProgram,
         shaderData.modelLocation,
