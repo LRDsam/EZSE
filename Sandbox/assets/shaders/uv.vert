@@ -1,7 +1,7 @@
 #version 460 core
 
 layout(location = 0) in vec3 a_position;
-layout(location = 3) in vec2 a_uv;
+layout(location = 2) in vec2 a_uv;
 layout(std140, binding = 0) uniform Camera {
     mat4 u_viewProjection;
 };

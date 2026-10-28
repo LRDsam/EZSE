@@ -155,7 +155,7 @@ Regels die de Renderer herbruikbaar houden:
 | 19 | Stijl | Direct State Access |
 | 20 | Venstergrootte | uitgesteld tot er een event-systeem is; geen tijdelijke oplossing. Opgelost in stap 16 (besluiten 58 tot en met 62) |
 | 21–23 | Resources | handles; Renderer slaat GPU-objecten op, resource manager komt later in Engine |
-| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1, sinds besluit 138 de normaal op 2, sinds besluit 153 de UV op 3); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
+| 24 | Hoekpunten | één vast `Vertex`-formaat (positie op attribuut 0, kleur op 1, sinds besluit 138 de normaal op 2, sinds besluit 153 de UV op 3; sinds besluit 179 zonder kleur: positie 0, normaal 1, UV 2); een vrij formaat ontwerpen we bij het eerste tweede formaat, waarschijnlijk texturen |
 | 25 | Indices | altijd verplicht, 32 bits (`std::uint32_t`); `CreateMesh` controleert met asserts dat het aantal een veelvoud van drie is en dat elke index naar een bestaand hoekpunt wijst |
 | 26 | Wiskunde | zelf geschreven, geen glm. De gebruiker schrijft de code zoals bij rendering: Claude geeft opdracht, signaturen en achtergrond en loopt na. Elke functie controleren met bekende uitkomsten voordat hij de shader in gaat |
 | 27 | Module `Math` | eigen statische library `EZSE::Math` met `.cpp`-bestanden (niet header-only); hangt van niets af, `Core` komt erbij bij de eerste `EZSE_ASSERT` |
@@ -304,6 +304,15 @@ Regels die de Renderer herbruikbaar houden:
 | 170 | Shader | `lit` aangepast, geen aparte shader: `lit.vert` neemt `a_uv` op location 3 aan en geeft `uv` door; `lit.frag` leest `vec3 surfaceColor = texture(u_texture, uv).rgb` (alfa genegeerd) op de plek van de vertex-kleur |
 | 171 | Vertex-kleur tot stap 24 | `lit` gebruikt alleen de texture-kleur en leest `a_color` niet meer (vermenigvuldigen zou het rode controlevak op een blauw vlak zwart maken). Het attribuut blijft in `Vertex` en in `CreateMesh` tot stap 24 het weghaalt |
 | 172 | Controle | in Sandbox zit het rode vak van `checker.png` op elk zijvlak, van buiten bekeken, linksboven: niet omgedraaid en niet gespiegeld (door de gebruiker gezien). `EngineTests` controleert dat een standaard `MeshRenderer` ook geen texture heeft |
+| 173 | Opdeling van stap 24 | 24a de vertex-kleur eruit; 24b een witte texture van 1 bij 1 in de Renderer; 24c het materiaal (struct, `DrawMesh` met materiaal, uniforms in `lit`, `MeshRenderer`, een tweede kubus) |
+| 174 | Wat een materiaal is | een struct met waarden, geen handle: `Material { ShaderHandle shader; TextureHandle texture; Vec3 tint; float shininess; float specularStrength; }`, met `DrawMesh(MeshHandle, const Material&, const Mat4& model)` en `MeshRenderer { MeshHandle mesh; Material material; }`. Elke entity heeft een eigen kopie; niets te maken of op te ruimen. Een `MaterialHandle` (delen, zoals Unity) komt met de resource manager. Regel 4 gaat over pointers en GPU-objecten: een tint en floats als gewone waarden in een component mogen |
+| 175 | Plek van `Material` | `Renderer/Material.h`: de Renderer moet de velden kennen om ze naar de shader te sturen; alleen handles en `Vec3` |
+| 176 | Waarden naar de shader | gewone uniforms per draw: `u_tint`, `u_shininess` en `u_specularStrength`, opgezocht in `CreateShader` zoals `u_model` en gezet met `glProgramUniform...`. Geen waarschuwing als ze ontbreken (`basic`, `normals` en `uv` hebben geen glans; OpenGL negeert locatie -1); alleen `u_model` blijft verplicht. Geen uniform buffer per materiaal: dat vraagt een handle |
+| 177 | Standaardwaarden | tint wit, `shininess = 128`, `specularStrength = 0.5`: de constanten uit `lit.frag` (besluit 148), zodat een standaardmateriaal er uitziet zoals voor stap 24 |
+| 178 | Witte texture | de Renderer maakt zelf een witte texture van 1 bij 1 in `Create` (privé); `DrawMesh` bindt die bij texture-id 0. Vervangt besluit 168: een shader heeft altijd een texture, en een materiaal met alleen een tint tekent die kleur |
+| 179 | Vertex-kleur weg | `Vertex { position[3], normal[3], uv[2] }`; attributen opnieuw genummerd zonder gat: positie 0, normaal 1, UV 2, in `CreateMesh` en alle shaders. De kubus heeft geen kleur per vlak meer |
+| 180 | `basic` | wordt unlit: texture maal tint (de tint vanaf 24c), zonder licht; voor debug-vormen en later de interface |
+| 181 | Controle van 24c | een tweede kubus in Sandbox met dezelfde mesh, zonder texture, een oranje tint en een andere glans (bijvoorbeeld `shininess = 16`, `specularStrength = 1`) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -364,7 +373,10 @@ omgedraaid voor OpenGL) en `ReadBinaryFile` in `Core`. `EngineTests` heeft nu 17
 repeat), en Sandbox maakt er een van `checker.png`, zonder debug-meldingen (door de gebruiker
 gezien). Deel 23d: `DrawMesh` neemt een `TextureHandle` (id 0 is geen texture), `MeshRenderer`
 heeft een `texture`, en `lit` tekent met de texture-kleur in plaats van de vertex-kleur. De kubus
-toont het schaakbord, goed om (door de gebruiker gezien). Daarmee is stap 23 af.
+toont het schaakbord, goed om (door de gebruiker gezien). Daarmee is stap 23 af. Stap 24
+(materialen) is begonnen met 24a: `Vertex` heeft geen kleur meer (positie 0, normaal 1, UV 2), en
+`basic` is een unlit shader die de texture toont. Sandbox ziet er ongewijzigd uit (door de
+gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -407,8 +419,6 @@ Bekende beperkingen, bewust zo gelaten:
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
   Ook texture unit 0 (`c_textureUnit`) en `binding = 0` van `u_texture` zijn zo'n afspraak.
 - `lit` met een texture van id 0 tekent zwart (besluit 168), zonder waarschuwing.
-- `a_color` (attribuut 1) staat nog in `Vertex` en in de kubus, maar `lit` gebruikt hem niet
-  meer; hij gaat weg in stap 24.
 - De uniform buffers van de camera en het licht krijgen geen begininhoud: wie tekent zonder eerst
   `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
@@ -463,22 +473,14 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 24, materialen
+## Volgende stap: 24b, de witte texture
 
 De route (besluit 149): 22 assets naast de executable (af), 23 texturen (af, besluiten 152 tot en
-met 172), 24 materialen. Opdeling en keuzes voor stap 24 moeten nog besproken worden.
-
-Open punten voor 24: wat een materiaal is (een texture, een tint, `shininess` en
-`specularStrength` uit `lit.frag`, besluit 148) en waar het staat (een `MaterialHandle` in de
-Renderer, of een struct in `Engine` die de `MeshRenderer` bevat); hoe de waarden naar de shader
-gaan (uniforms per draw, of een uniform buffer per materiaal); de witte texture van 1 bij 1 voor
-effen kleuren (wie maakt hem, en vervangt hij id 0 uit besluit 168); `color` uit `Vertex`, uit
-`CreateMesh` en uit de kubus halen, en de shaders `basic`, `normals` en `uv` daarop aanpassen.
-
-Afgesproken voor stap 24 (materialen): de vertex-kleur (`color`, attribuut 1) gaat uit `Vertex`.
-De kleur komt dan uit het materiaal: een texture maal een tint, met een witte texture van 1 bij 1
-voor effen kleuren. Niet eerder, omdat er tot dan geen vervanging is en er anders tijdelijk een
-vaste kleur in de shaders zou moeten.
+met 172), 24 materialen (besluit 173: 24a de vertex-kleur eruit af, 24b de witte texture, 24c het
+materiaal). Voor 24b (besluit 178): de Renderer maakt in `Create` een witte texture van 1 bij 1
+(met `CreateTexture` of rechtstreeks) en bewaart hem privé; `DrawMesh` bindt hem bij texture-id 0.
+Controle: tijdelijk de texture van de kubus op id 0 zetten geeft een witte, belichte kubus. Daarna
+24c (besluiten 174 tot en met 177, 180 en 181).
 
 Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse (141 tot en
 met 144), 21c ambient en specular (145 tot en met 148).
