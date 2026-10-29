@@ -4,12 +4,15 @@ A small game and rendering engine in C++20 and OpenGL 4.6, built from scratch as
 project. The goal is to understand how an engine fits together, and to keep its parts reusable on
 their own: the renderer, for example, does not know about the ECS, files or windows.
 
+![Two lit cubes in the Sandbox: one with an orange material, one with a checkerboard texture](docs/screenshot.png)
+
 ## Features
 
 - **Renderer**: OpenGL 4.6 in Direct State Access style; meshes, shaders and textures behind
   handles; camera and light in uniform buffers; depth test and back-face culling.
 - **Lighting**: one directional light with ambient, diffuse (Lambert) and specular (Blinn-Phong).
-- **Textures**: PNG loading with stb_image, mipmaps and trilinear filtering.
+- **Textures and materials**: PNG loading with stb_image, mipmaps and trilinear filtering; a
+  material per object with a shader, a texture, a tint and its own shininess.
 - **ECS**: entities, components stored in sparse sets, signatures as bitsets, and systems that
   run in a fixed order.
 - **Engine**: owns the window, the renderer and the world, and runs the game loop.
@@ -17,7 +20,8 @@ their own: the renderer, for example, does not know about the ECS, files or wind
   checked by its own test program.
 - **Platform**: a GLFW window behind its own interface, with keyboard and mouse input.
 
-The Sandbox shows a spinning, textured and lit cube that you can walk around.
+The Sandbox shows two lit cubes that share one mesh but have different materials, and you can
+walk around them.
 
 ## Structure
 
