@@ -313,6 +313,13 @@ Regels die de Renderer herbruikbaar houden:
 | 179 | Vertex-kleur weg | `Vertex { position[3], normal[3], uv[2] }`; attributen opnieuw genummerd zonder gat: positie 0, normaal 1, UV 2, in `CreateMesh` en alle shaders. De kubus heeft geen kleur per vlak meer |
 | 180 | `basic` | wordt unlit: texture maal tint (de tint vanaf 24c), zonder licht; voor debug-vormen en later de interface |
 | 181 | Controle van 24c | een tweede kubus in Sandbox met dezelfde mesh, zonder texture, een oranje tint en een andere glans (bijvoorbeeld `shininess = 16`, `specularStrength = 1`) |
+| 182 | Modelformaat | OBJ (tekst: `v`, `vt`, `vn`, `f`), met een eigen parser, geschreven door de gebruiker met opdracht en hints van Claude (zoals `Image.cpp`). glTF 2.0 komt bij de eerste aanleiding die OBJ niet kan (animatie, een scene met meerdere voorwerpen); tinyobjloader als eigen OBJ-bestanden tekortschieten. Geen FBX |
+| 183 | Deel van OBJ | `v`, `vt`, `vn` en `f` in de vorm `v/vt/vn`; een vlak met meer dan drie hoeken wordt een waaier van driehoeken (alleen goed voor convexe vlakken); alleen positieve indices (negatieve geven een fout). `o`, `g`, `s`, `usemtl`, `mtllib` en commentaar worden genegeerd; het hele bestand wordt één mesh. Een vlak zonder UV of normaal geeft voorlopig een fout; normalen uitrekenen komt bij een model zonder normalen |
+| 184 | Hoekpunten samenvoegen | OBJ heeft een index per soort gegeven, OpenGL één per hoekpunt. Een `std::unordered_map` met het drietal `(v, vt, vn)` als sleutel en de index van het `Vertex` als waarde, zodat gedeelde hoekpunten één keer worden opgeslagen |
+| 185 | Vorm en plek | `struct MeshData { std::vector<Vertex> vertices; std::vector<std::uint32_t> indices; }` in `Engine/Resources/MeshData.h` (niet specifiek voor OBJ; een latere glTF-lader of een gegenereerde vorm geeft hetzelfde). In `Engine/Resources/Obj.h`/`.cpp`, zoals `Image`: `std::optional<MeshData> ParseObj(std::string_view text)` (testbaar zonder bestand) en `std::optional<MeshData> ReadObjFile(const std::filesystem::path&)` (`ReadTextFile`, dan `ParseObj`). Bij een fout `LogError` met het regelnummer en `std::nullopt`, geen assert (een kapot bestand is geen programmeerfout). De privé `MeshData` in de Renderer botst niet (andere scope) |
+| 186 | Getallen lezen | `std::from_chars` uit `<charconv>`: snel, geen exceptions, en onafhankelijk van de taalinstelling (`strtof` kan op een Nederlandse Windows een komma verwachten). Geen `std::istringstream` |
+| 187 | Assenstelsel en UV's | OBJ is right-handed met Y omhoog en de UV begint linksonder, zoals bij ons en OpenGL: niets omdraaien (plaatjes worden al omgedraaid bij het laden, besluit 158) |
+| 188 | Opdeling en controle van stap 25 | 25a `MeshData` en `ParseObj`, met tests in `EngineTests` (een vierkant van twee driehoeken geeft 4 hoekpunten en 6 indices, een vierhoek als `f`-regel wordt twee driehoeken, een index buiten bereik en een vlak zonder normaal geven niets); 25b `ReadObjFile` en de kubus uit `Sandbox/assets/models/cube.obj` (door Claude met een script uit de array gemaakt) in plaats van de array in `main.cpp`, met precies hetzelfde beeld; 25c een echt model, bij voorkeur Suzanne uit Blender (door de gebruiker geëxporteerd als OBJ met normalen en UV's), of een gratis CC0-model (downloaden eerst vragen) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -483,14 +490,16 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: 25a, `MeshData` en `ParseObj`
 
-De route van besluit 149 is af: 22 assets naast de executable, 23 texturen (besluiten 152 tot en
-met 172) en 24 materialen (besluiten 173 tot en met 181: 24a de vertex-kleur eruit, 24b de witte
-texture, 24c het materiaal). De volgende stap moet nog gekozen worden, uit de lijst onder Daarna.
-Voor de hand liggend: meer lichten of een puntlicht, het licht als entity met een `LightSystem`,
-gamma-correctie, een resource manager (laden en delen van meshes, textures en materialen), of
-modellen uit bestanden laden.
+Stap 25: modellen uit bestanden laden (besluiten 182 tot en met 188). Eerst 25a: Claude maakt
+`Engine/Resources/MeshData.h` en `Obj.h`/`.cpp` aan (leeg, met de regels in CMake) en geeft de
+opdracht; de gebruiker schrijft `MeshData` en `ParseObj` (regels lezen als `std::string_view`,
+getallen met `std::from_chars`, hoekpunten samenvoegen met een `std::unordered_map`, waaiers voor
+vlakken met meer dan drie hoeken, fouten met regelnummer). Claude schrijft de tests in
+`EngineTests`. Daarna 25b (`ReadObjFile` en `cube.obj` in Sandbox) en 25c (een echt model).
+
+De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
 Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse (141 tot en
 met 144), 21c ambient en specular (145 tot en met 148).
