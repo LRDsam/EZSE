@@ -116,8 +116,16 @@ void TestComponentDefaults() {
     Check(camera.nearPlane < camera.farPlane, "Camera: the near plane lies before the far plane");
 
     const ezse::MeshRenderer meshRenderer;
-    Check(meshRenderer.mesh.id == 0 && meshRenderer.shader.id == 0 && meshRenderer.texture.id == 0,
+    Check(meshRenderer.mesh.id == 0 && meshRenderer.material.shader.id == 0 &&
+              meshRenderer.material.texture.id == 0,
           "MeshRenderer: a default MeshRenderer has no mesh, shader or texture");
+
+    // The defaults are the constants lit.frag had before materials (decision 177).
+    const ezse::Material material;
+    Check(material.tint.x == 1.0f && material.tint.y == 1.0f && material.tint.z == 1.0f,
+          "Material: the default tint is white");
+    Check(material.shininess == 128.0f && material.specularStrength == 0.5f,
+          "Material: the default shine is shininess 128 and strength 0.5");
 }
 
 // A PNG of 2 by 2 pixels, made by a script. In the file the top row is red, green and the

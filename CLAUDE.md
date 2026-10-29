@@ -96,7 +96,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
-| `Renderer` | OpenGL laden, meshes, shaders, textures, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
+| `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`) | |
 
@@ -239,13 +239,13 @@ Regels die de Renderer herbruikbaar houden:
 | 105 | Opsplitsing van 18j | 18j de components, 18k `CameraSystem` en `RenderSystem` en Sandbox op de `Engine` met een stilstaande kubus, 18l de systems van het spel (draaien, camera besturen, Escape) |
 | 106 | Plek van de components | in de module `Engine`, een header per component in `Components/` (submappen per soort, zie de conventies). Wat specifiek is voor het spel blijft in Sandbox. `EZSE/Engine/Components/Transform.h` naast `EZSE/Math/Transform.h`: de bouwstenen (`Translation`, `RotationY` en dergelijke) blijven in `Math`, de component en de functions die hem omzetten naar een matrix staan in `Engine`, omdat `Math` geen components kent |
 | 107 | `Transform` | `Vec3 position`, `Vec3 rotation` (drie hoeken in radialen, Euler angles) en `Vec3 scale` (default `{1, 1, 1}`). Geen quaternion: dat komt bij vrije rotaties of animatie (gimbal lock). Vaste volgorde (vervolg op besluit 43): `ModelMatrix = Translation * RotationY * RotationX * RotationZ * Scale` (yaw, pitch, roll). `ViewMatrix(const Transform&)` is het omgekeerde zonder schaal: `RotationZ(-z) * RotationX(-x) * RotationY(-y) * Translation(-position)` (vervolg op besluit 49). Beide als losse functions in `Transform.cpp` |
-| 108 | `MeshRenderer` | `MeshHandle mesh` en `ShaderHandle shader`, sinds besluit 167 ook `TextureHandle texture`; alleen handles (regel 4) |
+| 108 | `MeshRenderer` | `MeshHandle mesh` en `ShaderHandle shader`, sinds besluit 167 ook `TextureHandle texture`; sinds besluit 174 `{ MeshHandle mesh; Material material; }` |
 | 109 | `Camera` | `fovY` (radialen, default 45 graden), `nearPlane` en `farPlane`. De plaatsing staat in de `Transform` van dezelfde entity; de `aspect` komt elk frame uit het venster (18k) |
 | 110 | `EngineTests` | eigen testprogramma zoals `MathTests` (besluit 34), voor wat zonder venster te testen is; verwachte matrices met de hand opgebouwd of gecontroleerd op wat ze met een punt doen |
 | 111 | Ingebouwde components | `Transform`, `MeshRenderer` en `Camera` komen altijd met de engine mee: de `Engine` registreert ze zelf in de body van zijn constructor (vermeld in `Engine.h`), zoals hij ook zelf venster en Renderer maakt. Het spel registreert alleen zijn eigen components. Nieuwe ingebouwde components worden op dezelfde plek geregistreerd |
 | 112 | Twee systems voor tekenen | een system heeft één signature, en de camera (`Transform` + `Camera`) en wat getekend wordt (`Transform` + `MeshRenderer`) zijn verschillende entities. Eén system zou de camera als member moeten bewaren (toestand van het spel, besluit 72) of een query op de `World` nodig hebben die er niet is |
 | 113 | `CameraSystem` | `CameraSystem(Window&, Renderer&)`, signature `Transform` + `Camera`. Gebruikt de eerste camera; zonder camera of bij een framebuffer van grootte 0 doet hij niets. De `aspect` komt elk frame uit `Window::GetFramebufferSize` (geen toestand nodig), daarna `SetCamera(ViewMatrix(transform), Perspective(...))` |
-| 114 | `RenderSystem` | `RenderSystem(Renderer&, Vec3 clearColor)` (rood, groen en blauw in `x`, `y` en `z`), signature `Transform` + `MeshRenderer`. Eerst `Clear`, dan per entity `DrawMesh(mesh, shader, ModelMatrix(transform))`. De achtergrondkleur is een parameter van de constructor; in `Camera` pas bij meerdere camera's met een eigen achtergrond |
+| 114 | `RenderSystem` | `RenderSystem(Renderer&, Vec3 clearColor)` (rood, groen en blauw in `x`, `y` en `z`), signature `Transform` + `MeshRenderer`. Eerst `Clear`, dan per entity `DrawMesh(mesh, material, ModelMatrix(transform))` (sinds stap 24). De achtergrondkleur is een parameter van de constructor; in `Camera` pas bij meerdere camera's met een eigen achtergrond |
 | 115 | Volgorde van de systems van de engine | het spel voegt `CameraSystem` en `RenderSystem` zelf toe, als laatste en in die volgorde, zodat ze na de systems van het spel lopen. De engine voegt ze niet zelf toe (dan zouden ze vooraan staan). Een aparte fase voor tekenen komt pas als deze afspraak knelt |
 | 116 | Components ophalen | `GetComponent` geeft een `T&`; ophalen met `const T&` (of `const auto&`) om te lezen en `T&` om te veranderen. Met `auto` zonder `&` krijg je een kopie, en een wijziging daarop gaat stil verloren |
 | 117 | Opsplitsing van 18l | 18l systems zonder entities en Escape, 18m `Vec3 * float` en de kubus draait, 18n `TransformDirection` en de camera met WASD en de pijltjes |
@@ -279,7 +279,7 @@ Regels die de Renderer herbruikbaar houden:
 | 145 | Ambient | een kleur in het blok `Light` (na richting en kleur, offset 32; `LightData` wordt 48 bytes), gezet met `Renderer::SetAmbientLight(const Vec3& color)`. Elke setter schrijft alleen zijn eigen deel van de buffer (`glNamedBufferSubData` met offset en grootte), zodat richtingslicht en ambient los te zetten zijn. Waarden worden eerst naar `float[3]` gekopieerd, niet als `Vec3` aan OpenGL gegeven (geen aanname over de indeling van `Vec3`). Sandbox: `(0.15, 0.15, 0.15)` |
 | 146 | Camerapositie naar de shader | `SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position)`; het blok `Camera` krijgt `vec3 u_cameraPosition` na `u_viewProjection` (`CameraData` van 80 bytes, met padding en `static_assert`). Het `CameraSystem` geeft `transform.position` mee. De buffer heet nu `m_cameraBuffer`. Shaders die alleen `u_viewProjection` declareren (`basic`, `normals`) werken ongewijzigd: een blok mag kleiner zijn dan de buffer |
 | 147 | Specular | Blinn-Phong in wereldruimte in `lit.frag`: `halfway = normalize(-u_lightDirection + normalize(u_cameraPosition - worldPosition))`, `specular = pow(max(dot(n, halfway), 0), shininess) * specularStrength`, alleen maal de lichtkleur (een glans heeft de kleur van het licht). `lit.vert` geeft `worldPosition` door. Totaal: `color * (ambient + diffuse * lightColor) + specular * lightColor` |
-| 148 | Glans van het oppervlak | `const float shininess = 128.0` en `specularStrength = 0.5` in `lit.frag`; alle belichte voorwerpen glanzen dus hetzelfde. Een materiaal (per voorwerp) wordt een eigen stap, waarschijnlijk samen met texturen |
+| 148 | Glans van het oppervlak (vervangen door de besluiten 174 tot en met 177 in stap 24) | `const float shininess = 128.0` en `specularStrength = 0.5` in `lit.frag`; alle belichte voorwerpen glanzen dus hetzelfde. Een materiaal (per voorwerp) wordt een eigen stap, waarschijnlijk samen met texturen |
 | 149 | Route na stap 21 | 22 assets naast de executable (vervangt het ingebakken pad van besluit 134, vóór er plaatjes bijkomen), 23 texturen (in delen: het vrije vertex-formaat met UV's, een plaatje inladen, textures in de Renderer, de shader), 24 materialen |
 | 150 | Assets naast de executable | losse bestanden in `Sandbox/assets/` (nu `shaders/`, straks `textures/`), die CMake bij elke build naast de executable kopieert: een custom target `SandboxAssets` (`ALL`) met `cmake -E copy_directory` naar `${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/assets` (niet `$<TARGET_FILE_DIR:Sandbox>`: dat zou een kring geven), en `add_dependencies(Sandbox SandboxAssets)` zodat F5 ook kopieert. Een aangepaste shader is er na de volgende build. Geen combinatie met de bronmap in Debug. Uitbreidbaar: het `COMMAND` van dat target is de plek voor een latere stap die assets comprimeert of inpakt (zoals de cook-stap van grote engines). Het minimum blijft CMake 3.24 (`copy_directory_if_different` vraagt 3.26) |
 | 151 | Map van de executable | `std::filesystem::path GetExecutableDirectory()` in `Platform/FileSystem.h`/`.cpp`, met `GetModuleFileNameW` (de `W`-versie, zodat paden met bijzondere tekens kloppen) en `parent_path()`. `windows.h` achter `WIN32_LEAN_AND_MEAN` en `NOMINMAX`, alleen in de `.cpp`, met `#error` voor andere platforms. Bij een fout of een afgekapt pad (`MAX_PATH`) `LogError` met `GetLastError()` en een leeg pad. Sandbox bouwt zelf `GetExecutableDirectory() / "assets" / "shaders"`; een assetsysteem in de engine komt met de resource manager |
@@ -377,7 +377,12 @@ toont het schaakbord, goed om (door de gebruiker gezien). Daarmee is stap 23 af.
 (materialen) is begonnen met 24a: `Vertex` heeft geen kleur meer (positie 0, normaal 1, UV 2), en
 `basic` is een unlit shader die de texture toont. Sandbox ziet er ongewijzigd uit (door de
 gebruiker gezien). Deel 24b: de Renderer maakt een witte texture van 1 bij 1, en een texture
-met id 0 tekent daarmee; met id 0 is de kubus wit en belicht (door de gebruiker gezien).
+met id 0 tekent daarmee; met id 0 is de kubus wit en belicht (door de gebruiker gezien). Deel 24c:
+een `Material` (shader, texture, tint, `shininess`, `specularStrength`, met de oude constanten als
+default values) gaat mee met `DrawMesh` en zit in de `MeshRenderer`; `lit` en `basic` lezen
+`u_tint`, `lit` ook de glans. Sandbox toont het schaakbord en ernaast een oranje kubus met een
+fellere glans, met dezelfde mesh (door de gebruiker gezien). `EngineTests` heeft nu 19 controles.
+Daarmee is stap 24 af.
 
 Publieke interface van `Renderer`:
 
@@ -389,7 +394,7 @@ ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragme
 TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
 void         DestroyTexture(TextureHandle texture);
 void         DestroyShader(ShaderHandle shader);
-void         DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model);
+void         DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
 void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
 void         SetAmbientLight(const Vec3& color);
@@ -423,8 +428,13 @@ Bekende beperkingen, bewust zo gelaten:
   `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
   shader.
-- Alle belichte voorwerpen hebben hetzelfde materiaal: `shininess` en `specularStrength` zijn
-  constanten in `lit.frag` (besluit 148).
+- Elke entity heeft een eigen kopie van zijn `Material` (besluit 174): een materiaal veranderen
+  voor alle voorwerpen tegelijk kan niet. Delen komt met een `MaterialHandle` en de resource manager.
+- De namen `u_tint`, `u_shininess` en `u_specularStrength` zijn een afspraak tussen Renderer en
+  shader, zonder waarschuwing als ze ontbreken (besluit 176); een tikfout in de shader geeft stil
+  zwart of geen glans.
+- `DrawMesh` zet alle uniforms bij elke draw opnieuw, ook als ze niet veranderd zijn. Voor een
+  paar voorwerpen maakt dat niets uit.
 - De normal matrix wordt per hoekpunt in de shader uitgerekend (besluit 141).
 - Face culling staat altijd aan: een los vlak is van achteren gezien onzichtbaar, en een
   driehoek in de verkeerde draairichting verdwijnt (besluit 57).
@@ -473,18 +483,14 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 24c, het materiaal
+## Volgende stap: nog te kiezen
 
-De route (besluit 149): 22 assets naast de executable (af), 23 texturen (af, besluiten 152 tot en
-met 172), 24 materialen (besluit 173: 24a de vertex-kleur eruit af, 24b de witte texture af, 24c
-het materiaal). Voor 24c (besluiten 174 tot en met 177, 180 en 181): `Renderer/Material.h` met
-de struct `Material` en de standaardwaarden; `DrawMesh(MeshHandle, const Material&, const Mat4&
-model)`; `CreateShader` zoekt `u_tint`, `u_shininess` en `u_specularStrength` op (zonder
-waarschuwing als ze ontbreken) en `DrawMesh` zet ze met `glProgramUniform...`; `lit.frag` krijgt
-die drie uniforms in plaats van de constanten, `basic.frag` de tint; `MeshRenderer` wordt `{ mesh,
-material }` en het `RenderSystem` geeft het materiaal door; `EngineTests` controleert de
-standaardwaarden; in Sandbox een tweede kubus met dezelfde mesh, zonder texture, oranje en met een
-andere glans.
+De route van besluit 149 is af: 22 assets naast de executable, 23 texturen (besluiten 152 tot en
+met 172) en 24 materialen (besluiten 173 tot en met 181: 24a de vertex-kleur eruit, 24b de witte
+texture, 24c het materiaal). De volgende stap moet nog gekozen worden, uit de lijst onder Daarna.
+Voor de hand liggend: meer lichten of een puntlicht, het licht als entity met een `LightSystem`,
+gamma-correctie, een resource manager (laden en delen van meshes, textures en materialen), of
+modellen uit bestanden laden.
 
 Stap 21 ging in deze delen: 21a normalen (besluiten 137 tot en met 140), 21b diffuse (141 tot en
 met 144), 21c ambient en specular (145 tot en met 148).

@@ -16,8 +16,9 @@ layout(std140, binding = 1) uniform Light {
 
 layout(binding = 0) uniform sampler2D u_texture;
 
-const float shininess = 128.0;
-const float specularStrength = 0.5;
+uniform vec3 u_tint;
+uniform float u_shininess;
+uniform float u_specularStrength;
 
 out vec4 fragColor;
 
@@ -29,10 +30,10 @@ void main() {
     vec3 toCamera = normalize(u_cameraPosition - worldPosition);
     vec3 halfway = normalize(toLight + toCamera);
 
-    float specular = pow(max(dot(worldNormal, halfway), 0.0), shininess) *
-        specularStrength;
+    float specular = pow(max(dot(worldNormal, halfway), 0.0), u_shininess) *
+        u_specularStrength;
 
-    vec3 surfaceColor = texture(u_texture, uv).rgb;
+    vec3 surfaceColor = texture(u_texture, uv).rgb * u_tint;
     fragColor = vec4(surfaceColor * (u_ambientColor + diffuse * u_lightColor) +
         specular * u_lightColor, 1.0);
 }

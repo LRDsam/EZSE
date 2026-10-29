@@ -163,14 +163,14 @@ void Renderer::DestroyMesh(MeshHandle mesh) {
     meshData = MeshData{};
 }
 
-void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model) {
+void Renderer::DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model) {
     const MeshData& meshData = GetMeshData(mesh);
-    const ShaderData& shaderData = GetShaderData(shader);
+    const ShaderData& shaderData = GetShaderData(material.shader);
 
     glUseProgram(shaderData.shaderProgram);
     glBindVertexArray(meshData.vertexArrayObj);
     // Id 0 draws with the white texture, so a shader always has a texture to read.
-    const TextureHandle drawTexture = texture.id == 0 ? m_whiteTexture : texture;
+    const TextureHandle drawTexture = material.texture.id == 0 ? m_whiteTexture : material.texture;
     glBindTextureUnit(c_textureUnit, GetTextureData(drawTexture).textureObj);
     glProgramUniformMatrix4fv(
         shaderData.shaderProgram,
@@ -178,6 +178,18 @@ void Renderer::DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle text
         1,
         GL_FALSE,
         &model.m[0][0]);
+    glProgramUniform3f(
+        shaderData.shaderProgram,
+        shaderData.tintLocation,
+        material.tint.x, material.tint.y, material.tint.z);
+    glProgramUniform1f(
+        shaderData.shaderProgram,
+        shaderData.shininessLocation,
+        material.shininess);
+    glProgramUniform1f(
+        shaderData.shaderProgram,
+        shaderData.specularStrengthLocation,
+        material.specularStrength);
     glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
@@ -242,6 +254,9 @@ ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_v
     if (shaderData.modelLocation < 0) {
         LogWarn("Uniform u_model not found in shader!");
     }
+    shaderData.tintLocation = glGetUniformLocation(shaderData.shaderProgram, "u_tint");
+    shaderData.shininessLocation = glGetUniformLocation(shaderData.shaderProgram, "u_shininess");
+    shaderData.specularStrengthLocation = glGetUniformLocation(shaderData.shaderProgram, "u_specularStrength");
 
     m_shaderData.push_back(shaderData);
     return ShaderHandle{ static_cast<std::uint32_t>(m_shaderData.size()) };

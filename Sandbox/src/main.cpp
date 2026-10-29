@@ -228,8 +228,16 @@ int main() {
     // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
-    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, shader, checkerTexture});
+    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, {.shader = shader, .texture = checkerTexture}});
     //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
+    // A second cube with the same mesh: no texture (white), an orange tint and a different shine.
+    const ezse::Entity orangeCube = world.CreateEntity();
+    world.AddComponent(orangeCube, ezse::Transform{1.5f, -2.0f, 0.0f});
+    world.AddComponent(orangeCube, ezse::MeshRenderer{cubeMesh, {
+        .shader = shader,
+        .tint = {1.0f, 0.5f, 0.1f},
+        .shininess = 16.0f,
+        .specularStrength = 1.0f}});
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});

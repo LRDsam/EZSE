@@ -1,5 +1,6 @@
 add_library(EZSERenderer STATIC
     include/EZSE/Renderer/Mesh.h
+    include/EZSE/Renderer/Material.h
     include/EZSE/Renderer/Renderer.h
     include/EZSE/Renderer/Shader.h
     include/EZSE/Renderer/Texture.h

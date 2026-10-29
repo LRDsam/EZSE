@@ -3,6 +3,7 @@
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Shader.h"
 #include "EZSE/Renderer/Texture.h"
+#include "EZSE/Renderer/Material.h"
 
 #include "EZSE/Math/Transform.h"
 #include "EZSE/Math/Vec3.h"
@@ -25,7 +26,7 @@ public:
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
     // texture: bound to texture unit 0 for this draw; id 0 binds a 1x1 white texture.
-    void DrawMesh(MeshHandle mesh, ShaderHandle shader, TextureHandle texture, const Mat4& model);
+    void DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
 
     // Creates a texture from RGBA pixels, 4 bytes per pixel, row by row (the first row is the bottom).
@@ -68,6 +69,9 @@ private:
     struct ShaderData {
         unsigned int shaderProgram = 0;
         int modelLocation = -1;
+        int tintLocation = -1;
+        int shininessLocation = -1;
+        int specularStrengthLocation = -1;
     };
 
     struct TextureData {
