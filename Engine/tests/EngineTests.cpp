@@ -2,6 +2,7 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Resources/Image.h"
+#include "EZSE/Engine/Resources/Obj.h"
 
 #include "EZSE/Math/Mat4.h"
 #include "EZSE/Math/Vec3.h"
@@ -11,6 +12,9 @@
 #include <cstdint>
 #include <iostream>
 #include <numbers>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace {
 
@@ -168,6 +172,62 @@ void TestDecodeImage() {
     Check(!ezse::DecodeImage(notAnImage).has_value(), "DecodeImage: bytes that are not an image give nothing");
 }
 
+// The positions, uvs and normal of a square in the XY plane, facing +Z. A test adds the faces.
+constexpr std::string_view c_squareData =
+    "v -0.5 -0.5 0.0\n"
+    "v  0.5 -0.5 0.0\n"
+    "v  0.5  0.5 0.0\n"
+    "v -0.5  0.5 0.0\n"
+    "vt 0 0\n"
+    "vt 1 0\n"
+    "vt 1 1\n"
+    "vt 0 1\n"
+    "vn 0 0 1\n";
+
+bool IndicesAre(const ezse::MeshData& mesh, const std::vector<std::uint32_t>& expected) {
+    return mesh.indices == expected;
+}
+
+void TestParseObj() {
+    // Two triangles share two corners: those become one Vertex each.
+    const std::string twoTriangles = std::string(c_squareData) +
+        "f 1/1/1 2/2/1 3/3/1\n"
+        "f 1/1/1 3/3/1 4/4/1\n";
+    const std::optional<ezse::MeshData> square = ezse::ParseObj(twoTriangles);
+    Check(square.has_value(), "ParseObj: a square of two triangles parses");
+    if (square) {
+        Check(square->vertices.size() == 4 && square->indices.size() == 6,
+              "ParseObj: shared corners are merged (4 vertices, 6 indices)");
+        Check(IndicesAre(*square, {0, 1, 2, 0, 2, 3}), "ParseObj: the indices follow the faces");
+        const ezse::Vertex& corner = square->vertices[2];
+        Check(corner.position[0] == 0.5f && corner.position[1] == 0.5f && corner.position[2] == 0.0f &&
+                  corner.normal[2] == 1.0f && corner.uv[0] == 1.0f && corner.uv[1] == 1.0f,
+              "ParseObj: a vertex gets its position, normal and uv");
+    }
+
+    // One face with four corners becomes a fan of two triangles.
+    const std::optional<ezse::MeshData> quad =
+        ezse::ParseObj(std::string(c_squareData) + "f 1/1/1 2/2/1 3/3/1 4/4/1\n");
+    Check(quad.has_value() && quad->vertices.size() == 4 && IndicesAre(*quad, {0, 1, 2, 0, 2, 3}),
+          "ParseObj: a face with four corners becomes two triangles");
+
+    // Windows line endings, extra spaces, comments and other keywords are fine.
+    const std::optional<ezse::MeshData> windows = ezse::ParseObj(
+        "# a comment\r\no square\r\nv -0.5 -0.5 0.0\r\nv  0.5  -0.5   0.0\r\nv 0.5 0.5 0.0\r\n"
+        "vt 0 0\r\nvn 0 0 1\r\ns off\r\nusemtl none\r\n\r\nf 1/1/1 2/1/1 3/1/1");
+    Check(windows.has_value() && windows->indices.size() == 3,
+          "ParseObj: CRLF, extra spaces, comments and other keywords are accepted");
+
+    std::cout << "(the next four checks log an error on purpose)\n";
+    Check(!ezse::ParseObj(std::string(c_squareData) + "f 1/1/1 2/2/1 5/3/1\n").has_value(),
+          "ParseObj: an index past what was read gives nothing");
+    Check(!ezse::ParseObj(std::string(c_squareData) + "f 1//1 2//1 3//1\n").has_value(),
+          "ParseObj: a corner without uv gives nothing");
+    Check(!ezse::ParseObj("v 1.0 O.5 3.0\n").has_value(),
+          "ParseObj: a number with a letter in it gives nothing");
+    Check(!ezse::ParseObj(c_squareData).has_value(), "ParseObj: text without faces gives nothing");
+}
+
 } // namespace
 
 int main() {
@@ -175,6 +235,7 @@ int main() {
     TestViewMatrix();
     TestComponentDefaults();
     TestDecodeImage();
+    TestParseObj();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
