@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` en `ParseObj`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -321,6 +321,7 @@ Regels die de Renderer herbruikbaar houden:
 | 187 | Assenstelsel en UV's | OBJ is right-handed met Y omhoog en de UV begint linksonder, zoals bij ons en OpenGL: niets omdraaien (plaatjes worden al omgedraaid bij het laden, besluit 158) |
 | 188 | Opdeling en controle van stap 25 | 25a `MeshData` en `ParseObj`, met tests in `EngineTests` (een vierkant van twee driehoeken geeft 4 hoekpunten en 6 indices, een vierhoek als `f`-regel wordt twee driehoeken, een index buiten bereik en een vlak zonder normaal geven niets); 25b `ReadObjFile` en de kubus uit `Sandbox/assets/models/cube.obj` (door Claude met een script uit de array gemaakt) in plaats van de array in `main.cpp`, met precies hetzelfde beeld; 25c een echt model, bij voorkeur Suzanne uit Blender (door de gebruiker geëxporteerd als OBJ met normalen en UV's), of een gratis CC0-model (downloaden eerst vragen) |
 | 189 | Uitwerking van `ParseObj` | hulpfuncties in een naamloze namespace binnen `ezse`: `NextLine` (knipt op `
+| 190 | Uitwerking van 25b | `ReadObjFile`: `ReadTextFile`, dan `ParseObj`; bij een parse-fout `LogError` met het pad (`ParseObj` kent alleen het regelnummer). Modellen van Sandbox staan in `Sandbox/assets/models/` (niet `meshes`: een bestand is een model, en "mesh" is de GPU-handle) en gaan mee met de bestaande kopieerstap. Sandbox leest `cube.obj` vóór `Engine::Create` (`return 1` als het mislukt); de kubus-arrays zijn weg uit `main.cpp`. `cube.obj` is met een script uit de arrays gemaakt (8 `v`, 4 `vt`, 6 `vn`, per zijde één `f` met vier hoeken) en geeft dezelfde 24 hoekpunten en 36 indices; de gebruiker heeft het commentaar eruit gehaald. `.obj`-bestanden staan niet in `add_executable`: CMake en Visual Studio geven elk `.obj` daar aan de linker als object file (`LNK1107`), en zichtbaar in Visual Studio hoeven ze niet |
 `, haalt een `` aan het eind weg), `NextToken` (knipt op spaties en tabs, `c_whitespace`), `ParseFloat`, `ParseIndex` (`std::from_chars`, het hele token moet een getal zijn; een `std::uint32_t` weigert vanzelf een minteken), `template <std::size_t N> ParseFloats` en `ParseCorner` (knipt `p/t/n` op `/`). Per regel eerst het sleutelwoord, dan een keten `if`/`else if` (een `switch` kan niet op strings). Een fout bij `v`, `vt` of `vn` logt de hele regel. Hoeken samenvoegen met `ObjCorner` (`= default` `operator==`) en `ObjCornerHash` (elke index maal een ander groot priemgetal, gecombineerd met `^`). De waaier wordt gemaakt tijdens het lezen: vanaf de derde hoek de driehoek `(first, previous, current)`. Tekst zonder vlakken is een fout, omdat `CreateMesh` geen lege mesh accepteert. De `f`-tak is op verzoek van de gebruiker door Claude geschreven |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
@@ -393,7 +394,9 @@ default values) gaat mee met `DrawMesh` en zit in de `MeshRenderer`; `lit` en `b
 fellere glans, met dezelfde mesh (door de gebruiker gezien). `EngineTests` heeft nu 19 controles.
 Daarmee is stap 24 af. Stap 25 (modellen uit bestanden) is begonnen met 25a: `MeshData` en
 `ParseObj` in `Engine/Resources/`, gecontroleerd door `EngineTests` (samenvoegen, waaiers,
-Windows-regeleinden en de foutgevallen; nu 29 controles).
+Windows-regeleinden en de foutgevallen; nu 29 controles). Deel 25b: `ReadObjFile`, en Sandbox
+leest de kubus uit `assets/models/cube.obj` in plaats van uit arrays in `main.cpp`; het beeld
+is ongewijzigd (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -494,15 +497,14 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 25b, `ReadObjFile` en `cube.obj`
+## Volgende stap: 25c, een echt model
 
-Stap 25: modellen uit bestanden laden (besluiten 182 tot en met 189); 25a (`MeshData` en
-`ParseObj`) is af. Voor 25b: `std::optional<MeshData> ReadObjFile(const std::filesystem::path&)`
-in `Obj.h`/`.cpp` (`ReadTextFile`, dan `ParseObj`; bij een fout het pad in de melding), een
-script van Claude dat `Sandbox/assets/models/cube.obj` maakt uit de huidige kubus-array, en
-Sandbox die de kubus vóór `Engine::Create` uit dat bestand leest (`return 1` als het mislukt,
-zoals bij de shaders en het plaatje) in plaats van uit de array. Sandbox moet er precies hetzelfde
-uitzien. Daarna 25c (een echt model).
+Stap 25: modellen uit bestanden laden (besluiten 182 tot en met 190); 25a (`ParseObj`) en 25b
+(`ReadObjFile` en `cube.obj`) zijn af. Voor 25c: Suzanne uit Blender 4.5 staat al klaar als
+`Sandbox/assets/models/monkey.obj` (nog niet gecommit); controleren dat het bestand normalen en UV's
+heeft (besluit 183), het in Sandbox laden als derde voorwerp, en kijken of de belichting en de
+vorm kloppen. Open punten: plek, schaal en materiaal van het model in Sandbox, en wat te doen als
+de export geen normalen of UV's heeft (opnieuw exporteren, of normalen uitrekenen).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

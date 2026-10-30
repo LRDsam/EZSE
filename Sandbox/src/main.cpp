@@ -3,11 +3,15 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Resources/Image.h"
+#include "EZSE/Engine/Resources/MeshData.h"
+#include "EZSE/Engine/Resources/obj.h"
+
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
 #include "EZSE/Core/Log.h"
 #include "EZSE/Core/File.h"
+
 
 #include "EZSE/Renderer/Mesh.h"
 
@@ -133,56 +137,12 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
 } // namespace
 
 int main() {
-    const ezse::Vertex cubeVertices[] = {
-        // Front (z = 0.5), normal +Z
-        {{-0.5f, -0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}, {0.0f, 0.0f}},
-        {{ 0.5f, -0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}, {1.0f, 0.0f}},
-        {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}, {1.0f, 1.0f}},
-        {{-0.5f,  0.5f,  0.5f}, { 0.0f,  0.0f,  1.0f}, {0.0f, 1.0f}},
-
-        // Back (z = -0.5), normal -Z
-        {{ 0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}, {0.0f, 0.0f}},
-        {{-0.5f, -0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}, {1.0f, 0.0f}},
-        {{-0.5f,  0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}, {1.0f, 1.0f}},
-        {{ 0.5f,  0.5f, -0.5f}, { 0.0f,  0.0f, -1.0f}, {0.0f, 1.0f}},
-
-        // Right (x = 0.5), normal +X
-        {{ 0.5f, -0.5f,  0.5f}, { 1.0f,  0.0f,  0.0f}, {0.0f, 0.0f}},
-        {{ 0.5f, -0.5f, -0.5f}, { 1.0f,  0.0f,  0.0f}, {1.0f, 0.0f}},
-        {{ 0.5f,  0.5f, -0.5f}, { 1.0f,  0.0f,  0.0f}, {1.0f, 1.0f}},
-        {{ 0.5f,  0.5f,  0.5f}, { 1.0f,  0.0f,  0.0f}, {0.0f, 1.0f}},
-
-        // Left (x = -0.5), normal -X
-        {{-0.5f, -0.5f, -0.5f}, {-1.0f,  0.0f,  0.0f}, {0.0f, 0.0f}},
-        {{-0.5f, -0.5f,  0.5f}, {-1.0f,  0.0f,  0.0f}, {1.0f, 0.0f}},
-        {{-0.5f,  0.5f,  0.5f}, {-1.0f,  0.0f,  0.0f}, {1.0f, 1.0f}},
-        {{-0.5f,  0.5f, -0.5f}, {-1.0f,  0.0f,  0.0f}, {0.0f, 1.0f}},
-
-        // Top (y = 0.5), normal +Y
-        {{-0.5f,  0.5f,  0.5f}, { 0.0f,  1.0f,  0.0f}, {0.0f, 0.0f}},
-        {{ 0.5f,  0.5f,  0.5f}, { 0.0f,  1.0f,  0.0f}, {1.0f, 0.0f}},
-        {{ 0.5f,  0.5f, -0.5f}, { 0.0f,  1.0f,  0.0f}, {1.0f, 1.0f}},
-        {{-0.5f,  0.5f, -0.5f}, { 0.0f,  1.0f,  0.0f}, {0.0f, 1.0f}},
-
-        // Bottom (y = -0.5), normal -Y
-        {{-0.5f, -0.5f, -0.5f}, { 0.0f, -1.0f,  0.0f}, {0.0f, 0.0f}},
-        {{ 0.5f, -0.5f, -0.5f}, { 0.0f, -1.0f,  0.0f}, {1.0f, 0.0f}},
-        {{ 0.5f, -0.5f,  0.5f}, { 0.0f, -1.0f,  0.0f}, {1.0f, 1.0f}},
-        {{-0.5f, -0.5f,  0.5f}, { 0.0f, -1.0f,  0.0f}, {0.0f, 1.0f}},
-    };
-    const std::uint32_t cubeIndices[] = {
-         0,  1,  2,   0,  2,  3,   // front
-         4,  5,  6,   4,  6,  7,   // back
-         8,  9, 10,   8, 10, 11,   // right
-        12, 13, 14,  12, 14, 15,   // left
-        16, 17, 18,  16, 18, 19,   // top
-        20, 21, 22,  20, 22, 23,   // bottom
-    };
-
     const std::filesystem::path shaderDir =
         ezse::GetExecutableDirectory() / "assets" / "shaders";
     const std::filesystem::path textureDir =
         ezse::GetExecutableDirectory() / "assets" / "textures";
+    const std::filesystem::path modelDir =
+        ezse::GetExecutableDirectory() / "assets" / "models";
 
     const std::optional<std::string> vertexSource = ezse::ReadTextFile(
         shaderDir / "lit.vert");
@@ -198,6 +158,11 @@ int main() {
         return 1;
     }
 
+    const std::optional<ezse::MeshData> cubeMeshData = ezse::ReadObjFile(modelDir / "cube.obj");
+    if (!cubeMeshData.has_value()) {
+        return 1;
+    }
+
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
         return 1;
@@ -207,7 +172,8 @@ int main() {
 
     const ezse::TextureHandle checkerTexture = renderer.CreateTexture(
         checkerImage->width, checkerImage->height, checkerImage->pixels);
-    const ezse::MeshHandle cubeMesh = renderer.CreateMesh(cubeVertices, cubeIndices);
+    const ezse::MeshHandle cubeMesh = renderer.CreateMesh(
+        cubeMeshData->vertices, cubeMeshData->indices);
     const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
         *fragmentSource);
     if (shader.id == 0) {
@@ -257,6 +223,7 @@ int main() {
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
 
+    // Capturing mouse in window and running game
     engine->GetWindow().SetCursorCaptured(true);
     engine->Run();
 

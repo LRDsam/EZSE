@@ -10,4 +10,6 @@ namespace ezse {
 
 std::optional<MeshData> ParseObj(std::string_view text);
 
+std::optional<MeshData> ReadObjFile(const std::filesystem::path& path);
+
 } // namespace ezse

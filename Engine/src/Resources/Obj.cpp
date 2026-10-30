@@ -217,4 +217,17 @@ std::optional<MeshData> ParseObj(std::string_view text) {
     return mesh;
 }
 
+std::optional<MeshData> ReadObjFile(const std::filesystem::path& path) {
+    std::optional<std::string> fileData = ReadTextFile(path);
+    if (!fileData.has_value()) {
+        return std::nullopt;
+    }
+    std::optional<MeshData> meshData = ParseObj(fileData.value());
+    if (!meshData.has_value()) {
+        LogError("Failed to load OBJ file '{}'", path.string());
+        return std::nullopt;
+    }
+    return meshData;
+}
+
 } // namespace ezse
