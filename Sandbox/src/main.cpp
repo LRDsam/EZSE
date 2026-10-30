@@ -162,6 +162,10 @@ int main() {
     if (!cubeMeshData.has_value()) {
         return 1;
     }
+    const std::optional<ezse::MeshData> monkeyMeshData = ezse::ReadObjFile(modelDir / "monkey.obj");
+    if (!monkeyMeshData.has_value()) {
+        return 1;
+    }
 
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
@@ -174,6 +178,8 @@ int main() {
         checkerImage->width, checkerImage->height, checkerImage->pixels);
     const ezse::MeshHandle cubeMesh = renderer.CreateMesh(
         cubeMeshData->vertices, cubeMeshData->indices);
+    const ezse::MeshHandle monkeyMesh = renderer.CreateMesh(
+        monkeyMeshData->vertices, monkeyMeshData->indices);
     const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
         *fragmentSource);
     if (shader.id == 0) {
@@ -204,6 +210,13 @@ int main() {
         .tint = {1.0f, 0.5f, 0.1f},
         .shininess = 16.0f,
         .specularStrength = 1.0f}});
+    // Suzanne from Blender, left of the cubes: half size, with the checkerboard to show her uvs.
+    const ezse::Entity monkey = world.CreateEntity();
+    world.AddComponent(monkey, ezse::Transform{
+        .position = {-1.75f, -2.0f, 0.0f},
+        .scale = {0.5f, 0.5f, 0.5f}});
+    world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
+    world.AddComponent(monkey, Spin{.speed = {0.0f, 0.5f, 0.0f}});
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});

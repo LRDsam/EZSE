@@ -322,6 +322,8 @@ Regels die de Renderer herbruikbaar houden:
 | 188 | Opdeling en controle van stap 25 | 25a `MeshData` en `ParseObj`, met tests in `EngineTests` (een vierkant van twee driehoeken geeft 4 hoekpunten en 6 indices, een vierhoek als `f`-regel wordt twee driehoeken, een index buiten bereik en een vlak zonder normaal geven niets); 25b `ReadObjFile` en de kubus uit `Sandbox/assets/models/cube.obj` (door Claude met een script uit de array gemaakt) in plaats van de array in `main.cpp`, met precies hetzelfde beeld; 25c een echt model, bij voorkeur Suzanne uit Blender (door de gebruiker geëxporteerd als OBJ met normalen en UV's), of een gratis CC0-model (downloaden eerst vragen) |
 | 189 | Uitwerking van `ParseObj` | hulpfuncties in een naamloze namespace binnen `ezse`: `NextLine` (knipt op `
 | 190 | Uitwerking van 25b | `ReadObjFile`: `ReadTextFile`, dan `ParseObj`; bij een parse-fout `LogError` met het pad (`ParseObj` kent alleen het regelnummer). Modellen van Sandbox staan in `Sandbox/assets/models/` (niet `meshes`: een bestand is een model, en "mesh" is de GPU-handle) en gaan mee met de bestaande kopieerstap. Sandbox leest `cube.obj` vóór `Engine::Create` (`return 1` als het mislukt); de kubus-arrays zijn weg uit `main.cpp`. `cube.obj` is met een script uit de arrays gemaakt (8 `v`, 4 `vt`, 6 `vn`, per zijde één `f` met vier hoeken) en geeft dezelfde 24 hoekpunten en 36 indices; de gebruiker heeft het commentaar eruit gehaald. `.obj`-bestanden staan niet in `add_executable`: CMake en Visual Studio geven elk `.obj` daar aan de linker als object file (`LNK1107`), en zichtbaar in Visual Studio hoeven ze niet |
+| 191 | Assets in git | kleine testassets gaan gewoon in git, tot 1 MB per bestand. Elke versie blijft in de geschiedenis en elke clone haalt die op; tekst comprimeert goed, plaatjes en binaire modellen niet. Bij het eerste bestand boven 1 MB kiezen we opnieuw: Git LFS (een verwijzing in git, het bestand apart bij GitHub, gratis tot 1 GB) of buiten git. Buiten git is onhandig zolang de gebruiker op twee pc's werkt: een clone zonder assets stopt Sandbox met `return 1` |
+| 192 | Suzanne in Sandbox (25c) | `monkey.obj` uit Blender 4.5: een fijnere Suzanne (met een subdivision-modifier geëxporteerd: 2012 posities, 1968 vlakken, gladde normalen, `s 1`, 298 KB) wordt gecommit; de platte versie en een gladde versie van de gewone Suzanne zijn op verzoek van de gebruiker niet bewaard. Derde entity naast de twee kubussen: plek `(-1.75, -2, 0)`, schaal `0.5` via de `Transform`, het schaakbord als texture (controleert de UV's), en een `Spin` om Y (`{0, 0.5, 0}`). De kubus met het schaakbord blijft staan |
 `, haalt een `` aan het eind weg), `NextToken` (knipt op spaties en tabs, `c_whitespace`), `ParseFloat`, `ParseIndex` (`std::from_chars`, het hele token moet een getal zijn; een `std::uint32_t` weigert vanzelf een minteken), `template <std::size_t N> ParseFloats` en `ParseCorner` (knipt `p/t/n` op `/`). Per regel eerst het sleutelwoord, dan een keten `if`/`else if` (een `switch` kan niet op strings). Een fout bij `v`, `vt` of `vn` logt de hele regel. Hoeken samenvoegen met `ObjCorner` (`= default` `operator==`) en `ObjCornerHash` (elke index maal een ander groot priemgetal, gecombineerd met `^`). De waaier wordt gemaakt tijdens het lezen: vanaf de derde hoek de driehoek `(first, previous, current)`. Tekst zonder vlakken is een fout, omdat `CreateMesh` geen lege mesh accepteert. De `f`-tak is op verzoek van de gebruiker door Claude geschreven |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
@@ -396,7 +398,9 @@ Daarmee is stap 24 af. Stap 25 (modellen uit bestanden) is begonnen met 25a: `Me
 `ParseObj` in `Engine/Resources/`, gecontroleerd door `EngineTests` (samenvoegen, waaiers,
 Windows-regeleinden en de foutgevallen; nu 29 controles). Deel 25b: `ReadObjFile`, en Sandbox
 leest de kubus uit `assets/models/cube.obj` in plaats van uit arrays in `main.cpp`; het beeld
-is ongewijzigd (door de gebruiker gezien).
+is ongewijzigd (door de gebruiker gezien). Deel 25c: Suzanne uit Blender (`monkey.obj`) staat
+als derde voorwerp links van de kubussen, half zo groot, draaiend, met het schaakbord. Daarmee is
+stap 25 af.
 
 Publieke interface van `Renderer`:
 
@@ -497,14 +501,13 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 25c, een echt model
+## Volgende stap: nog te kiezen
 
-Stap 25: modellen uit bestanden laden (besluiten 182 tot en met 190); 25a (`ParseObj`) en 25b
-(`ReadObjFile` en `cube.obj`) zijn af. Voor 25c: Suzanne uit Blender 4.5 staat al klaar als
-`Sandbox/assets/models/monkey.obj` (nog niet gecommit); controleren dat het bestand normalen en UV's
-heeft (besluit 183), het in Sandbox laden als derde voorwerp, en kijken of de belichting en de
-vorm kloppen. Open punten: plek, schaal en materiaal van het model in Sandbox, en wat te doen als
-de export geen normalen of UV's heeft (opnieuw exporteren, of normalen uitrekenen).
+Stap 25 (modellen uit OBJ-bestanden, besluiten 182 tot en met 192) is af. De volgende stap moet
+nog gekozen worden, uit de lijst onder Daarna. Voor de hand liggend: een resource manager (laden
+en delen van meshes, textures en materialen; nu laadt Sandbox alles zelf in `main.cpp`), meer
+lichten of een puntlicht, het licht als entity met een `LightSystem`, gamma-correctie, of
+normalen uitrekenen voor modellen zonder normalen.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -567,7 +570,7 @@ Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `V
 het vrije vertex-formaat (besluit 153), meer lichten of een
 puntlicht, het licht als entity met een `LightSystem` (besluit 143), de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
-als `WindowEvent`, shaders en modellen uit bestanden laden,
+als `WindowEvent`, glTF (besluit 182),
 een resource manager in de Engine-module, gebeurtenissen binnen het spel (besluit 121), en pauze
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
 toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen
