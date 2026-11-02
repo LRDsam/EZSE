@@ -412,7 +412,8 @@ stap 25 af. Stap 26 (de resource manager) is begonnen met 26a: de `Engine` bezit
 genormaliseerd als sleutel) en een teller per pad bijhoudt; `UnloadMesh` telt af en ruimt de mesh
 pas bij 0 op, de destructor ruimt de rest op. Sandbox laadt de kubus en Suzanne via de manager, en
 laadt de kubus een tweede keer via `./models/cube.obj`: dezelfde id, één keer geladen, en na één
-`UnloadMesh` niet opgeruimd (door de gebruiker gezien).
+`UnloadMesh` niet opgeruimd (door de gebruiker gezien). Daarna de hernoeming van besluit 200: de
+privé structs in de Renderer heten nu `GPUMesh`, `GPUShader` en `GPUTexture`.
 
 Publieke interface van `Renderer`:
 
@@ -520,13 +521,12 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: de GPU-hernoeming, daarna 26b
+## Volgende stap: 26b, textures via de `ResourceManager`
 
-26a is af. Eerst de opschoonstap van besluit 200: in de Renderer `MeshData`, `ShaderData` en
-`TextureData` hernoemen naar `GPUMesh`, `GPUShader` en `GPUTexture` (met de getters en vectors),
-door Claude, als eigen commit. Daarna 26b: textures via de `ResourceManager`, en de boekhouding
-(twee maps en de teller) eruit halen als template `ResourceCache<Handle>` met tests in
-`EngineTests`. Daarna 26c (shaders; kiezen tussen twee paden en een basisnaam).
+26a en de GPU-hernoeming (besluit 200) zijn af. 26b: textures laden via de `ResourceManager`
+(`LoadTexture`, `UnloadTexture`), en de boekhouding (twee maps en de teller) eruit halen als
+template `ResourceCache<Handle>` met tests in `EngineTests`. De keuzes voor 26b moeten nog
+besproken worden. Daarna 26c (shaders; kiezen tussen twee paden en een basisnaam).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

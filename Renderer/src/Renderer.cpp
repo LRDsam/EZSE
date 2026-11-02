@@ -125,72 +125,72 @@ MeshHandle Renderer::CreateMesh(std::span<const Vertex> vertices, std::span<cons
         EZSE_ASSERT(index < vertices.size(), "CreateMesh got an index that points past the last vertex");
     }
 
-    MeshData meshData;
-    glCreateBuffers(1, &meshData.vertexBufferObj);
-    glNamedBufferStorage(meshData.vertexBufferObj, vertices.size_bytes(), vertices.data(), 0);
-    LogInfo("OpenGL: Vertex buffer {} created", meshData.vertexBufferObj);
+    GPUMesh gpuMesh;
+    glCreateBuffers(1, &gpuMesh.vertexBufferObj);
+    glNamedBufferStorage(gpuMesh.vertexBufferObj, vertices.size_bytes(), vertices.data(), 0);
+    LogInfo("OpenGL: Vertex buffer {} created", gpuMesh.vertexBufferObj);
 
-    glCreateVertexArrays(1, &meshData.vertexArrayObj);
-    glVertexArrayVertexBuffer(meshData.vertexArrayObj, 0, meshData.vertexBufferObj, 0,sizeof(Vertex));
-    glVertexArrayAttribFormat(meshData.vertexArrayObj, 0, 3, GL_FLOAT, GL_FALSE, 0);
-    glVertexArrayAttribFormat(meshData.vertexArrayObj, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, normal));
-    glVertexArrayAttribFormat(meshData.vertexArrayObj, 2, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, uv));
-    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 0);
-    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 1);
-    glEnableVertexArrayAttrib(meshData.vertexArrayObj, 2);
-    glVertexArrayAttribBinding(meshData.vertexArrayObj, 0, 0);
-    glVertexArrayAttribBinding(meshData.vertexArrayObj, 1, 0);
-    glVertexArrayAttribBinding(meshData.vertexArrayObj, 2, 0);
-    LogInfo("OpenGL: Vertex Array {} created", meshData.vertexArrayObj);
+    glCreateVertexArrays(1, &gpuMesh.vertexArrayObj);
+    glVertexArrayVertexBuffer(gpuMesh.vertexArrayObj, 0, gpuMesh.vertexBufferObj, 0,sizeof(Vertex));
+    glVertexArrayAttribFormat(gpuMesh.vertexArrayObj, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribFormat(gpuMesh.vertexArrayObj, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, normal));
+    glVertexArrayAttribFormat(gpuMesh.vertexArrayObj, 2, 2, GL_FLOAT, GL_FALSE, offsetof(Vertex, uv));
+    glEnableVertexArrayAttrib(gpuMesh.vertexArrayObj, 0);
+    glEnableVertexArrayAttrib(gpuMesh.vertexArrayObj, 1);
+    glEnableVertexArrayAttrib(gpuMesh.vertexArrayObj, 2);
+    glVertexArrayAttribBinding(gpuMesh.vertexArrayObj, 0, 0);
+    glVertexArrayAttribBinding(gpuMesh.vertexArrayObj, 1, 0);
+    glVertexArrayAttribBinding(gpuMesh.vertexArrayObj, 2, 0);
+    LogInfo("OpenGL: Vertex Array {} created", gpuMesh.vertexArrayObj);
 
-    glCreateBuffers(1, &meshData.indexBufferObj);
-    glNamedBufferStorage(meshData.indexBufferObj, indices.size_bytes(), indices.data(), 0);
-    glVertexArrayElementBuffer(meshData.vertexArrayObj, meshData.indexBufferObj);
-    LogInfo("OpenGL: Index buffer {} created", meshData.indexBufferObj);
+    glCreateBuffers(1, &gpuMesh.indexBufferObj);
+    glNamedBufferStorage(gpuMesh.indexBufferObj, indices.size_bytes(), indices.data(), 0);
+    glVertexArrayElementBuffer(gpuMesh.vertexArrayObj, gpuMesh.indexBufferObj);
+    LogInfo("OpenGL: Index buffer {} created", gpuMesh.indexBufferObj);
 
-    meshData.indexCount = static_cast<unsigned int>(indices.size());
-    m_meshData.push_back(meshData);
-    return MeshHandle{ static_cast<std::uint32_t>(m_meshData.size()) };
+    gpuMesh.indexCount = static_cast<unsigned int>(indices.size());
+    m_gpuMeshes.push_back(gpuMesh);
+    return MeshHandle{ static_cast<std::uint32_t>(m_gpuMeshes.size()) };
 }
 
 void Renderer::DestroyMesh(MeshHandle mesh) {
-    MeshData& meshData = GetMeshData(mesh);
+    GPUMesh& gpuMesh = GetGPUMesh(mesh);
 
-    glDeleteBuffers(1, &meshData.vertexBufferObj);
-    glDeleteBuffers(1, &meshData.indexBufferObj);
-    glDeleteVertexArrays(1, &meshData.vertexArrayObj);
+    glDeleteBuffers(1, &gpuMesh.vertexBufferObj);
+    glDeleteBuffers(1, &gpuMesh.indexBufferObj);
+    glDeleteVertexArrays(1, &gpuMesh.vertexArrayObj);
 
-    meshData = MeshData{};
+    gpuMesh = GPUMesh{};
 }
 
 void Renderer::DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model) {
-    const MeshData& meshData = GetMeshData(mesh);
-    const ShaderData& shaderData = GetShaderData(material.shader);
+    const GPUMesh& gpuMesh = GetGPUMesh(mesh);
+    const GPUShader& gpuShader = GetGPUShader(material.shader);
 
-    glUseProgram(shaderData.shaderProgram);
-    glBindVertexArray(meshData.vertexArrayObj);
+    glUseProgram(gpuShader.shaderProgram);
+    glBindVertexArray(gpuMesh.vertexArrayObj);
     // Id 0 draws with the white texture, so a shader always has a texture to read.
     const TextureHandle drawTexture = material.texture.id == 0 ? m_whiteTexture : material.texture;
-    glBindTextureUnit(c_textureUnit, GetTextureData(drawTexture).textureObj);
+    glBindTextureUnit(c_textureUnit, GetGPUTexture(drawTexture).textureObj);
     glProgramUniformMatrix4fv(
-        shaderData.shaderProgram,
-        shaderData.modelLocation,
+        gpuShader.shaderProgram,
+        gpuShader.modelLocation,
         1,
         GL_FALSE,
         &model.m[0][0]);
     glProgramUniform3f(
-        shaderData.shaderProgram,
-        shaderData.tintLocation,
+        gpuShader.shaderProgram,
+        gpuShader.tintLocation,
         material.tint.x, material.tint.y, material.tint.z);
     glProgramUniform1f(
-        shaderData.shaderProgram,
-        shaderData.shininessLocation,
+        gpuShader.shaderProgram,
+        gpuShader.shininessLocation,
         material.shininess);
     glProgramUniform1f(
-        shaderData.shaderProgram,
-        shaderData.specularStrengthLocation,
+        gpuShader.shaderProgram,
+        gpuShader.specularStrengthLocation,
         material.specularStrength);
-    glDrawElements(GL_TRIANGLES, meshData.indexCount, GL_UNSIGNED_INT, nullptr);
+    glDrawElements(GL_TRIANGLES, gpuMesh.indexCount, GL_UNSIGNED_INT, nullptr);
 }
 
 TextureHandle Renderer::CreateTexture(int width, int height, std::span<const std::uint8_t> pixels) {
@@ -201,26 +201,26 @@ TextureHandle Renderer::CreateTexture(int width, int height, std::span<const std
     // One level for every halving of the largest side, down to 1 pixel: 256 gives 9 levels.
     const int levels = static_cast<int>(std::bit_width(static_cast<unsigned int>(std::max(width, height))));
 
-    TextureData textureData;
-    glCreateTextures(GL_TEXTURE_2D, 1, &textureData.textureObj);
-    glTextureStorage2D(textureData.textureObj, levels, GL_RGBA8, width, height);
-    glTextureSubImage2D(textureData.textureObj, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-    glGenerateTextureMipmap(textureData.textureObj);
+    GPUTexture gpuTexture;
+    glCreateTextures(GL_TEXTURE_2D, 1, &gpuTexture.textureObj);
+    glTextureStorage2D(gpuTexture.textureObj, levels, GL_RGBA8, width, height);
+    glTextureSubImage2D(gpuTexture.textureObj, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glGenerateTextureMipmap(gpuTexture.textureObj);
 
-    glTextureParameteri(textureData.textureObj, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTextureParameteri(textureData.textureObj, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(textureData.textureObj, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTextureParameteri(textureData.textureObj, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    LogInfo("OpenGL: Texture {} created ({}x{}, {} levels)", textureData.textureObj, width, height, levels);
+    glTextureParameteri(gpuTexture.textureObj, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTextureParameteri(gpuTexture.textureObj, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(gpuTexture.textureObj, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(gpuTexture.textureObj, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    LogInfo("OpenGL: Texture {} created ({}x{}, {} levels)", gpuTexture.textureObj, width, height, levels);
 
-    m_textureData.push_back(textureData);
-    return TextureHandle{ static_cast<std::uint32_t>(m_textureData.size()) };
+    m_gpuTextures.push_back(gpuTexture);
+    return TextureHandle{ static_cast<std::uint32_t>(m_gpuTextures.size()) };
 }
 
 void Renderer::DestroyTexture(TextureHandle texture) {
-    TextureData& textureData = GetTextureData(texture);
-    glDeleteTextures(1, &textureData.textureObj);
-    textureData = TextureData{};
+    GPUTexture& gpuTexture = GetGPUTexture(texture);
+    glDeleteTextures(1, &gpuTexture.textureObj);
+    gpuTexture = GPUTexture{};
 }
 
 ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_view fragmentSource) {
@@ -233,40 +233,40 @@ ShaderHandle Renderer::CreateShader(std::string_view vertexSource, std::string_v
         glDeleteShader(vertShader);
         return {};
     }
-    ShaderData shaderData;
-    shaderData.shaderProgram = glCreateProgram();
-    glAttachShader(shaderData.shaderProgram, vertShader);
-    glAttachShader(shaderData.shaderProgram, fragShader);
-    glLinkProgram(shaderData.shaderProgram);
+    GPUShader gpuShader;
+    gpuShader.shaderProgram = glCreateProgram();
+    glAttachShader(gpuShader.shaderProgram, vertShader);
+    glAttachShader(gpuShader.shaderProgram, fragShader);
+    glLinkProgram(gpuShader.shaderProgram);
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
     GLint status = 0;
-    glGetProgramiv(shaderData.shaderProgram, GL_LINK_STATUS, &status);
+    glGetProgramiv(gpuShader.shaderProgram, GL_LINK_STATUS, &status);
     if (status != GL_TRUE) {
         char error[512];
-        glGetProgramInfoLog(shaderData.shaderProgram, sizeof(error), nullptr, error);
+        glGetProgramInfoLog(gpuShader.shaderProgram, sizeof(error), nullptr, error);
         LogError("OpenGL: Error while linking shader program: {}", error);
-        glDeleteProgram(shaderData.shaderProgram);
+        glDeleteProgram(gpuShader.shaderProgram);
         return {};
     }
 
-    shaderData.modelLocation = glGetUniformLocation(shaderData.shaderProgram, "u_model");
-    if (shaderData.modelLocation < 0) {
+    gpuShader.modelLocation = glGetUniformLocation(gpuShader.shaderProgram, "u_model");
+    if (gpuShader.modelLocation < 0) {
         LogWarn("Uniform u_model not found in shader!");
     }
-    shaderData.tintLocation = glGetUniformLocation(shaderData.shaderProgram, "u_tint");
-    shaderData.shininessLocation = glGetUniformLocation(shaderData.shaderProgram, "u_shininess");
-    shaderData.specularStrengthLocation = glGetUniformLocation(shaderData.shaderProgram, "u_specularStrength");
+    gpuShader.tintLocation = glGetUniformLocation(gpuShader.shaderProgram, "u_tint");
+    gpuShader.shininessLocation = glGetUniformLocation(gpuShader.shaderProgram, "u_shininess");
+    gpuShader.specularStrengthLocation = glGetUniformLocation(gpuShader.shaderProgram, "u_specularStrength");
 
-    m_shaderData.push_back(shaderData);
-    return ShaderHandle{ static_cast<std::uint32_t>(m_shaderData.size()) };
+    m_gpuShaders.push_back(gpuShader);
+    return ShaderHandle{ static_cast<std::uint32_t>(m_gpuShaders.size()) };
 
 }
 
 void Renderer::DestroyShader(ShaderHandle shader) {
-    ShaderData& shaderData = GetShaderData(shader);
-    glDeleteProgram(shaderData.shaderProgram);
-    shaderData = ShaderData{};
+    GPUShader& gpuShader = GetGPUShader(shader);
+    glDeleteProgram(gpuShader.shaderProgram);
+    gpuShader = GPUShader{};
 
 }
 
@@ -298,27 +298,27 @@ void Renderer::SetAmbientLight(const Vec3& color) {
         ambient);
 }
 
-Renderer::MeshData& Renderer::GetMeshData(MeshHandle mesh) {
-    EZSE_ASSERT(mesh.id > 0 && mesh.id <= m_meshData.size(), "Mesh handle is out of range");
+Renderer::GPUMesh& Renderer::GetGPUMesh(MeshHandle mesh) {
+    EZSE_ASSERT(mesh.id > 0 && mesh.id <= m_gpuMeshes.size(), "Mesh handle is out of range");
 
-    MeshData& meshData = m_meshData[mesh.id - 1];
-    EZSE_ASSERT(meshData.vertexArrayObj != 0, "Mesh handle refers to a destroyed mesh");
-    return meshData;
+    GPUMesh& gpuMesh = m_gpuMeshes[mesh.id - 1];
+    EZSE_ASSERT(gpuMesh.vertexArrayObj != 0, "Mesh handle refers to a destroyed mesh");
+    return gpuMesh;
 }
 
-Renderer::ShaderData& Renderer::GetShaderData(ShaderHandle shader) {
-    EZSE_ASSERT(shader.id > 0 && shader.id <= m_shaderData.size(), "Shader handle is out of range");
+Renderer::GPUShader& Renderer::GetGPUShader(ShaderHandle shader) {
+    EZSE_ASSERT(shader.id > 0 && shader.id <= m_gpuShaders.size(), "Shader handle is out of range");
 
-    ShaderData& shaderData = m_shaderData[shader.id - 1];
-    EZSE_ASSERT(shaderData.shaderProgram != 0, "Shader handle refers to a destroyed shader");
-    return shaderData;
+    GPUShader& gpuShader = m_gpuShaders[shader.id - 1];
+    EZSE_ASSERT(gpuShader.shaderProgram != 0, "Shader handle refers to a destroyed shader");
+    return gpuShader;
 }
 
-Renderer::TextureData& Renderer::GetTextureData(TextureHandle texture) {
-    EZSE_ASSERT(texture.id > 0 && texture.id <= m_textureData.size(), "Texture handle is out of range");
-    TextureData& textureData = m_textureData[texture.id - 1];
-    EZSE_ASSERT(textureData.textureObj != 0, "Texture handle refers to a destroyed texture");
-    return textureData;
+Renderer::GPUTexture& Renderer::GetGPUTexture(TextureHandle texture) {
+    EZSE_ASSERT(texture.id > 0 && texture.id <= m_gpuTextures.size(), "Texture handle is out of range");
+    GPUTexture& gpuTexture = m_gpuTextures[texture.id - 1];
+    EZSE_ASSERT(gpuTexture.textureObj != 0, "Texture handle refers to a destroyed texture");
+    return gpuTexture;
 }
 
 void Renderer::Clear(float red, float green, float blue) {
@@ -327,18 +327,18 @@ void Renderer::Clear(float red, float green, float blue) {
 }
 
 Renderer::~Renderer() {
-    for (auto& meshData : m_meshData) {
-        glDeleteBuffers(1, &meshData.vertexBufferObj);
-        glDeleteBuffers(1, &meshData.indexBufferObj);
-        glDeleteVertexArrays(1, &meshData.vertexArrayObj);
+    for (auto& gpuMesh : m_gpuMeshes) {
+        glDeleteBuffers(1, &gpuMesh.vertexBufferObj);
+        glDeleteBuffers(1, &gpuMesh.indexBufferObj);
+        glDeleteVertexArrays(1, &gpuMesh.vertexArrayObj);
     }
 
-    for (auto& shaderData : m_shaderData) {
-        glDeleteProgram(shaderData.shaderProgram);
+    for (auto& gpuShader : m_gpuShaders) {
+        glDeleteProgram(gpuShader.shaderProgram);
     }
 
-    for (auto& textureData : m_textureData) {
-        glDeleteTextures(1, &textureData.textureObj);
+    for (auto& gpuTexture : m_gpuTextures) {
+        glDeleteTextures(1, &gpuTexture.textureObj);
     }
 
     glDeleteBuffers(1, &m_cameraBuffer);

@@ -59,14 +59,14 @@ public:
 private:
     Renderer() = default;
 
-    struct MeshData {
+    struct GPUMesh {
         unsigned int vertexBufferObj = 0;
         unsigned int vertexArrayObj = 0;
         unsigned int indexBufferObj = 0;
         unsigned int indexCount = 0;
     };
 
-    struct ShaderData {
+    struct GPUShader {
         unsigned int shaderProgram = 0;
         int modelLocation = -1;
         int tintLocation = -1;
@@ -74,22 +74,22 @@ private:
         int specularStrengthLocation = -1;
     };
 
-    struct TextureData {
+    struct GPUTexture {
         unsigned int textureObj = 0;
     };
 
-    MeshData& GetMeshData(MeshHandle mesh);
-    ShaderData& GetShaderData(ShaderHandle shader);
-    TextureData& GetTextureData(TextureHandle texture);
+    GPUMesh& GetGPUMesh(MeshHandle mesh);
+    GPUShader& GetGPUShader(ShaderHandle shader);
+    GPUTexture& GetGPUTexture(TextureHandle texture);
 
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
     // 1x1 white, drawn when a draw call has no texture
     TextureHandle m_whiteTexture;
 
-    std::vector<MeshData> m_meshData;
-    std::vector<ShaderData> m_shaderData;
-    std::vector<TextureData> m_textureData;
+    std::vector<GPUMesh> m_gpuMeshes;
+    std::vector<GPUShader> m_gpuShaders;
+    std::vector<GPUTexture> m_gpuTextures;
 
 };
 
