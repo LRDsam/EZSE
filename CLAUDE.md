@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`): bezit venster, Renderer en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`; testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -320,11 +320,18 @@ Regels die de Renderer herbruikbaar houden:
 | 186 | Getallen lezen | `std::from_chars` uit `<charconv>`: snel, geen exceptions, en onafhankelijk van de taalinstelling (`strtof` kan op een Nederlandse Windows een komma verwachten). Geen `std::istringstream` |
 | 187 | Assenstelsel en UV's | OBJ is right-handed met Y omhoog en de UV begint linksonder, zoals bij ons en OpenGL: niets omdraaien (plaatjes worden al omgedraaid bij het laden, besluit 158) |
 | 188 | Opdeling en controle van stap 25 | 25a `MeshData` en `ParseObj`, met tests in `EngineTests` (een vierkant van twee driehoeken geeft 4 hoekpunten en 6 indices, een vierhoek als `f`-regel wordt twee driehoeken, een index buiten bereik en een vlak zonder normaal geven niets); 25b `ReadObjFile` en de kubus uit `Sandbox/assets/models/cube.obj` (door Claude met een script uit de array gemaakt) in plaats van de array in `main.cpp`, met precies hetzelfde beeld; 25c een echt model, bij voorkeur Suzanne uit Blender (door de gebruiker geëxporteerd als OBJ met normalen en UV's), of een gratis CC0-model (downloaden eerst vragen) |
-| 189 | Uitwerking van `ParseObj` | hulpfuncties in een naamloze namespace binnen `ezse`: `NextLine` (knipt op `
+| 189 | Uitwerking van `ParseObj` | hulpfuncties in een naamloze namespace binnen `ezse`: `NextLine` (knipt op `\n`, haalt een `\r` aan het eind weg), `NextToken` (knipt op spaties en tabs, `c_whitespace`), `ParseFloat`, `ParseIndex` (`std::from_chars`, het hele token moet een getal zijn; een `std::uint32_t` weigert vanzelf een minteken), `template <std::size_t N> ParseFloats` en `ParseCorner` (knipt `p/t/n` op `/`). Per regel eerst het sleutelwoord, dan een keten `if`/`else if` (een `switch` kan niet op strings). Een fout bij `v`, `vt` of `vn` logt de hele regel. Hoeken samenvoegen met `ObjCorner` (`= default` `operator==`) en `ObjCornerHash` (elke index maal een ander groot priemgetal, gecombineerd met `^`). De waaier wordt gemaakt tijdens het lezen: vanaf de derde hoek de driehoek `(first, previous, current)`. Tekst zonder vlakken is een fout, omdat `CreateMesh` geen lege mesh accepteert. De `f`-tak is op verzoek van de gebruiker door Claude geschreven |
 | 190 | Uitwerking van 25b | `ReadObjFile`: `ReadTextFile`, dan `ParseObj`; bij een parse-fout `LogError` met het pad (`ParseObj` kent alleen het regelnummer). Modellen van Sandbox staan in `Sandbox/assets/models/` (niet `meshes`: een bestand is een model, en "mesh" is de GPU-handle) en gaan mee met de bestaande kopieerstap. Sandbox leest `cube.obj` vóór `Engine::Create` (`return 1` als het mislukt); de kubus-arrays zijn weg uit `main.cpp`. `cube.obj` is met een script uit de arrays gemaakt (8 `v`, 4 `vt`, 6 `vn`, per zijde één `f` met vier hoeken) en geeft dezelfde 24 hoekpunten en 36 indices; de gebruiker heeft het commentaar eruit gehaald. `.obj`-bestanden staan niet in `add_executable`: CMake en Visual Studio geven elk `.obj` daar aan de linker als object file (`LNK1107`), en zichtbaar in Visual Studio hoeven ze niet |
 | 191 | Assets in git | kleine testassets gaan gewoon in git, tot 1 MB per bestand. Elke versie blijft in de geschiedenis en elke clone haalt die op; tekst comprimeert goed, plaatjes en binaire modellen niet. Bij het eerste bestand boven 1 MB kiezen we opnieuw: Git LFS (een verwijzing in git, het bestand apart bij GitHub, gratis tot 1 GB) of buiten git. Buiten git is onhandig zolang de gebruiker op twee pc's werkt: een clone zonder assets stopt Sandbox met `return 1` |
 | 192 | Suzanne in Sandbox (25c) | `monkey.obj` uit Blender 4.5: een fijnere Suzanne (met een subdivision-modifier geëxporteerd: 2012 posities, 1968 vlakken, gladde normalen, `s 1`, 298 KB) wordt gecommit; de platte versie en een gladde versie van de gewone Suzanne zijn op verzoek van de gebruiker niet bewaard. Derde entity naast de twee kubussen: plek `(-1.75, -2, 0)`, schaal `0.5` via de `Transform`, het schaakbord als texture (controleert de UV's), en een `Spin` om Y (`{0, 0.5, 0}`). De kubus met het schaakbord blijft staan |
-`, haalt een `` aan het eind weg), `NextToken` (knipt op spaties en tabs, `c_whitespace`), `ParseFloat`, `ParseIndex` (`std::from_chars`, het hele token moet een getal zijn; een `std::uint32_t` weigert vanzelf een minteken), `template <std::size_t N> ParseFloats` en `ParseCorner` (knipt `p/t/n` op `/`). Per regel eerst het sleutelwoord, dan een keten `if`/`else if` (een `switch` kan niet op strings). Een fout bij `v`, `vt` of `vn` logt de hele regel. Hoeken samenvoegen met `ObjCorner` (`= default` `operator==`) en `ObjCornerHash` (elke index maal een ander groot priemgetal, gecombineerd met `^`). De waaier wordt gemaakt tijdens het lezen: vanaf de derde hoek de driehoek `(first, previous, current)`. Tekst zonder vlakken is een fout, omdat `CreateMesh` geen lege mesh accepteert. De `f`-tak is op verzoek van de gebruiker door Claude geschreven |
+| 193 | Resource manager | `ResourceManager` in `Engine/Resources/ResourceManager.h`/`.cpp`: laadt bestanden, onthoudt wat geladen is en geeft handles terug. Aanleiding: `main.cpp` bouwt zelf paden, leest en maakt elke resource in twee stappen, en een bestand dat op twee plekken geladen wordt komt twee keer op de GPU. De gebruiker schrijft hem, zoals de `World` |
+| 194 | Opdeling van stap 26 | 26a de manager voor meshes (OBJ), met teller en `Unload`, eigendom van de `Engine`, gebruikt door Sandbox; 26b textures, en daarbij de boekhouding eruit halen als template `ResourceCache<Handle>` met tests in `EngineTests` (zonder Renderer te testen); 26c shaders (twee paden of een basisnaam wordt daar gekozen). Een `MaterialHandle`, laden in de achtergrond en opnieuw laden tijdens het draaien komen pas bij aanleiding |
+| 195 | Eigenaar en assetmap | de `Engine` bezit de manager by value, als member tussen `m_renderer` en `m_world` (opruimen: eerst de world, dan de manager, dan de Renderer), met `ResourceManager& GetResources()`. De manager krijgt `Renderer&` en de root `GetExecutableDirectory() / "assets"` via zijn constructor; het spel geeft alleen relatieve paden (`LoadMesh("models/cube.obj")`). Een eigen map per spel (een `EngineDesc`) bij aanleiding |
+| 196 | Sleutel | het relatieve pad als `std::string`, eerst `lexically_normal().generic_string()` (haalt `./` en `a/../` weg en maakt van `\` een `/`, zonder op schijf te kijken). Hoofdletters blijven verschillend. Laden op een eigen naam (`Add("cube")`) komt er niet bij |
+| 197 | Teller | de teller telt `Load`-aanroepen, niet gebruikers: elke `LoadMesh` van hetzelfde pad geeft dezelfde handle en telt 1 op, elke `UnloadMesh` telt 1 af. Bij 0 roept de manager `Renderer::DestroyMesh` aan en vergeet hij het pad; een volgende `Load` leest het bestand opnieuw en geeft een nieuwe handle (handles worden niet hergebruikt). Wie `Load` aanroept, roept `Unload` aan, zoals `new` en `delete`. Geen handle die zichzelf opruimt (zoals `shared_ptr`): components blijven kale, kopieerbare structs |
+| 198 | `UnloadMesh` | op handle: `void UnloadMesh(MeshHandle)`. Daarvoor twee maps: pad naar handle (voor `Load`) en id naar `{ pad, teller }` (voor `Unload`). Een handle die de manager niet kent (ook id `0` en een handle die al op 0 stond) is een assert |
+| 199 | Fouten en afsluiten | `LoadMesh` geeft bij een fout een handle met id `0` en logt de oorzaak; een mislukte poging wordt niet onthouden. Laden gebeurt nu na `Engine::Create`, dus bij een ontbrekend bestand gaat het venster even open. De destructor van de manager ruimt alles op wat nog geladen is, zonder waarschuwing. `LogInfo` bij laden en bij echt opruimen, zodat in het log te zien is dat opruimen pas bij 0 gebeurt |
+| 200 | Namen van GPU-resources | de privé structs in de Renderer krijgen het voorvoegsel `GPU`: `MeshData` wordt `GPUMesh`, `ShaderData` `GPUShader`, `TextureData` `GPUTexture`, de getters `GetGPUMesh` en dergelijke, de vectors `m_gpuMeshes` en dergelijke. Aanleiding: `MeshData` bestond twee keer, met de ruwe hoekpunten in `Engine` en de GPU-objecten in de Renderer. Afkorting in hoofdletters, zoals `GLLoadFunction`. De handles en `LightData`/`CameraData` (de indeling van een uniform buffer, geen resource) blijven zoals ze zijn. Een opschoonstap direct na 26a, door Claude |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -400,7 +407,12 @@ Windows-regeleinden en de foutgevallen; nu 29 controles). Deel 25b: `ReadObjFile
 leest de kubus uit `assets/models/cube.obj` in plaats van uit arrays in `main.cpp`; het beeld
 is ongewijzigd (door de gebruiker gezien). Deel 25c: Suzanne uit Blender (`monkey.obj`) staat
 als derde voorwerp links van de kubussen, half zo groot, draaiend, met het schaakbord. Daarmee is
-stap 25 af.
+stap 25 af. Stap 26 (de resource manager) is begonnen met 26a: de `Engine` bezit een
+`ResourceManager` (`GetResources()`) die meshes uit `assets/` laadt met `LoadMesh` (relatief pad,
+genormaliseerd als sleutel) en een teller per pad bijhoudt; `UnloadMesh` telt af en ruimt de mesh
+pas bij 0 op, de destructor ruimt de rest op. Sandbox laadt de kubus en Suzanne via de manager, en
+laadt de kubus een tweede keer via `./models/cube.obj`: dezelfde id, één keer geladen, en na één
+`UnloadMesh` niet opgeruimd (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -497,17 +509,24 @@ Bekende beperkingen, bewust zo gelaten:
   (de volgorde in een `EntitySet` ligt niet vast). Een veld `active` komt bij de tweede camera.
 - Dat het `CameraSystem` vóór het `RenderSystem` en beide na de systems van het spel worden
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
+- De teller van de `ResourceManager` telt `Load`-aanroepen, niet gebruikers: wie laadt, roept
+  zelf `Unload` aan. Een entity verwijderen doet geen `Unload`, en een `Unload` terwijl een
+  `MeshRenderer` de handle nog gebruikt, laat het `RenderSystem` tekenen met een opgeruimde mesh.
+- De sleutel van de `ResourceManager` is hoofdlettergevoelig: `Models/Cube.obj` en
+  `models/cube.obj` zijn twee resources, ook al is het op Windows hetzelfde bestand.
+- Laden via de manager gebeurt na `Engine::Create`: bij een ontbrekend model gaat het venster even
+  open en weer dicht.
 - De hoeken in `Transform::rotation` worden bij het draaien steeds groter; na lange tijd wordt
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: de GPU-hernoeming, daarna 26b
 
-Stap 25 (modellen uit OBJ-bestanden, besluiten 182 tot en met 192) is af. De volgende stap moet
-nog gekozen worden, uit de lijst onder Daarna. Voor de hand liggend: een resource manager (laden
-en delen van meshes, textures en materialen; nu laadt Sandbox alles zelf in `main.cpp`), meer
-lichten of een puntlicht, het licht als entity met een `LightSystem`, gamma-correctie, of
-normalen uitrekenen voor modellen zonder normalen.
+26a is af. Eerst de opschoonstap van besluit 200: in de Renderer `MeshData`, `ShaderData` en
+`TextureData` hernoemen naar `GPUMesh`, `GPUShader` en `GPUTexture` (met de getters en vectors),
+door Claude, als eigen commit. Daarna 26b: textures via de `ResourceManager`, en de boekhouding
+(twee maps en de teller) eruit halen als template `ResourceCache<Handle>` met tests in
+`EngineTests`. Daarna 26c (shaders; kiezen tussen twee paden en een basisnaam).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

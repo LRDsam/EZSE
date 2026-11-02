@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EZSE/Engine/Resources/ResourceManager.h"
+
 #include "EZSE/ECS/World.h"
 #include "EZSE/Platform/Window.h"
 #include "EZSE/Renderer/Renderer.h"
@@ -20,14 +22,16 @@ public:
     World& GetWorld();
     Window& GetWindow();
     Renderer& GetRenderer();
+    ResourceManager& GetResources();
 
 private:
     Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer);
 
     // Destroyed in reverse order:
-    // the world (and its systems) first, the window last.
+    // the world (and its systems) first, then the resources, the window last.
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
+    ResourceManager m_resources;
     World m_world;
     bool m_quitRequested = false;
 };

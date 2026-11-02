@@ -4,6 +4,7 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 
+#include "EZSE/Platform/FileSystem.h"
 #include "EZSE/Platform/WindowEvent.h"
 
 #include "EZSE/Core/Log.h"
@@ -30,7 +31,9 @@ std::unique_ptr<Engine> Engine::Create(const WindowDesc& windowDesc) {
 }
 
 Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer)
-    : m_window(std::move(window)), m_renderer(std::move(renderer)) {
+    : m_window(std::move(window)),
+      m_renderer(std::move(renderer)),
+      m_resources(*m_renderer, GetExecutableDirectory() / "assets") {
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
@@ -75,6 +78,10 @@ Window& Engine::GetWindow() {
 
 Renderer& Engine::GetRenderer() {
     return *m_renderer;
+}
+
+ResourceManager& Engine::GetResources() {
+    return m_resources;
 }
 
 } // namespace ezse

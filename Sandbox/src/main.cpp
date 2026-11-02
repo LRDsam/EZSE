@@ -3,8 +3,6 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Resources/Image.h"
-#include "EZSE/Engine/Resources/MeshData.h"
-#include "EZSE/Engine/Resources/obj.h"
 
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
@@ -141,8 +139,7 @@ int main() {
         ezse::GetExecutableDirectory() / "assets" / "shaders";
     const std::filesystem::path textureDir =
         ezse::GetExecutableDirectory() / "assets" / "textures";
-    const std::filesystem::path modelDir =
-        ezse::GetExecutableDirectory() / "assets" / "models";
+    const std::filesystem::path modelDir = "models";
 
     const std::optional<std::string> vertexSource = ezse::ReadTextFile(
         shaderDir / "lit.vert");
@@ -158,15 +155,6 @@ int main() {
         return 1;
     }
 
-    const std::optional<ezse::MeshData> cubeMeshData = ezse::ReadObjFile(modelDir / "cube.obj");
-    if (!cubeMeshData.has_value()) {
-        return 1;
-    }
-    const std::optional<ezse::MeshData> monkeyMeshData = ezse::ReadObjFile(modelDir / "monkey.obj");
-    if (!monkeyMeshData.has_value()) {
-        return 1;
-    }
-
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
         return 1;
@@ -176,10 +164,18 @@ int main() {
 
     const ezse::TextureHandle checkerTexture = renderer.CreateTexture(
         checkerImage->width, checkerImage->height, checkerImage->pixels);
-    const ezse::MeshHandle cubeMesh = renderer.CreateMesh(
-        cubeMeshData->vertices, cubeMeshData->indices);
-    const ezse::MeshHandle monkeyMesh = renderer.CreateMesh(
-        monkeyMeshData->vertices, monkeyMeshData->indices);
+
+    const ezse::MeshHandle cubeMesh = engine->GetResources().LoadMesh(modelDir / "cube.obj");
+    const ezse::MeshHandle monkeyMesh = engine->GetResources().LoadMesh(modelDir / "monkey.obj");
+    if (cubeMesh.id == 0 || monkeyMesh.id == 0) {
+        return 1;
+    }
+    // Checks the counter of the resource manager: the same file through another path gives the
+    // same handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
+    const ezse::MeshHandle cubeMeshAgain = engine->GetResources().LoadMesh("./models/cube.obj");
+    ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
+    engine->GetResources().UnloadMesh(cubeMeshAgain);
+
     const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
         *fragmentSource);
     if (shader.id == 0) {

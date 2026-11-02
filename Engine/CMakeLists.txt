@@ -6,12 +6,14 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Resources/Image.h
     include/EZSE/Engine/Resources/MeshData.h
     include/EZSE/Engine/Resources/Obj.h
+    include/EZSE/Engine/Resources/ResourceManager.h
     include/EZSE/Engine/Systems/CameraSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
     src/Components/Transform.cpp
     src/Engine.cpp
     src/Resources/Image.cpp
     src/Resources/Obj.cpp
+    src/Resources/ResourceManager.cpp
     src/Systems/CameraSystem.cpp
     src/Systems/RenderSystem.cpp
 )
