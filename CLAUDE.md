@@ -339,6 +339,8 @@ Regels die de Renderer herbruikbaar houden:
 | 205 | Een texture die niet laadt | `LoadTexture` geeft id `0`, volgens de conventie. Omdat een `Material` met texture id `0` wit tekent (besluit 178), controleert Sandbox op id `0` en stopt met `return 1`; anders zou een ontbrekend plaatje een stil wit voorwerp geven. Een opvallende vervangende texture (roze schaakbord) komt bij aanleiding. De controle met de dubbele kubus in Sandbox blijft staan: hij is de enige controle op het normaliseren van het pad |
 | 206 | Shaders via de manager (26d) | `ShaderHandle LoadShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)` en `void UnloadShader(ShaderHandle)` met een `ResourceCache<ShaderHandle> m_shaders`: twee paden, zoals `CreateShader` twee bronnen neemt. Expliciet, geen verborgen afspraak over bestandsnamen, en een vertex shader kan gedeeld worden. Geen basisnaam waar de manager `.vert` en `.frag` achter plakt. Een derde soort shader (geometry, compute) maakt er een struct met paden van, bij aanleiding |
 | 207 | Sleutel en fouten van een shader | de sleutel is `MakeKey(vertexPath) + '\|' + MakeKey(fragmentPath)` (`\|` kan op Windows niet in een bestandsnaam staan, dus twee paren geven nooit dezelfde sleutel; de volgorde telt). Een bestand dat niet gelezen kan worden of een shader die niet compileert geeft id `0` en gaat niet in de cache; beide fouten zijn al gelogd. Een shader met id `0` in een `Material` geeft bij het tekenen een assert, anders dan een texture. Sandbox laadt `lit` zo en leest daarna zelf geen bestanden meer |
+| 208 | Mappen van assets | het spel geeft het hele pad relatief aan `assets/` (`"models/cube.obj"`); de manager kent alleen de root en dwingt geen map per soort af. Zo kiest elk spel zijn eigen indeling (per soort, of per voorwerp: `characters/knight/knight.obj` naast `knight.png`), en staat in de code, het log en de sleutel hetzelfde pad, zoals bij Godot (`res://`) en Unity. Sandbox schrijft de paden voluit, zonder variabelen per map |
+| 209 | Kamer in Sandbox | `Sandbox/assets/models/room.obj`, met een script gemaakt en zonder commentaar: een vloer op y = -2,5 en vier muren tot y = 1,5, x en z van -6 tot 6, het plafond open (op verzoek van de gebruiker). Naar binnen gericht: normalen naar binnen en tegen de klok in van binnen gezien, door face culling (besluit 57) van buiten onzichtbaar. UV's in meters gedeeld door 2, zodat het schaakbord zich met `GL_REPEAT` elke 2 meter herhaalt. Entity `room` op de oorsprong met het schaakbord, tint 0,6, `shininess` 8 en `specularStrength` 0,1. Geen schaduwen: het richtingslicht schijnt door alles heen |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -428,7 +430,9 @@ controles). `Engine` geeft `Core` nu `PUBLIC` door. Deel 26c: textures via de ma
 (`LoadTexture`, `UnloadTexture`); Sandbox laadt `checker.png` zo, en leest zelf geen plaatjes
 meer. Het beeld is ongewijzigd (door de gebruiker gezien). Deel 26d: shaders via de manager
 (`LoadShader` met twee paden, `UnloadShader`); Sandbox leest zelf geen enkel bestand meer en geeft
-alleen paden relatief aan `assets/` (door de gebruiker gezien). Daarmee is stap 26 af.
+alleen paden relatief aan `assets/` (door de gebruiker gezien). Daarmee is stap 26 af. Daarna
+schrijft Sandbox de paden voluit (besluit 208), en staat alles in een kamer van 12 bij 12 meter
+met een open plafond (`room.obj`, besluit 209; door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 

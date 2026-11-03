@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <numbers>
 #include <variant>
 
@@ -129,11 +128,6 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
 } // namespace
 
 int main() {
-    // Setting asset directories
-    const std::filesystem::path shaderDir = "shaders";
-    const std::filesystem::path textureDir = "textures";
-    const std::filesystem::path modelDir = "models";
-
     // Creating engine
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
@@ -146,17 +140,18 @@ int main() {
 
     // Loading shader
     const ezse::ShaderHandle shader = resources.LoadShader(
-        shaderDir / "lit.vert",
-        shaderDir / "lit.frag");
+        "shaders/lit.vert",
+        "shaders/lit.frag");
     if (shader.id == 0) {
         return 1;
     }
 
     // Loading Textures and meshes
-    const ezse::TextureHandle checkerTexture = resources.LoadTexture(textureDir / "checker.png");
-    const ezse::MeshHandle cubeMesh = resources.LoadMesh(modelDir / "cube.obj");
-    const ezse::MeshHandle monkeyMesh = resources.LoadMesh(modelDir / "monkey.obj");
-    if (cubeMesh.id == 0 || monkeyMesh.id == 0 || checkerTexture.id == 0) {
+    const ezse::TextureHandle checkerTexture = resources.LoadTexture("textures/checker.png");
+    const ezse::MeshHandle cubeMesh = resources.LoadMesh("models/cube.obj");
+    const ezse::MeshHandle monkeyMesh = resources.LoadMesh("models/monkey.obj");
+    const ezse::MeshHandle roomMesh = resources.LoadMesh("models/room.obj");
+    if (cubeMesh.id == 0 || monkeyMesh.id == 0 || roomMesh.id == 0 || checkerTexture.id == 0) {
         return 1;
     }
     // Checks the counter of the resource manager: the same file through another path gives the
@@ -197,6 +192,16 @@ int main() {
         .scale = {0.5f, 0.5f, 0.5f}});
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
     world.AddComponent(monkey, Spin{.speed = {0.0f, 0.5f, 0.0f}});
+    // A room around everything: a floor under the cubes and four walls, open at the top. Grey
+    // checkerboard with little shine, so it does not look like the cubes.
+    const ezse::Entity room = world.CreateEntity();
+    world.AddComponent(room, ezse::Transform{});
+    world.AddComponent(room, ezse::MeshRenderer{roomMesh, {
+        .shader = shader,
+        .texture = checkerTexture,
+        .tint = {0.6f, 0.6f, 0.6f},
+        .shininess = 8.0f,
+        .specularStrength = 0.1f}});
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
