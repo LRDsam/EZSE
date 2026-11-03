@@ -56,6 +56,13 @@ public:
 
     void Clear(float red, float green, float blue);
 
+    // Debug UI (Dear ImGui), drawn over the image. InitDebugUI once after ImGui::CreateContext;
+    // BeginDebugUIFrame at the start of a frame; DrawDebugUI after ImGui::Render.
+    void InitDebugUI();
+    void BeginDebugUIFrame();
+    void DrawDebugUI();
+    void ShutdownDebugUI();
+
 private:
     Renderer() = default;
 

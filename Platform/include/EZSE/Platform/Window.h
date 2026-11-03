@@ -64,6 +64,12 @@ public:
     // so the mouse can turn without limits.
     void SetCursorCaptured(bool captured);
 
+    // Debug UI (Dear ImGui). InitDebugUI connects ImGui to the input of this window; call it once,
+    // after ImGui::CreateContext. BeginDebugUIFrame passes input and size to ImGui, every frame.
+    void InitDebugUI();
+    void BeginDebugUIFrame();
+    void ShutdownDebugUI();
+
     GLLoadFunction GetGLLoadFunction() const;
 
 private:

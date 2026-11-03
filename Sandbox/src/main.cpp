@@ -21,6 +21,8 @@
 #include <numbers>
 #include <variant>
 
+#include <imgui.h>
+
 namespace {
 
 // Components
@@ -58,6 +60,12 @@ void GameControlSystem::Update(ezse::World&, float) {
             if (pressed->key == ezse::Key::Escape) {
                 m_engine.Quit();
             }
+            // F1 shows or hides the debug UI; the cursor is free while it is shown.
+            if (pressed->key == ezse::Key::F1) {
+                const bool visible = !m_engine.IsDebugUIVisible();
+                m_engine.SetDebugUIVisible(visible);
+                m_window.SetCursorCaptured(!visible);
+            }
         }
     }
 }
@@ -77,23 +85,49 @@ void SpinSystem::Update(ezse::World& world, float deltaTime) {
 }
 
 
+// Draws the debug windows while the debug UI is on (F1).
+class DebugUISystem : public ezse::System {
+public:
+    explicit DebugUISystem(ezse::Engine& engine);
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+
+private:
+    ezse::Engine& m_engine;
+};
+
+DebugUISystem::DebugUISystem(ezse::Engine& engine) :
+    m_engine(engine) {}
+
+void DebugUISystem::Update(ezse::World&, float) {
+    if (!m_engine.IsDebugUIVisible()) {
+        return;
+    }
+    ImGui::ShowDemoWindow();
+}
+
 // Enables control of the entity by user input.
-// Mouse movement to look around and WASD to move.
+// Mouse movement to look around and WASD to move. Does nothing while the debug UI is on.
 class CameraControlSystem : public ezse::System {
 public:
-    explicit CameraControlSystem(ezse::Window& window);
+    CameraControlSystem(ezse::Window& window, ezse::Engine& engine);
 
 protected:
     void Update(ezse::World& world, float deltaTime) override;
 
 private:
     ezse::Window& m_window;
+    ezse::Engine& m_engine;
 };
 
-CameraControlSystem::CameraControlSystem(ezse::Window& window) :
-    m_window(window) {}
+CameraControlSystem::CameraControlSystem(ezse::Window& window, ezse::Engine& engine) :
+    m_window(window), m_engine(engine) {}
 
 void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
+    if (m_engine.IsDebugUIVisible()) {
+        return;
+    }
     const float maxPitch = 89.0f * (std::numbers::pi_v<float> / 180.0f);
 
     ezse::Vec3 move;
@@ -214,7 +248,8 @@ int main() {
     world.AddSystem<SpinSystem>(ezse::MakeSignature<ezse::Transform, Spin>());
     world.AddSystem<CameraControlSystem>(
         ezse::MakeSignature<ezse::Transform, CameraController>(),
-        engine->GetWindow());
+        engine->GetWindow(), *engine);
+    world.AddSystem<DebugUISystem>(ezse::MakeSignature<>(), *engine);
     // The engine systems come last, the camera before the drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);

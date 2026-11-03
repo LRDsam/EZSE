@@ -4,6 +4,7 @@
 #include "EZSE/Core/Log.h"
 
 #include <GLFW/glfw3.h>
+#include <imgui_impl_glfw.h>
 
 namespace ezse {
 
@@ -149,6 +150,19 @@ void Window::SetCursorCaptured(bool captured) {
             captured ? GLFW_TRUE : GLFW_FALSE);
     }
     glfwGetCursorPos(m_handle, &m_lastCursorX, &m_lastCursorY);
+}
+
+void Window::InitDebugUI() {
+    // true: ImGui installs its own GLFW callbacks and calls ours after them.
+    ImGui_ImplGlfw_InitForOpenGL(m_handle, true);
+}
+
+void Window::BeginDebugUIFrame() {
+    ImGui_ImplGlfw_NewFrame();
+}
+
+void Window::ShutdownDebugUI() {
+    ImGui_ImplGlfw_Shutdown();
 }
 
 Window::GLLoadFunction Window::GetGLLoadFunction() const {

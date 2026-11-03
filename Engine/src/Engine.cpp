@@ -9,6 +9,8 @@
 
 #include "EZSE/Core/Log.h"
 
+#include <imgui.h>
+
 #include <chrono>
 #include <variant>
 
@@ -37,6 +39,19 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
+
+    ImGui::CreateContext();
+    // No imgui.ini with window positions in the working folder.
+    ImGui::GetIO().IniFilename = nullptr;
+    m_window->InitDebugUI();
+    m_renderer->InitDebugUI();
+}
+
+Engine::~Engine() {
+    // The body runs before the members are destroyed, so the Renderer and the window still exist.
+    m_renderer->ShutdownDebugUI();
+    m_window->ShutdownDebugUI();
+    ImGui::DestroyContext();
 }
 
 void Engine::Run() {
@@ -46,6 +61,9 @@ void Engine::Run() {
 
     while (!m_quitRequested && !m_window->ShouldClose()) {
         m_window->PollEvents();
+        m_window->BeginDebugUIFrame();
+        m_renderer->BeginDebugUIFrame();
+        ImGui::NewFrame();
         for (const WindowEvent& event : m_window->GetEvents()) {
             if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
                 if (resized->width == 0 || resized->height == 0) {
@@ -59,13 +77,25 @@ void Engine::Run() {
         const std::chrono::duration<float> deltaTime = now - lastFrame;
         lastFrame = now;
 
+        // Systems may call ImGui:: functions during the update.
         m_world.Update(deltaTime.count());
+
+        ImGui::Render();
+        m_renderer->DrawDebugUI();
         m_window->SwapBuffers();
     }
 }
 
 void Engine::Quit() {
     m_quitRequested = true;
+}
+
+void Engine::SetDebugUIVisible(bool visible) {
+    m_debugUIVisible = visible;
+}
+
+bool Engine::IsDebugUIVisible() const {
+    return m_debugUIVisible;
 }
 
 World& Engine::GetWorld() {

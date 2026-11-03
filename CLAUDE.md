@@ -50,7 +50,7 @@ minder gangbare onderdelen wel (templates, `std::span`, macro's, linkage en derg
 ## Bouwen en starten
 
 Nodig: Visual Studio 2022 met de C++-workload, CMake 3.24 of nieuwer, git, en een videokaart
-met driver die OpenGL 4.6 ondersteunt. De eerste keer genereren downloadt GLFW 3.4 van GitHub.
+met driver die OpenGL 4.6 ondersteunt. De eerste keer genereren downloadt GLFW 3.4 en Dear ImGui v1.93.0 van GitHub.
 
 ```bash
 cmake -S . -B build
@@ -94,11 +94,11 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), stb (PRIVATE) |
-| `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
-| `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `SetDebugUIVisible`, `IsDebugUIVisible`): bezit venster, Renderer, `ResourceManager` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
+| `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key`; de GLFW-backend van de debug-UI | Core, GLFW, imgui_glfw (PRIVATE) |
+| `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen; de OpenGL-backend van de debug-UI | Math (PUBLIC), Core, glad, imgui_opengl3 (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
-| `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`) | |
+| `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`); Dear ImGui v1.93.0 via FetchContent (targets `imgui`, `imgui_glfw`, `imgui_opengl3`) | |
 
 Regels die de Renderer herbruikbaar houden:
 
@@ -341,6 +341,12 @@ Regels die de Renderer herbruikbaar houden:
 | 207 | Sleutel en fouten van een shader | de sleutel is `MakeKey(vertexPath) + '\|' + MakeKey(fragmentPath)` (`\|` kan op Windows niet in een bestandsnaam staan, dus twee paren geven nooit dezelfde sleutel; de volgorde telt). Een bestand dat niet gelezen kan worden of een shader die niet compileert geeft id `0` en gaat niet in de cache; beide fouten zijn al gelogd. Een shader met id `0` in een `Material` geeft bij het tekenen een assert, anders dan een texture. Sandbox laadt `lit` zo en leest daarna zelf geen bestanden meer |
 | 208 | Mappen van assets | het spel geeft het hele pad relatief aan `assets/` (`"models/cube.obj"`); de manager kent alleen de root en dwingt geen map per soort af. Zo kiest elk spel zijn eigen indeling (per soort, of per voorwerp: `characters/knight/knight.obj` naast `knight.png`), en staat in de code, het log en de sleutel hetzelfde pad, zoals bij Godot (`res://`) en Unity. Sandbox schrijft de paden voluit, zonder variabelen per map |
 | 209 | Kamer in Sandbox | `Sandbox/assets/models/room.obj`, met een script gemaakt en zonder commentaar: een vloer op y = -2,5 en vier muren tot y = 1,5, x en z van -6 tot 6, het plafond open (op verzoek van de gebruiker). Naar binnen gericht: normalen naar binnen en tegen de klok in van binnen gezien, door face culling (besluit 57) van buiten onzichtbaar. UV's in meters gedeeld door 2, zodat het schaakbord zich met `GL_REPEAT` elke 2 meter herhaalt. Entity `room` op de oorsprong met het schaakbord, tint 0,6, `shininess` 8 en `specularStrength` 0,1. Geen schaduwen: het richtingslicht schijnt door alles heen |
+| 210 | Debug-UI | Dear ImGui (MIT, immediate mode: elk frame `ImGui::SliderFloat(...)`, geen widget-objecten), de standaard voor debug-UI in engines. Geen eigen UI: die vraagt tekst, fonts, invoer en layout, en hoort later bij een UI voor het spel (menu's). Versie v1.93.0 via FetchContent (`GIT_SHALLOW`), zoals GLFW; ImGui heeft geen CMake, dus `ThirdParty/CMakeLists.txt` maakt de targets `imgui` (de kern, met `imgui_demo.cpp`), `imgui_glfw` en `imgui_opengl3` |
+| 211 | Plek van de backends | de officiële backends, elk in de module die die API bezit: `imgui_impl_glfw` in `Platform` (`PRIVATE imgui_glfw`), `imgui_impl_opengl3` in de `Renderer` (`PRIVATE imgui_opengl3`; laadt zijn eigen OpenGL-functions, los van glad). Regel 1 en 2 blijven heel; geen publieke header van Platform of Renderer include ImGui. Prijs: beide modules hangen van ImGui af (later uitzetbaar met een CMake-optie). Eigen backends (onze events naar ImGui en een algemene 2D-tekenroute in de Renderer) kunnen later, samen met een UI voor het spel. `Engine` linkt `imgui` `PUBLIC`, zodat het spel `ImGui::` kan aanroepen |
+| 212 | Functions van de debug-UI | `Window`: `InitDebugUI` (`ImGui_ImplGlfw_InitForOpenGL(handle, true)`: ImGui installeert zijn callbacks en roept de onze daarna aan), `BeginDebugUIFrame`, `ShutdownDebugUI`. `Renderer`: `InitDebugUI` (`"#version 460"`), `BeginDebugUIFrame`, `DrawDebugUI` (`RenderDrawData`; de backend bewaart de OpenGL-toestand en zet hem terug), `ShutdownDebugUI`. Gecontroleerd tegen het officiële voorbeeld `example_glfw_opengl3`; schaling voor hoge DPI en navigatie met toetsenbord of gamepad bewust weggelaten |
+| 213 | Debug-UI in de `Engine` | de constructor maakt de context (`ImGui::CreateContext`, `IniFilename = nullptr`: geen `imgui.ini` in de werkmap) en start beide backends; een eigen destructor stopt ze en ruimt de context op (de body loopt vóór de members worden opgeruimd, dus Renderer en venster bestaan nog). `Run` per frame: na `PollEvents` `BeginDebugUIFrame` van venster en Renderer en `ImGui::NewFrame`, dan `World::Update` (systems mogen `ImGui::` aanroepen), dan `ImGui::Render` en `DrawDebugUI` vóór `SwapBuffers` |
+| 214 | Aan en uit | een vlag in de `Engine` (`SetDebugUIVisible`, `IsDebugUIVisible`, standaard uit), niet in een system (besluit 72). Systems tekenen debug-UI alleen als de vlag aan staat; staat hij uit, dan is er geen ImGui-venster dat de muis kan opvangen. In Sandbox zet F1 (`GameControlSystem`) de vlag om en maakt de cursor vrij; het `CameraControlSystem` krijgt een `Engine&` en doet niets zolang de UI aan staat; een `DebugUISystem` (lege signature, `Engine&`) toont het demo-venster van ImGui. Op verzoek van de gebruiker door Claude geschreven |
+| 215 | Opdeling van stap 27 | 27a ImGui in de build met beide backends en het demo-venster met F1; 27b een eigen debug-venster (frametijd, positie van de camera); 27c waarden die echt iets aanpassen, samen met het licht als entity (`DirectionalLight`-component), zodat een slider een component verandert |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -432,7 +438,11 @@ meer. Het beeld is ongewijzigd (door de gebruiker gezien). Deel 26d: shaders via
 (`LoadShader` met twee paden, `UnloadShader`); Sandbox leest zelf geen enkel bestand meer en geeft
 alleen paden relatief aan `assets/` (door de gebruiker gezien). Daarmee is stap 26 af. Daarna
 schrijft Sandbox de paden voluit (besluit 208), en staat alles in een kamer van 12 bij 12 meter
-met een open plafond (`room.obj`, besluit 209; door de gebruiker gezien).
+met een open plafond (`room.obj`, besluit 209; door de gebruiker gezien). Stap 27 (een debug-UI)
+is begonnen met 27a: Dear ImGui zit in de build, de GLFW-backend in `Platform` en de
+OpenGL-backend in de `Renderer`, en de `Engine` draait elk frame een ImGui-frame. In Sandbox
+toont F1 het demo-venster van ImGui, met de cursor vrij en de camera stil (door de gebruiker
+gezien).
 
 Publieke interface van `Renderer`:
 
@@ -531,6 +541,12 @@ Bekende beperkingen, bewust zo gelaten:
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
 - Een texture die via de manager niet laadt, geeft id `0`, en een `Material` met id `0` tekent
   wit: wie niet op id `0` controleert, ziet een wit voorwerp in plaats van een fout.
+- `Platform` en de `Renderer` hangen van ImGui af (besluit 211): wie de Renderer los in een ander
+  project gebruikt, neemt ImGui mee.
+- De debug-UI schaalt niet mee met de schaling van Windows: op een scherm met meer dan 100% is
+  hij klein (besluit 212).
+- Het ImGui-frame draait elk frame, ook als de debug-UI uit staat; een system dat ImGui aanroept
+  zonder de vlag te controleren, maakt een venster dat de muis kan opvangen.
 - De teller van de `ResourceManager` telt `Load`-aanroepen, niet gebruikers: wie laadt, roept
   zelf `Unload` aan. Een entity verwijderen doet geen `Unload`, en een `Unload` terwijl een
   `MeshRenderer` de handle nog gebruikt, laat het `RenderSystem` tekenen met een opgeruimde mesh.
@@ -542,13 +558,12 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: 27b, een eigen debug-venster
 
-Stap 26 (de resource manager, besluiten 193 tot en met 207) is af: meshes, textures en shaders gaan
-via de `ResourceManager` met een teller per pad. De volgende stap moet nog gekozen worden, uit de
-lijst onder Daarna. Voor de hand liggend: meer lichten of een puntlicht, het licht als entity met
-een `LightSystem`, gamma-correctie, een `MaterialHandle` (materialen delen via de manager), of
-normalen uitrekenen voor modellen zonder normalen.
+27a is af (besluiten 210 tot en met 215). 27b: een eigen debug-venster in het `DebugUISystem` van
+Sandbox, bijvoorbeeld met de frametijd en de positie van de camera. Daarna 27c: waarden die echt
+iets aanpassen, samen met het licht als entity (`DirectionalLight`-component met een
+`LightSystem`). De keuzes voor 27b moeten nog besproken worden.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

@@ -16,8 +16,14 @@ public:
     // in its World; the game registers only its own components.
     static std::unique_ptr<Engine> Create(const WindowDesc& windowDesc);
 
+    ~Engine();
+
     void Run();
     void Quit();
+
+    // Whether the debug UI is shown. Systems that draw debug UI only do so while it is on.
+    void SetDebugUIVisible(bool visible);
+    bool IsDebugUIVisible() const;
 
     World& GetWorld();
     Window& GetWindow();
@@ -34,6 +40,7 @@ private:
     ResourceManager m_resources;
     World m_world;
     bool m_quitRequested = false;
+    bool m_debugUIVisible = false;
 };
 
 } // namespace ezse

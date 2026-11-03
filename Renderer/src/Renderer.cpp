@@ -4,6 +4,8 @@
 #include "EZSE/Core/Log.h"
 
 #include <glad/gl.h>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
 
 #include <algorithm>
 #include <bit>
@@ -324,6 +326,23 @@ Renderer::GPUTexture& Renderer::GetGPUTexture(TextureHandle texture) {
 void Renderer::Clear(float red, float green, float blue) {
     glClearColor(red, green, blue, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void Renderer::InitDebugUI() {
+    ImGui_ImplOpenGL3_Init("#version 460");
+}
+
+void Renderer::BeginDebugUIFrame() {
+    ImGui_ImplOpenGL3_NewFrame();
+}
+
+void Renderer::DrawDebugUI() {
+    // The backend saves the OpenGL state (depth test, culling, blending) and restores it after.
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void Renderer::ShutdownDebugUI() {
+    ImGui_ImplOpenGL3_Shutdown();
 }
 
 Renderer::~Renderer() {
