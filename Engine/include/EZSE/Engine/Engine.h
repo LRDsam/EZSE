@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Resources/ResourceManager.h"
 
 #include "EZSE/ECS/World.h"
@@ -21,14 +22,11 @@ public:
     void Run();
     void Quit();
 
-    // Whether the debug UI is shown. Systems that draw debug UI only do so while it is on.
-    void SetDebugUIVisible(bool visible);
-    bool IsDebugUIVisible() const;
-
     World& GetWorld();
     Window& GetWindow();
     Renderer& GetRenderer();
     ResourceManager& GetResources();
+    DebugUI& GetDebugUI();
 
 private:
     Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer);
@@ -38,9 +36,9 @@ private:
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
     ResourceManager m_resources;
+    DebugUI m_debugUI;
     World m_world;
     bool m_quitRequested = false;
-    bool m_debugUIVisible = false;
 };
 
 } // namespace ezse

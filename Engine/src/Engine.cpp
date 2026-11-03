@@ -45,6 +45,10 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     ImGui::GetIO().IniFilename = nullptr;
     m_window->InitDebugUI();
     m_renderer->InitDebugUI();
+    m_debugUI.AddPanel("Stats", [](World&) {
+        const float framerate = ImGui::GetIO().Framerate;
+        ImGui::Text("%.2f ms (%.0f FPS)", 1000.0f / framerate, framerate);
+    });
 }
 
 Engine::~Engine() {
@@ -80,6 +84,7 @@ void Engine::Run() {
         // Systems may call ImGui:: functions during the update.
         m_world.Update(deltaTime.count());
 
+        m_debugUI.Draw(m_world);
         ImGui::Render();
         m_renderer->DrawDebugUI();
         m_window->SwapBuffers();
@@ -88,14 +93,6 @@ void Engine::Run() {
 
 void Engine::Quit() {
     m_quitRequested = true;
-}
-
-void Engine::SetDebugUIVisible(bool visible) {
-    m_debugUIVisible = visible;
-}
-
-bool Engine::IsDebugUIVisible() const {
-    return m_debugUIVisible;
 }
 
 World& Engine::GetWorld() {
@@ -112,6 +109,10 @@ Renderer& Engine::GetRenderer() {
 
 ResourceManager& Engine::GetResources() {
     return m_resources;
+}
+
+DebugUI& Engine::GetDebugUI() {
+    return m_debugUI;
 }
 
 } // namespace ezse

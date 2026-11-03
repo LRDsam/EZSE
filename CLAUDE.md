@@ -347,6 +347,8 @@ Regels die de Renderer herbruikbaar houden:
 | 213 | Debug-UI in de `Engine` | de constructor maakt de context (`ImGui::CreateContext`, `IniFilename = nullptr`: geen `imgui.ini` in de werkmap) en start beide backends; een eigen destructor stopt ze en ruimt de context op (de body loopt vóór de members worden opgeruimd, dus Renderer en venster bestaan nog). `Run` per frame: na `PollEvents` `BeginDebugUIFrame` van venster en Renderer en `ImGui::NewFrame`, dan `World::Update` (systems mogen `ImGui::` aanroepen), dan `ImGui::Render` en `DrawDebugUI` vóór `SwapBuffers` |
 | 214 | Aan en uit | een vlag in de `Engine` (`SetDebugUIVisible`, `IsDebugUIVisible`, standaard uit), niet in een system (besluit 72). Systems tekenen debug-UI alleen als de vlag aan staat; staat hij uit, dan is er geen ImGui-venster dat de muis kan opvangen. In Sandbox zet F1 (`GameControlSystem`) de vlag om en maakt de cursor vrij; het `CameraControlSystem` krijgt een `Engine&` en doet niets zolang de UI aan staat; een `DebugUISystem` (lege signature, `Engine&`) toont het demo-venster van ImGui. Op verzoek van de gebruiker door Claude geschreven |
 | 215 | Opdeling van stap 27 | 27a ImGui in de build met beide backends en het demo-venster met F1; 27b een eigen debug-venster (frametijd, positie van de camera); 27c waarden die echt iets aanpassen, samen met het licht als entity (`DirectionalLight`-component), zodat een slider een component verandert |
+| 216 | `DebugUI` (27b, vervangt de vlag in de `Engine` uit besluit 214 en de systems per venster) | een class `DebugUI` in `Engine/Debug/DebugUI.h`/`.cpp`, eigendom van de `Engine` (`GetDebugUI()`). Het spel voegt panelen toe met `AddPanel(std::string name, std::function<void(World&)> draw)`: een naam en een function (meestal een lambda) die alleen de inhoud tekent. De `DebugUI` doet het vaste werk: niets als hij uit staat (`SetVisible`, `IsVisible`), en anders één venster "Debug" (`ImGuiWindowFlags_AlwaysAutoResize`, met een beginplek via `ImGuiCond_FirstUseEver`) met elk paneel als inklapbaar kopje (`CollapsingHeader`, standaard open). Zo kunnen panelen niet overlappen; losse vensters onder elkaar zetten lukt niet goed, omdat ImGui de grootte van een venster pas na een of twee frames kent. Docking (de aparte tak `docking` van ImGui) hoort bij een editor. Geen system: hij heeft geen entities nodig en moet na alle systems tekenen, dus roept `Engine::Run` hem aan direct na `World::Update`. De engine voegt zelf een paneel "Stats" toe (frametijd en FPS uit `ImGui::GetIO().Framerate`); Sandbox een paneel "Camera" met alleen de positie (`DragFloat3` op een eigen `float[3]`, terugschrijven bij `true`; geen `&position.x`, besluit 145). De FPS staat op 60 door vsync (`glfwSwapInterval(1)` in `Window::Create`); een knop voor vsync is bewust niet toegevoegd. Het `DebugUISystem` en het demo-venster verdwijnen. F1 en de cursor blijven in het `GameControlSystem` van het spel. Geen panelen als classes met `virtual Draw`: dan weer een class per paneel |
+| 217 | Inspector | een paneel "Entities" met per soort component een geregistreerde editor (zoals de inspector van Unity of Godot) staat onder Daarna, niet als vaste volgende stap. Zonder opslaan is het debug-gereedschap; met scenes opslaan, undo en entities maken wordt het een editor. Of die kant op gaat, beslist de gebruiker later |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -442,7 +444,9 @@ met een open plafond (`room.obj`, besluit 209; door de gebruiker gezien). Stap 2
 is begonnen met 27a: Dear ImGui zit in de build, de GLFW-backend in `Platform` en de
 OpenGL-backend in de `Renderer`, en de `Engine` draait elk frame een ImGui-frame. In Sandbox
 toont F1 het demo-venster van ImGui, met de cursor vrij en de camera stil (door de gebruiker
-gezien).
+gezien). Deel 27b: de `DebugUI` in de `Engine` met panelen als lambda's in één venster "Debug";
+de engine voegt "Stats" toe (frametijd en FPS), Sandbox "Camera" (positie). Het
+`DebugUISystem` en het demo-venster zijn weg (door de gebruiker gezien).
 
 Publieke interface van `Renderer`:
 
@@ -541,6 +545,8 @@ Bekende beperkingen, bewust zo gelaten:
   toegevoegd, is een afspraak die nergens wordt afgedwongen (besluit 115).
 - Een texture die via de manager niet laadt, geeft id `0`, en een `Material` met id `0` tekent
   wit: wie niet op id `0` controleert, ziet een wit voorwerp in plaats van een fout.
+- De FPS in "Stats" komt door vsync niet boven de verversing van de monitor (meestal 60), en zegt
+  dus niet hoe zwaar een frame echt is.
 - `Platform` en de `Renderer` hangen van ImGui af (besluit 211): wie de Renderer los in een ander
   project gebruikt, neemt ImGui mee.
 - De debug-UI schaalt niet mee met de schaling van Windows: op een scherm met meer dan 100% is
@@ -558,12 +564,12 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 27b, een eigen debug-venster
+## Volgende stap: 27c, het licht als entity met een paneel
 
-27a is af (besluiten 210 tot en met 215). 27b: een eigen debug-venster in het `DebugUISystem` van
-Sandbox, bijvoorbeeld met de frametijd en de positie van de camera. Daarna 27c: waarden die echt
-iets aanpassen, samen met het licht als entity (`DirectionalLight`-component met een
-`LightSystem`). De keuzes voor 27b moeten nog besproken worden.
+27b is af (besluiten 216 en 217). 27c: het richtingslicht als entity, met een component
+`DirectionalLight` en een `LightSystem` dat het elk frame naar de Renderer stuurt (besluit 143),
+en een paneel om richting, kleur en ambient tijdens het draaien aan te passen. De keuzes voor 27c
+moeten nog besproken worden.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -626,7 +632,8 @@ Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `V
 het vrije vertex-formaat (besluit 153), meer lichten of een
 puntlicht, het licht als entity met een `LightSystem` (besluit 143), de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
-als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174),
+als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174), een inspector voor
+entities en components in de debug-UI (besluit 217, de opstap naar een editor),
 gebeurtenissen binnen het spel (besluit 121), en pauze
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
 toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen

@@ -2,6 +2,7 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
+#include "EZSE/Engine/Debug/DebugUI.h"
 
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
@@ -62,8 +63,9 @@ void GameControlSystem::Update(ezse::World&, float) {
             }
             // F1 shows or hides the debug UI; the cursor is free while it is shown.
             if (pressed->key == ezse::Key::F1) {
-                const bool visible = !m_engine.IsDebugUIVisible();
-                m_engine.SetDebugUIVisible(visible);
+                ezse::DebugUI& debugUI = m_engine.GetDebugUI();
+                const bool visible = !debugUI.IsVisible();
+                debugUI.SetVisible(visible);
                 m_window.SetCursorCaptured(!visible);
             }
         }
@@ -84,29 +86,6 @@ void SpinSystem::Update(ezse::World& world, float deltaTime) {
     }
 }
 
-
-// Draws the debug windows while the debug UI is on (F1).
-class DebugUISystem : public ezse::System {
-public:
-    explicit DebugUISystem(ezse::Engine& engine);
-
-protected:
-    void Update(ezse::World& world, float deltaTime) override;
-
-private:
-    ezse::Engine& m_engine;
-};
-
-DebugUISystem::DebugUISystem(ezse::Engine& engine) :
-    m_engine(engine) {}
-
-void DebugUISystem::Update(ezse::World&, float) {
-    if (!m_engine.IsDebugUIVisible()) {
-        return;
-    }
-    ImGui::ShowDemoWindow();
-}
-
 // Enables control of the entity by user input.
 // Mouse movement to look around and WASD to move. Does nothing while the debug UI is on.
 class CameraControlSystem : public ezse::System {
@@ -125,7 +104,7 @@ CameraControlSystem::CameraControlSystem(ezse::Window& window, ezse::Engine& eng
     m_window(window), m_engine(engine) {}
 
 void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
-    if (m_engine.IsDebugUIVisible()) {
+    if (m_engine.GetDebugUI().IsVisible()) {
         return;
     }
     const float maxPitch = 89.0f * (std::numbers::pi_v<float> / 180.0f);
@@ -241,6 +220,20 @@ int main() {
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
     world.AddComponent(camera, ezse::Camera{});
     world.AddComponent(camera, CameraController{});
+    // Making the debug panel for the Camera
+    engine->GetDebugUI().AddPanel("Camera", [camera](ezse::World& world) {
+        ezse::Transform& cameraTransform = world.GetComponent<ezse::Transform>(camera);
+        float values[] = {
+            cameraTransform.position.x,
+            cameraTransform.position.y,
+            cameraTransform.position.z
+        };
+        if (ImGui::DragFloat3("Position", values, 0.05f)) {
+            cameraTransform.position.x = values[0];
+            cameraTransform.position.y = values[1];
+            cameraTransform.position.z = values[2];
+        }
+    });
 
     // Registing the systems
     world.AddSystem<GameControlSystem>(ezse::MakeSignature<>(),
@@ -249,7 +242,6 @@ int main() {
     world.AddSystem<CameraControlSystem>(
         ezse::MakeSignature<ezse::Transform, CameraController>(),
         engine->GetWindow(), *engine);
-    world.AddSystem<DebugUISystem>(ezse::MakeSignature<>(), *engine);
     // The engine systems come last, the camera before the drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
