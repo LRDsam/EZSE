@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS (PUBLIC), Core en stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -332,6 +332,9 @@ Regels die de Renderer herbruikbaar houden:
 | 198 | `UnloadMesh` | op handle: `void UnloadMesh(MeshHandle)`. Daarvoor twee maps: pad naar handle (voor `Load`) en id naar `{ pad, teller }` (voor `Unload`). Een handle die de manager niet kent (ook id `0` en een handle die al op 0 stond) is een assert |
 | 199 | Fouten en afsluiten | `LoadMesh` geeft bij een fout een handle met id `0` en logt de oorzaak; een mislukte poging wordt niet onthouden. Laden gebeurt nu na `Engine::Create`, dus bij een ontbrekend bestand gaat het venster even open. De destructor van de manager ruimt alles op wat nog geladen is, zonder waarschuwing. `LogInfo` bij laden en bij echt opruimen, zodat in het log te zien is dat opruimen pas bij 0 gebeurt |
 | 200 | Namen van GPU-resources | de privé structs in de Renderer krijgen het voorvoegsel `GPU`: `MeshData` wordt `GPUMesh`, `ShaderData` `GPUShader`, `TextureData` `GPUTexture`, de getters `GetGPUMesh` en dergelijke, de vectors `m_gpuMeshes` en dergelijke. Aanleiding: `MeshData` bestond twee keer, met de ruwe hoekpunten in `Engine` en de GPU-objecten in de Renderer. Afkorting in hoofdletters, zoals `GLLoadFunction`. De handles en `LightData`/`CameraData` (de indeling van een uniform buffer, geen resource) blijven zoals ze zijn. Een opschoonstap direct na 26a, door Claude |
+| 201 | Opdeling van 26b en verder (vervangt de opdeling in besluit 194) | 26b `ResourceCache` met tests, en `LoadMesh`/`UnloadMesh` daarop omgebouwd zonder ander gedrag (zelfde log, zelfde beeld); 26c textures; 26d shaders |
+| 202 | `ResourceCache<Handle>` | in `Engine/Resources/ResourceCache.h`, alleen een header (template, zoals `ComponentArray`): de boekhouding van besluit 197 en 198, los van Renderer en bestanden, zodat `EngineTests` hem kan testen. De twee maps verhuizen uit de manager; `Entry { key, count }` is een privé struct. Werkt met elke handle met een `std::uint32_t id`. De manager krijgt per soort een member (`ResourceCache<MeshHandle> m_meshes`). De normalisatie van het pad blijft in de manager: de cache krijgt een kale `std::string`. De gebruiker schrijft de template, Claude de tests |
+| 203 | Functions van `ResourceCache` | drie losse stappen, zodat de volgorde in de manager zichtbaar blijft: `Handle Acquire(const std::string& key)` (bekend: teller +1 en de handle; onbekend: id `0`), `void Add(const std::string& key, Handle handle)` (teller 1; assert bij een bekende sleutel of id `0`), `bool Release(Handle handle)` (teller -1; `true` bij 0, en dan vergeten; assert bij een onbekende handle). Geen `Load` met een lambda die zelf maakt wat ontbreekt. Verder `const std::string& GetKey(Handle) const` (de manager logt het pad vóór `Release`; de cache logt zelf niets, hij weet niet welke soort het is) en `std::vector<Handle> GetHandles() const` (een kopie, voor de destructor van de manager) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -413,7 +416,11 @@ genormaliseerd als sleutel) en een teller per pad bijhoudt; `UnloadMesh` telt af
 pas bij 0 op, de destructor ruimt de rest op. Sandbox laadt de kubus en Suzanne via de manager, en
 laadt de kubus een tweede keer via `./models/cube.obj`: dezelfde id, één keer geladen, en na één
 `UnloadMesh` niet opgeruimd (door de gebruiker gezien). Daarna de hernoeming van besluit 200: de
-privé structs in de Renderer heten nu `GPUMesh`, `GPUShader` en `GPUTexture`.
+privé structs in de Renderer heten nu `GPUMesh`, `GPUShader` en `GPUTexture`. Deel 26b: de
+boekhouding (twee maps en de teller) staat nu in de template `ResourceCache<Handle>`, en de
+`ResourceManager` heeft een `ResourceCache<MeshHandle>`; Sandbox geeft hetzelfde log en beeld als
+na 26a (door de gebruiker gezien). `EngineTests` controleert de cache zonder Renderer (nu 43
+controles). `Engine` geeft `Core` nu `PUBLIC` door.
 
 Publieke interface van `Renderer`:
 
@@ -521,12 +528,11 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 26b, textures via de `ResourceManager`
+## Volgende stap: 26c, textures via de `ResourceManager`
 
-26a en de GPU-hernoeming (besluit 200) zijn af. 26b: textures laden via de `ResourceManager`
-(`LoadTexture`, `UnloadTexture`), en de boekhouding (twee maps en de teller) eruit halen als
-template `ResourceCache<Handle>` met tests in `EngineTests`. De keuzes voor 26b moeten nog
-besproken worden. Daarna 26c (shaders; kiezen tussen twee paden en een basisnaam).
+26b is af. 26c: `LoadTexture` en `UnloadTexture` met een `ResourceCache<TextureHandle>`
+(`ReadImageFile`, dan `CreateTexture`), en Sandbox laadt `checker.png` via de manager. De keuzes
+moeten nog besproken worden. Daarna 26d (shaders; kiezen tussen twee paden en een basisnaam).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

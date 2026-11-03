@@ -3,6 +3,7 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
+#include "EZSE/Engine/Resources/ResourceCache.h"
 
 #include "EZSE/Math/Mat4.h"
 #include "EZSE/Math/Vec3.h"
@@ -228,6 +229,38 @@ void TestParseObj() {
     Check(!ezse::ParseObj(c_squareData).has_value(), "ParseObj: text without faces gives nothing");
 }
 
+// The handles are made up here: the cache only stores them and never asks the Renderer.
+void TestResourceCache() {
+    ezse::ResourceCache<ezse::MeshHandle> cache;
+    Check(cache.Acquire("models/cube.obj").id == 0, "ResourceCache: an unknown key gives id 0");
+    Check(cache.GetHandles().empty(), "ResourceCache: a new cache has no handles");
+
+    const ezse::MeshHandle cube{7};
+    cache.Add("models/cube.obj", cube);
+    Check(cache.GetKey(cube) == "models/cube.obj", "ResourceCache: GetKey gives the key of a handle");
+    Check(cache.Acquire("models/cube.obj").id == 7, "ResourceCache: a known key gives its handle");
+
+    const ezse::MeshHandle monkey{9};
+    cache.Add("models/monkey.obj", monkey);
+    Check(cache.GetHandles().size() == 2, "ResourceCache: GetHandles gives every handle");
+
+    // The cube is at count 2 now (Add, then one Acquire).
+    Check(!cache.Release(cube), "ResourceCache: the first Release of two is not the last");
+    Check(cache.Acquire("models/cube.obj").id == 7, "ResourceCache: after one Release the key is still known");
+    Check(!cache.Release(cube), "ResourceCache: Release counts down an Acquire");
+    Check(cache.Release(cube), "ResourceCache: the last Release returns true");
+    Check(cache.Acquire("models/cube.obj").id == 0, "ResourceCache: after the last Release the key is unknown");
+
+    const std::vector<ezse::MeshHandle> left = cache.GetHandles();
+    Check(left.size() == 1 && left[0].id == 9, "ResourceCache: other keys keep their own count");
+    Check(cache.Release(monkey), "ResourceCache: a single Add needs a single Release");
+    Check(cache.GetHandles().empty(), "ResourceCache: the cache is empty after everything is released");
+
+    // A key can be added again after its last Release, with a new handle.
+    cache.Add("models/cube.obj", ezse::MeshHandle{12});
+    Check(cache.Acquire("models/cube.obj").id == 12, "ResourceCache: a released key can be added again");
+}
+
 } // namespace
 
 int main() {
@@ -236,6 +269,7 @@ int main() {
     TestComponentDefaults();
     TestDecodeImage();
     TestParseObj();
+    TestResourceCache();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

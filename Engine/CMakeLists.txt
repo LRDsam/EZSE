@@ -6,6 +6,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Resources/Image.h
     include/EZSE/Engine/Resources/MeshData.h
     include/EZSE/Engine/Resources/Obj.h
+    include/EZSE/Engine/Resources/ResourceCache.h
     include/EZSE/Engine/Resources/ResourceManager.h
     include/EZSE/Engine/Systems/CameraSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
@@ -21,8 +22,8 @@ add_library(EZSE::Engine ALIAS EZSEEngine)
 
 target_include_directories(EZSEEngine PUBLIC include)
 target_link_libraries(EZSEEngine
-    PUBLIC EZSE::Platform EZSE::Renderer EZSE::ECS
-    PRIVATE EZSE::Core stb
+    PUBLIC EZSE::Platform EZSE::Renderer EZSE::ECS EZSE::Core
+    PRIVATE stb
 )
 
 add_executable(EngineTests tests/EngineTests.cpp)

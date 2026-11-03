@@ -1,12 +1,12 @@
 #pragma once
 
+#include "EZSE/Engine/Resources/ResourceCache.h"
+
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Renderer.h"
 
-#include <cstdint>
 #include <filesystem>
 #include <string>
-#include <unordered_map>
 
 namespace ezse {
 
@@ -22,15 +22,10 @@ public:
     void UnloadMesh(MeshHandle mesh);
 
 private:
-    struct MeshEntry {
-        std::string key;
-        std::uint32_t count = 0;
-    };
-
     Renderer& m_renderer;
     std::filesystem::path m_root;
-    std::unordered_map<std::string, MeshHandle> m_meshesByKey;
-    std::unordered_map<std::uint32_t, MeshEntry> m_meshEntries;
+
+    ResourceCache<MeshHandle> m_meshes;
 };
 
 } // namespace ezse
