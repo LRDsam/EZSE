@@ -7,15 +7,12 @@
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
 #include "EZSE/Core/Log.h"
-#include "EZSE/Core/File.h"
-
 
 #include "EZSE/Renderer/Mesh.h"
 
 #include "EZSE/Platform/Window.h"
 #include "EZSE/Platform/Key.h"
 #include "EZSE/Platform/WindowEvent.h"
-#include "EZSE/Platform/FileSystem.h"
 
 #include "EZSE/Math/Transform.h"
 
@@ -23,8 +20,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <numbers>
-#include <optional>
-#include <string>
 #include <variant>
 
 namespace {
@@ -134,28 +129,30 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
 } // namespace
 
 int main() {
-    const std::filesystem::path shaderDir =
-        ezse::GetExecutableDirectory() / "assets" / "shaders";
+    // Setting asset directories
+    const std::filesystem::path shaderDir = "shaders";
     const std::filesystem::path textureDir = "textures";
     const std::filesystem::path modelDir = "models";
 
-    const std::optional<std::string> vertexSource = ezse::ReadTextFile(
-        shaderDir / "lit.vert");
-    const std::optional<std::string> fragmentSource = ezse::ReadTextFile(
-        shaderDir / "lit.frag");
-    if (!vertexSource.has_value() || !fragmentSource.has_value()) {
-        ezse::LogError("Reading vertex and/or fragment source failed.");
-        return 1;
-    }
-
+    // Creating engine
     auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
     if (!engine) {
         return 1;
     }
 
+    // Setting references for renderer and resources
     ezse::Renderer& renderer = engine->GetRenderer();
     ezse::ResourceManager& resources = engine->GetResources();
 
+    // Loading shader
+    const ezse::ShaderHandle shader = resources.LoadShader(
+        shaderDir / "lit.vert",
+        shaderDir / "lit.frag");
+    if (shader.id == 0) {
+        return 1;
+    }
+
+    // Loading Textures and meshes
     const ezse::TextureHandle checkerTexture = resources.LoadTexture(textureDir / "checker.png");
     const ezse::MeshHandle cubeMesh = resources.LoadMesh(modelDir / "cube.obj");
     const ezse::MeshHandle monkeyMesh = resources.LoadMesh(modelDir / "monkey.obj");
@@ -168,12 +165,7 @@ int main() {
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
-    const ezse::ShaderHandle shader = renderer.CreateShader(*vertexSource,
-        *fragmentSource);
-    if (shader.id == 0) {
-        ezse::LogError("Failed to compile shader.");
-        return 1;
-    }
+    // Setting global light values
     renderer.SetDirectionalLight(
         ezse::Vec3{ -0.5f, -1.0f, -0.7f },
         ezse::Vec3{ 1.0f, 1.0f, 1.0f });

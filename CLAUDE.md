@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`): bezit venster, Renderer, `ResourceManager` en `World` en draait de game loop; ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key` | Core, GLFW (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen | Math (PUBLIC), Core, glad (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -110,7 +110,7 @@ Regels die de Renderer herbruikbaar houden:
    handles terug.
 4. **Over modulegrenzen gaan handles, geen pointers.** De Renderer slaat de GPU-objecten op
    en verwijdert ze op verzoek (`Destroy...`) en bij afsluiten. Wie `Create...` aanroept
-   beslist over de levensduur; later wordt dat een resource manager in de Engine-module,
+   beslist over de levensduur; dat is de `ResourceManager` in de Engine-module (stap 26),
    en ECS-componenten bevatten alleen handles.
 
 ## Conventies
@@ -337,6 +337,8 @@ Regels die de Renderer herbruikbaar houden:
 | 203 | Functions van `ResourceCache` | drie losse stappen, zodat de volgorde in de manager zichtbaar blijft: `Handle Acquire(const std::string& key)` (bekend: teller +1 en de handle; onbekend: id `0`), `void Add(const std::string& key, Handle handle)` (teller 1; assert bij een bekende sleutel of id `0`), `bool Release(Handle handle)` (teller -1; `true` bij 0, en dan vergeten; assert bij een onbekende handle). Geen `Load` met een lambda die zelf maakt wat ontbreekt. Verder `const std::string& GetKey(Handle) const` (de manager logt het pad vóór `Release`; de cache logt zelf niets, hij weet niet welke soort het is) en `std::vector<Handle> GetHandles() const` (een kopie, voor de destructor van de manager) |
 | 204 | Textures via de manager (26c) | `TextureHandle LoadTexture(const std::filesystem::path&)` en `void UnloadTexture(TextureHandle)` met een `ResourceCache<TextureHandle> m_textures`, op dezelfde manier als meshes: `ReadImageFile`, dan `CreateTexture`, `Add` en `LogInfo`; de destructor ruimt ook de textures op. De sleutel komt uit één hulpfunction `MakeKey` in een naamloze namespace in `ResourceManager.cpp` (besluit 196 op één plek). De witte texture van de Renderer komt nooit in de manager |
 | 205 | Een texture die niet laadt | `LoadTexture` geeft id `0`, volgens de conventie. Omdat een `Material` met texture id `0` wit tekent (besluit 178), controleert Sandbox op id `0` en stopt met `return 1`; anders zou een ontbrekend plaatje een stil wit voorwerp geven. Een opvallende vervangende texture (roze schaakbord) komt bij aanleiding. De controle met de dubbele kubus in Sandbox blijft staan: hij is de enige controle op het normaliseren van het pad |
+| 206 | Shaders via de manager (26d) | `ShaderHandle LoadShader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath)` en `void UnloadShader(ShaderHandle)` met een `ResourceCache<ShaderHandle> m_shaders`: twee paden, zoals `CreateShader` twee bronnen neemt. Expliciet, geen verborgen afspraak over bestandsnamen, en een vertex shader kan gedeeld worden. Geen basisnaam waar de manager `.vert` en `.frag` achter plakt. Een derde soort shader (geometry, compute) maakt er een struct met paden van, bij aanleiding |
+| 207 | Sleutel en fouten van een shader | de sleutel is `MakeKey(vertexPath) + '\|' + MakeKey(fragmentPath)` (`\|` kan op Windows niet in een bestandsnaam staan, dus twee paren geven nooit dezelfde sleutel; de volgorde telt). Een bestand dat niet gelezen kan worden of een shader die niet compileert geeft id `0` en gaat niet in de cache; beide fouten zijn al gelogd. Een shader met id `0` in een `Material` geeft bij het tekenen een assert, anders dan een texture. Sandbox laadt `lit` zo en leest daarna zelf geen bestanden meer |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -424,7 +426,9 @@ boekhouding (twee maps en de teller) staat nu in de template `ResourceCache<Hand
 na 26a (door de gebruiker gezien). `EngineTests` controleert de cache zonder Renderer (nu 43
 controles). `Engine` geeft `Core` nu `PUBLIC` door. Deel 26c: textures via de manager
 (`LoadTexture`, `UnloadTexture`); Sandbox laadt `checker.png` zo, en leest zelf geen plaatjes
-meer. Het beeld is ongewijzigd (door de gebruiker gezien).
+meer. Het beeld is ongewijzigd (door de gebruiker gezien). Deel 26d: shaders via de manager
+(`LoadShader` met twee paden, `UnloadShader`); Sandbox leest zelf geen enkel bestand meer en geeft
+alleen paden relatief aan `assets/` (door de gebruiker gezien). Daarmee is stap 26 af.
 
 Publieke interface van `Renderer`:
 
@@ -534,12 +538,13 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 26d, shaders via de `ResourceManager`
+## Volgende stap: nog te kiezen
 
-26c is af. 26d: shaders laden via de manager, met een `ResourceCache<ShaderHandle>`. Te kiezen:
-twee paden (`LoadShader("shaders/lit.vert", "shaders/lit.frag")`) of een basisnaam
-(`LoadShader("shaders/lit")`), en wat dan de sleutel is. Daarmee leest Sandbox zelf geen bestanden
-meer en verdwijnt `shaderDir` uit `main.cpp`.
+Stap 26 (de resource manager, besluiten 193 tot en met 207) is af: meshes, textures en shaders gaan
+via de `ResourceManager` met een teller per pad. De volgende stap moet nog gekozen worden, uit de
+lijst onder Daarna. Voor de hand liggend: meer lichten of een puntlicht, het licht als entity met
+een `LightSystem`, gamma-correctie, een `MaterialHandle` (materialen delen via de manager), of
+normalen uitrekenen voor modellen zonder normalen.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -602,8 +607,8 @@ Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `V
 het vrije vertex-formaat (besluit 153), meer lichten of een
 puntlicht, het licht als entity met een `LightSystem` (besluit 143), de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
-als `WindowEvent`, glTF (besluit 182),
-een resource manager in de Engine-module, gebeurtenissen binnen het spel (besluit 121), en pauze
+als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174),
+gebeurtenissen binnen het spel (besluit 121), en pauze
 en menu's: de loop blijft in `Engine::Run`; pauze wordt een toestand van het spel met systems per
 toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een hoofdmenu een eigen
 `World` (scene) die de `Engine` als actieve wereld kan wisselen; beide vragen een interface over

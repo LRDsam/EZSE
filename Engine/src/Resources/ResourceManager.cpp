@@ -3,6 +3,7 @@
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 
+#include "EZSE/Core/File.h"
 #include "EZSE/Core/Log.h"
 
 #include <optional>
@@ -27,6 +28,9 @@ ResourceManager::~ResourceManager() {
     }
     for (TextureHandle texture : m_textures.GetHandles()) {
         m_renderer.DestroyTexture(texture);
+    }
+    for (ShaderHandle shader : m_shaders.GetHandles()) {
+        m_renderer.DestroyShader(shader);
     }
 }
 
@@ -75,6 +79,35 @@ void ResourceManager::UnloadTexture(TextureHandle texture) {
     if (m_textures.Release(texture)) {
         LogInfo("Unloaded texture '{}' (id {})", key, texture.id);
         m_renderer.DestroyTexture(texture);
+    }
+}
+
+ShaderHandle ResourceManager::LoadShader(const std::filesystem::path& vertexPath,
+                                         const std::filesystem::path& fragmentPath) {
+    const std::string key = MakeKey(vertexPath) + '|' + MakeKey(fragmentPath);
+    ShaderHandle shader = m_shaders.Acquire(key);
+    if (shader.id != 0) {
+        return shader;
+    }
+    const std::optional<std::string> vertexSource = ReadTextFile(m_root / vertexPath);
+    const std::optional<std::string> fragmentSource = ReadTextFile(m_root / fragmentPath);
+    if (!vertexSource.has_value() || !fragmentSource.has_value()) {
+        return ShaderHandle{};
+    }
+    shader = m_renderer.CreateShader(*vertexSource, *fragmentSource);
+    if (shader.id == 0) {
+        return ShaderHandle{};
+    }
+    m_shaders.Add(key, shader);
+    LogInfo("Loaded shader '{}' (id {})", key, shader.id);
+    return shader;
+}
+
+void ResourceManager::UnloadShader(ShaderHandle shader) {
+    const std::string key = m_shaders.GetKey(shader);
+    if (m_shaders.Release(shader)) {
+        LogInfo("Unloaded shader '{}' (id {})", key, shader.id);
+        m_renderer.DestroyShader(shader);
     }
 }
 
