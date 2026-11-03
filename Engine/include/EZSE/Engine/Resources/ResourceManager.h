@@ -4,6 +4,7 @@
 
 #include "EZSE/Renderer/Mesh.h"
 #include "EZSE/Renderer/Renderer.h"
+#include "EZSE/Renderer/Texture.h"
 
 #include <filesystem>
 #include <string>
@@ -21,11 +22,15 @@ public:
     MeshHandle LoadMesh(const std::filesystem::path& path);
     void UnloadMesh(MeshHandle mesh);
 
+    TextureHandle LoadTexture(const std::filesystem::path& path);
+    void UnloadTexture(TextureHandle texture);
+
 private:
     Renderer& m_renderer;
     std::filesystem::path m_root;
 
     ResourceCache<MeshHandle> m_meshes;
+    ResourceCache<TextureHandle> m_textures;
 };
 
 } // namespace ezse
