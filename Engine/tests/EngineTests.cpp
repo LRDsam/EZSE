@@ -1,4 +1,5 @@
 #include "EZSE/Engine/Components/Camera.h"
+#include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Resources/Image.h"
@@ -131,6 +132,15 @@ void TestComponentDefaults() {
           "Material: the default tint is white");
     Check(material.shininess == 128.0f && material.specularStrength == 0.5f,
           "Material: the default shine is shininess 128 and strength 0.5");
+
+    const ezse::Light light;
+    Check(light.type == ezse::LightType::Directional, "Light: a default light is directional");
+    Check(light.color.x == 1.0f && light.color.y == 1.0f && light.color.z == 1.0f &&
+              light.intensity == 1.0f,
+          "Light: the default light is white with intensity 1");
+    Check(light.range > 0.0f, "Light: the default range is larger than 0");
+    Check(light.innerAngle > 0.0f && light.innerAngle < light.outerAngle,
+          "Light: the inner spot angle lies inside the outer one");
 }
 
 // A PNG of 2 by 2 pixels, made by a script. In the file the top row is red, green and the

@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `SetDebugUIVisible`, `IsDebugUIVisible`): bezit venster, Renderer, `ResourceManager` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`; systems in `Systems/`: `CameraSystem` en `RenderSystem`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `GetDebugUI`): bezit venster, Renderer, `ResourceManager`, `DebugUI` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`, `Light` met `LightType`; systems in `Systems/`: `CameraSystem`, `LightSystem` en `RenderSystem`; in `Debug/`: `DebugUI` (`AddPanel`, `SetVisible`, `IsVisible`, `Draw`); in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key`; de GLFW-backend van de debug-UI | Core, GLFW, imgui_glfw (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen; de OpenGL-backend van de debug-UI | Math (PUBLIC), Core, glad, imgui_opengl3 (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -349,6 +349,12 @@ Regels die de Renderer herbruikbaar houden:
 | 215 | Opdeling van stap 27 | 27a ImGui in de build met beide backends en het demo-venster met F1; 27b een eigen debug-venster (frametijd, positie van de camera); 27c waarden die echt iets aanpassen, samen met het licht als entity (`DirectionalLight`-component), zodat een slider een component verandert |
 | 216 | `DebugUI` (27b, vervangt de vlag in de `Engine` uit besluit 214 en de systems per venster) | een class `DebugUI` in `Engine/Debug/DebugUI.h`/`.cpp`, eigendom van de `Engine` (`GetDebugUI()`). Het spel voegt panelen toe met `AddPanel(std::string name, std::function<void(World&)> draw)`: een naam en een function (meestal een lambda) die alleen de inhoud tekent. De `DebugUI` doet het vaste werk: niets als hij uit staat (`SetVisible`, `IsVisible`), en anders één venster "Debug" (`ImGuiWindowFlags_AlwaysAutoResize`, met een beginplek via `ImGuiCond_FirstUseEver`) met elk paneel als inklapbaar kopje (`CollapsingHeader`, standaard open). Zo kunnen panelen niet overlappen; losse vensters onder elkaar zetten lukt niet goed, omdat ImGui de grootte van een venster pas na een of twee frames kent. Docking (de aparte tak `docking` van ImGui) hoort bij een editor. Geen system: hij heeft geen entities nodig en moet na alle systems tekenen, dus roept `Engine::Run` hem aan direct na `World::Update`. De engine voegt zelf een paneel "Stats" toe (frametijd en FPS uit `ImGui::GetIO().Framerate`); Sandbox een paneel "Camera" met alleen de positie (`DragFloat3` op een eigen `float[3]`, terugschrijven bij `true`; geen `&position.x`, besluit 145). De FPS staat op 60 door vsync (`glfwSwapInterval(1)` in `Window::Create`); een knop voor vsync is bewust niet toegevoegd. Het `DebugUISystem` en het demo-venster verdwijnen. F1 en de cursor blijven in het `GameControlSystem` van het spel. Geen panelen als classes met `virtual Draw`: dan weer een class per paneel |
 | 217 | Inspector | een paneel "Entities" met per soort component een geregistreerde editor (zoals de inspector van Unity of Godot) staat onder Daarna, niet als vaste volgende stap. Zonder opslaan is het debug-gereedschap; met scenes opslaan, undo en entities maken wordt het een editor. Of die kant op gaat, beslist de gebruiker later |
+| 218 | Soorten licht | één component `Light` met `enum class LightType { Directional, Point, Spot, Ambient }`, zoals Unity: het `LightSystem` heeft signature `Transform` + `Light` en krijgt zo alle lichten. Een system heeft één signature (alles EN), dus losse components per soort zouden een gezamenlijke component (`Light` + `PointLight`, makkelijk te vergeten) of meerdere signatures per system (een uitbreiding van de ECS) vragen. Velden die een soort niet gebruikt (bereik, hoeken bij een richtingslicht) kosten een paar floats |
+| 219 | `Light` | in `Engine/Components/Light.h`, ingebouwd en door de `Engine` geregistreerd (besluit 111): `type` (default `Directional`), `Vec3 color` (default wit), `float intensity` (default 1), en alvast `range` voor point en spot en `innerAngle`/`outerAngle` (radialen) voor spot. Naar de Renderer gaat `color * intensity`, zodat de sterkte los van de kleur te veranderen is. Plek en richting staan in de `Transform`, niet in `Light` |
+| 220 | Richting van een licht | uit de draaiing van de `Transform`: een licht schijnt langs zijn eigen -Z, zoals de camera kijkt: `TransformDirection(RotationY(rotation.y) * RotationX(rotation.x), {0, 0, -1})`. Zoals Unity en Godot, en een spotlicht gebruikt hetzelfde. Geen veld `direction` (dubbele informatie naast de `Transform`). De zon in Sandbox krijgt ongeveer `rotation = {-50.6°, 35.5°, 0}`: dezelfde richting als het oude `(-0.5, -1, -0.7)` |
+| 221 | Ambient als licht | `LightType::Ambient`: het `LightSystem` stuurt `color * intensity` naar `SetAmbientLight`, zoals Three.js een `AmbientLight` heeft. Zo is ambient op dezelfde manier aan te passen als de andere lichten. De entity heeft een `Transform` die hij niet gebruikt, omdat de signature hem vraagt |
+| 222 | `LightSystem` | in `Engine/Systems/LightSystem.h`/`.cpp`, `explicit LightSystem(Renderer&)`. Elk frame: het eerste richtingslicht naar `SetDirectionalLight` en het eerste ambient licht naar `SetAmbientLight`; is er geen, dan zwart (zo krijgt de buffer van het licht altijd een waarde). Point en spot worden overgeslagen tot de Renderer een lijst lichten kan aan (een eigen stap: een blok met een array en een maximum, en een loop in `lit.frag`). Het spel voegt hem toe tussen het `CameraSystem` en het `RenderSystem` (vervolg op besluit 115) |
+| 223 | Opdeling van 27c | 27c `Light`, `LightSystem`, en Sandbox met een zon- en een ambient-entity in plaats van de twee losse aanroepen, met hetzelfde beeld; 27d een paneel "Light" (richting als pitch en yaw in graden, `ColorEdit3`, sterkte, ambient). De gebruiker schrijft component, system en Sandbox; Claude de tests voor de standaardwaarden van `Light` |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -446,7 +452,12 @@ OpenGL-backend in de `Renderer`, en de `Engine` draait elk frame een ImGui-frame
 toont F1 het demo-venster van ImGui, met de cursor vrij en de camera stil (door de gebruiker
 gezien). Deel 27b: de `DebugUI` in de `Engine` met panelen als lambda's in één venster "Debug";
 de engine voegt "Stats" toe (frametijd en FPS), Sandbox "Camera" (positie). Het
-`DebugUISystem` en het demo-venster zijn weg (door de gebruiker gezien).
+`DebugUISystem` en het demo-venster zijn weg (door de gebruiker gezien). Deel 27c: het licht is een
+entity: een ingebouwde component `Light` (`LightType` `Directional`, `Point`, `Spot`, `Ambient`) en
+een `LightSystem` dat elk frame het eerste richtingslicht en het eerste ambient licht naar de
+Renderer stuurt (zwart als er geen is). Sandbox heeft een zon en een ambient licht als entities in
+plaats van de losse aanroepen; het beeld is gelijk (door de gebruiker gezien). `EngineTests` heeft
+nu 47 controles.
 
 Publieke interface van `Renderer`:
 
@@ -488,8 +499,12 @@ Bekende beperkingen, bewust zo gelaten:
 - Hetzelfde geldt voor de naam `u_model` en voor het blok `Camera` op bindpunt 0: de Renderer
   en de shader moeten het allebei zo doen. Een shader zonder het blok geeft geen waarschuwing.
   Ook texture unit 0 (`c_textureUnit`) en `binding = 0` van `u_texture` zijn zo'n afspraak.
-- De uniform buffers van de camera en het licht krijgen geen begininhoud: wie tekent zonder eerst
-  `SetCamera` en (met `lit`) `SetDirectionalLight` aan te roepen, tekent met onbepaalde waarden.
+- De uniform buffer van de camera krijgt geen begininhoud: wie tekent zonder eerst `SetCamera` aan
+  te roepen, tekent met onbepaalde waarden. Het licht krijgt sinds 27c elk frame een waarde van
+  het `LightSystem` (zwart als er geen licht is), zolang dat system is toegevoegd.
+- Het `LightSystem` gebruikt het eerste richtingslicht en het eerste ambient licht; punt- en
+  spotlichten worden nog overgeslagen, en bij meer lichten van één soort is "de eerste"
+  willekeurig (zoals bij de camera).
 - Er is precies één richtingslicht; meer lichten of een puntlicht vragen een ander blok in de
   shader.
 - Elke entity heeft een eigen kopie van zijn `Material` (besluit 174): een materiaal veranderen
@@ -564,12 +579,12 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 27c, het licht als entity met een paneel
+## Volgende stap: 27d, het paneel "Light"
 
-27b is af (besluiten 216 en 217). 27c: het richtingslicht als entity, met een component
-`DirectionalLight` en een `LightSystem` dat het elk frame naar de Renderer stuurt (besluit 143),
-en een paneel om richting, kleur en ambient tijdens het draaien aan te passen. De keuzes voor 27c
-moeten nog besproken worden.
+27c is af (besluiten 218 tot en met 223). 27d: een paneel "Light" in de `DebugUI` om de zon en het
+ambient licht tijdens het draaien aan te passen (richting als pitch en yaw in graden, kleur met
+`ColorEdit3`, sterkte). Daarna puntlichten in de Renderer (een lijst lichten in de shader). De
+keuzes voor 27d moeten nog besproken worden.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

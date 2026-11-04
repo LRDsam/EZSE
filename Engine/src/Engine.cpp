@@ -1,6 +1,7 @@
 #include "EZSE/Engine/Engine.h"
 
 #include "EZSE/Engine/Components/Camera.h"
+#include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 
@@ -39,6 +40,7 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
+    m_world.RegisterComponent<Light>();
 
     ImGui::CreateContext();
     // No imgui.ini with window positions in the working folder.

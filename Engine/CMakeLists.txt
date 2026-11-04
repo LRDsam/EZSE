@@ -1,5 +1,6 @@
 add_library(EZSEEngine STATIC
     include/EZSE/Engine/Components/Camera.h
+    include/EZSE/Engine/Components/Light.h
     include/EZSE/Engine/Components/MeshRenderer.h
     include/EZSE/Engine/Components/Transform.h
     include/EZSE/Engine/Debug/DebugUI.h
@@ -10,6 +11,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Resources/ResourceCache.h
     include/EZSE/Engine/Resources/ResourceManager.h
     include/EZSE/Engine/Systems/CameraSystem.h
+    include/EZSE/Engine/Systems/LightSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
     src/Components/Transform.cpp
     src/Debug/DebugUI.cpp
@@ -18,6 +20,7 @@ add_library(EZSEEngine STATIC
     src/Resources/Obj.cpp
     src/Resources/ResourceManager.cpp
     src/Systems/CameraSystem.cpp
+    src/Systems/LightSystem.cpp
     src/Systems/RenderSystem.cpp
 )
 add_library(EZSE::Engine ALIAS EZSEEngine)

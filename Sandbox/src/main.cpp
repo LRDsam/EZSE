@@ -1,10 +1,12 @@
 #include "EZSE/Engine/Components/Camera.h"
+#include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
 
 #include "EZSE/Engine/Systems/CameraSystem.h"
+#include "EZSE/Engine/Systems/LightSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
 #include "EZSE/Core/Log.h"
@@ -173,12 +175,6 @@ int main() {
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
-    // Setting global light values
-    renderer.SetDirectionalLight(
-        ezse::Vec3{ -0.5f, -1.0f, -0.7f },
-        ezse::Vec3{ 1.0f, 1.0f, 1.0f });
-    renderer.SetAmbientLight(ezse::Vec3{ 0.15f, 0.15f, 0.15f });
-
     ezse::World& world = engine->GetWorld();
 
     // Registering components
@@ -215,6 +211,18 @@ int main() {
         .tint = {0.6f, 0.6f, 0.6f},
         .shininess = 8.0f,
         .specularStrength = 0.1f}});
+    // The sun: a white directional light, turned so it shines in the direction (-0.5, -1, -0.7),
+    // like the light that Sandbox set by hand before.
+    const float degrees = std::numbers::pi_v<float> / 180.0f;
+    const ezse::Entity sun = world.CreateEntity();
+    world.AddComponent(sun, ezse::Transform{.rotation = {-50.6f * degrees, 35.5f * degrees, 0.0f}});
+    world.AddComponent(sun, ezse::Light{});
+    // The light that reaches every surface from all sides.
+    const ezse::Entity ambient = world.CreateEntity();
+    world.AddComponent(ambient, ezse::Transform{});
+    world.AddComponent(ambient, ezse::Light{
+        .type = ezse::LightType::Ambient,
+        .color = {0.15f, 0.15f, 0.15f}});
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
@@ -242,9 +250,11 @@ int main() {
     world.AddSystem<CameraControlSystem>(
         ezse::MakeSignature<ezse::Transform, CameraController>(),
         engine->GetWindow(), *engine);
-    // The engine systems come last, the camera before the drawing (decision 115).
+    // The engine systems come last: camera, then lights, then drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
+    world.AddSystem<ezse::LightSystem>(ezse::MakeSignature<ezse::Transform, ezse::Light>(),
+                                       renderer);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
 
