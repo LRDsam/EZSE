@@ -4,6 +4,7 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
+#include "EZSE/Engine/Debug/DebugWidgets.h"
 
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/LightSystem.h"
@@ -185,6 +186,7 @@ int main() {
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
     world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, {.shader = shader, .texture = checkerTexture}});
+
     //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
     // A second cube with the same mesh: no texture (white), an orange tint and a different shine.
     const ezse::Entity orangeCube = world.CreateEntity();
@@ -194,6 +196,7 @@ int main() {
         .tint = {1.0f, 0.5f, 0.1f},
         .shininess = 16.0f,
         .specularStrength = 1.0f}});
+
     // Suzanne from Blender, left of the cubes: half size, with the checkerboard to show her uvs.
     const ezse::Entity monkey = world.CreateEntity();
     world.AddComponent(monkey, ezse::Transform{
@@ -201,6 +204,7 @@ int main() {
         .scale = {0.5f, 0.5f, 0.5f}});
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
     world.AddComponent(monkey, Spin{.speed = {0.0f, 0.5f, 0.0f}});
+
     // A room around everything: a floor under the cubes and four walls, open at the top. Grey
     // checkerboard with little shine, so it does not look like the cubes.
     const ezse::Entity room = world.CreateEntity();
@@ -211,6 +215,7 @@ int main() {
         .tint = {0.6f, 0.6f, 0.6f},
         .shininess = 8.0f,
         .specularStrength = 0.1f}});
+
     // The sun: a white directional light, turned so it shines in the direction (-0.5, -1, -0.7),
     // like the light that Sandbox set by hand before.
     const float degrees = std::numbers::pi_v<float> / 180.0f;
@@ -223,6 +228,22 @@ int main() {
     world.AddComponent(ambient, ezse::Light{
         .type = ezse::LightType::Ambient,
         .color = {0.15f, 0.15f, 0.15f}});
+
+    // Debug panel for the sun and the ambient light.
+    engine->GetDebugUI().AddPanel("Light", [sun, ambient](ezse::World& world) {
+        ezse::Vec3& sunRotation = world.GetComponent<ezse::Transform>(sun).rotation;
+        ezse::Light& sunLight = world.GetComponent<ezse::Light>(sun);
+        ezse::Light& ambientLight = world.GetComponent<ezse::Light>(ambient);
+        ImGui::SeparatorText("Sun");
+        ImGui::SliderAngle("Pitch", &sunRotation.x, -90.0f, 90.0f);
+        ImGui::SliderAngle("Yaw", &sunRotation.y, -180.0f, 180.0f);
+        ezse::ColorEditVec3("Color##sun", sunLight.color);
+        ImGui::SliderFloat("Intensity##sun", &sunLight.intensity, 0.0f, 2.0f);
+        ImGui::SeparatorText("Ambient");
+        ezse::ColorEditVec3("Color##ambient", ambientLight.color);
+        ImGui::SliderFloat("Intensity##ambient", &ambientLight.intensity, 0.0f, 2.0f);
+    });
+
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.
     const ezse::Entity camera = world.CreateEntity();
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
@@ -230,17 +251,8 @@ int main() {
     world.AddComponent(camera, CameraController{});
     // Making the debug panel for the Camera
     engine->GetDebugUI().AddPanel("Camera", [camera](ezse::World& world) {
-        ezse::Transform& cameraTransform = world.GetComponent<ezse::Transform>(camera);
-        float values[] = {
-            cameraTransform.position.x,
-            cameraTransform.position.y,
-            cameraTransform.position.z
-        };
-        if (ImGui::DragFloat3("Position", values, 0.05f)) {
-            cameraTransform.position.x = values[0];
-            cameraTransform.position.y = values[1];
-            cameraTransform.position.z = values[2];
-        }
+        ezse::Vec3& cameraPos = world.GetComponent<ezse::Transform>(camera).position;
+        ezse::DragVec3("Position", cameraPos, 0.05f);
     });
 
     // Registing the systems
