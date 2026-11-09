@@ -17,6 +17,8 @@ namespace {
 
 constexpr GLuint c_cameraBindingPoint = 0;
 constexpr GLuint c_lightBindingPoint = 1;
+constexpr GLuint c_pointLightBindingPoint = 2;
+constexpr GLuint c_maxPointLights = 16;
 constexpr GLuint c_textureUnit = 0;
 
 const char* GetString(GLenum name) {
@@ -65,6 +67,24 @@ struct LightData {
 };
 static_assert(sizeof(LightData) == 48);
 
+// One element of u_pointLights in the PointLights block, laid out as std140: range fills the hole
+// after position, and color is followed by one float of padding (32 bytes in all).
+struct PointLightData {
+    float position[3];
+    float range;
+    float color[3];
+    float padding0 = 0.0f;
+};
+static_assert(sizeof(PointLightData) == 32);
+
+// The PointLights block: the array, then the number of lights in use (a GLSL int).
+struct PointLightDataArray {
+    PointLightData pointLights[c_maxPointLights];
+    std::int32_t count = 0;
+    float padding0[3] = {};
+};
+static_assert(offsetof(PointLightDataArray, count) == 512);
+
 // The Camera block in the shaders, laid out as std140: the mat4 takes 64 bytes, and the vec3 after
 // it takes the room of a vec4, so it is followed by one float of padding.
 struct CameraData {
@@ -103,6 +123,13 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glCreateBuffers(1, &renderer->m_lightBuffer);
     glNamedBufferStorage(renderer->m_lightBuffer, sizeof(LightData), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_UNIFORM_BUFFER, c_lightBindingPoint, renderer->m_lightBuffer);
+
+    // Starts with zero point lights, so a frame without SetPointLights reads a count of 0.
+    const PointLightDataArray noPointLights{};
+    glCreateBuffers(1, &renderer->m_pointLightBuffer);
+    glNamedBufferStorage(renderer->m_pointLightBuffer, sizeof(PointLightDataArray), &noPointLights,
+        GL_DYNAMIC_STORAGE_BIT);
+    glBindBufferBase(GL_UNIFORM_BUFFER, c_pointLightBindingPoint, renderer->m_pointLightBuffer);
 
     const std::uint8_t whitePixel[] = { 255, 255, 255, 255 };
     renderer->m_whiteTexture = renderer->CreateTexture(1, 1, whitePixel);
@@ -300,6 +327,27 @@ void Renderer::SetAmbientLight(const Vec3& color) {
         ambient);
 }
 
+void Renderer::SetPointLights(std::span<const PointLight> lights) {
+    if (lights.size() > c_maxPointLights && !m_pointLightWarningLogged) {
+        LogWarn("{} point lights given, only the first {} are drawn",
+            lights.size(), c_maxPointLights);
+        m_pointLightWarningLogged = true;
+    }
+    PointLightDataArray data{};
+    for (const PointLight& light : lights) {
+        if (data.count >= static_cast<std::int32_t>(c_maxPointLights)) {
+            break;
+        }
+        data.pointLights[data.count] = PointLightData{
+            .position{light.position.x, light.position.y, light.position.z},
+            .range = light.range,
+            .color{light.color.x, light.color.y, light.color.z}};
+        ++data.count;
+    }
+    glNamedBufferSubData(m_pointLightBuffer, 0, sizeof(PointLightDataArray), &data);
+}
+
+
 Renderer::GPUMesh& Renderer::GetGPUMesh(MeshHandle mesh) {
     EZSE_ASSERT(mesh.id > 0 && mesh.id <= m_gpuMeshes.size(), "Mesh handle is out of range");
 
@@ -362,6 +410,7 @@ Renderer::~Renderer() {
 
     glDeleteBuffers(1, &m_cameraBuffer);
     glDeleteBuffers(1, &m_lightBuffer);
+    glDeleteBuffers(1, &m_pointLightBuffer);
 
 }
 

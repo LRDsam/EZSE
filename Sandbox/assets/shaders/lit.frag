@@ -14,6 +14,16 @@ layout(std140, binding = 1) uniform Light {
     vec3 u_ambientColor;     // offset 32
 };
 
+struct PointLight {
+    vec3  position;  // offset 0
+    float range;     // offset 12: a float may fill the hole after a vec3
+    vec3  color;     // offset 16, then 4 bytes padding
+};                   // one element takes 32 bytes
+layout(std140, binding = 2) uniform PointLights {
+    PointLight u_pointLights[16];  // offset 0
+    int        u_pointLightCount;  // offset 16 * 32 = 512
+};
+
 layout(binding = 0) uniform sampler2D u_texture;
 
 uniform vec3 u_tint;

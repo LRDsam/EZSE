@@ -357,6 +357,11 @@ Regels die de Renderer herbruikbaar houden:
 | 223 | Opdeling van 27c | 27c `Light`, `LightSystem`, en Sandbox met een zon- en een ambient-entity in plaats van de twee losse aanroepen, met hetzelfde beeld; 27d een paneel "Light" (richting als pitch en yaw in graden, `ColorEdit3`, sterkte, ambient). De gebruiker schrijft component, system en Sandbox; Claude de tests voor de standaardwaarden van `Light` |
 | 224 | Paneel "Light" (27d) | in Sandbox, zoals het paneel "Camera": de lambda neemt de entities `sun` en `ambient` mee (`[sun, ambient]`); een algemeen paneel dat alle lichten zoekt hoort bij de inspector (besluit 217). Eén paneel met `ImGui::SeparatorText("Sun")` en `("Ambient")`. Zon: pitch en yaw met `ImGui::SliderAngle` (toont graden, bewaart radialen; pitch -90 tot 90, yaw -180 tot 180), kleur, sterkte met `SliderFloat` van 0 tot 2. Ambient: kleur en sterkte. Het type is nog niet te kiezen, omdat alleen richtingslicht en ambient werken |
 | 225 | `DragVec3` en `ColorEditVec3` | `bool DragVec3(const char* label, Vec3& value, float speed)` en `bool ColorEditVec3(const char* label, Vec3& color)` in `Engine/Debug/DebugWidgets.h`/`.cpp`: de omweg via een eigen `float[3]` (besluit 145) op één plek, terugschrijven bij `true`, en `true` teruggeven als de waarde veranderde. In de engine, omdat elk spel `Vec3` in de debug-UI wil aanpassen. Aanleiding: drie keer dezelfde omweg (positie van de camera, kleur van zon en ambient). Het paneel "Camera" gebruikt `DragVec3` |
+| 226 | Opdeling van stap 28 | 28a puntlichten (Renderer, `lit.frag`, `LightSystem`, een lamp in Sandbox); 28b spotlichten in een eigen lijst; 28c het paneel "Light" uitbreiden met lamp en spot |
+| 227 | Puntlichten naar de Renderer | de hele lijst per frame: `void SetPointLights(std::span<const PointLight> lights)`, zoals het `LightSystem` al verzamelt en daarna één keer verstuurt. Geen `Add`/`Clear` per licht (verborgen toestand) en geen index per licht. `struct PointLight { Vec3 position; Vec3 color; float range; }` in `Renderer/PointLight.h`: ruwe gegevens, de positie in de wereld en de kleur al maal `intensity`. Niet de component `Light`: de Renderer hangt niet van `Engine` af (regel 3); het `LightSystem` vertaalt `Transform` + `Light` naar `PointLight` |
+| 228 | Opslag op de GPU | een uniform buffer op bindpunt 2 (`c_pointLightBindingPoint`) met een vaste array en een aantal: `PointLight u_pointLights[16]; int u_pointLightCount;` (std140: 32 bytes per licht, het aantal op offset 512). Maximum `c_maxPointLights = 16` in `Renderer.cpp`; het getal in de shader is een afspraak die nergens wordt afgedwongen. Meer lichten worden overgeslagen met één `LogWarn`. Geen shader storage buffer: pas nodig bij honderden lichten. Het bestaande blok `Light` blijft ongewijzigd |
+| 229 | Afname met de afstand | inverse square met een venster op `range`, zoals Unreal en Frostbite: `window = clamp(1 - (d / range)^4, 0, 1)`, `attenuation = window * window / (d * d + 1)`. Natuurkundig `1 / d²`, de `+ 1` voorkomt delen door 0, en bij `range` is het licht zacht precies 0. Geen constant, linear en quadratic (drie velden extra, nooit 0) |
+| 230 | Shader | Blinn-Phong in `lit.frag` naar een function `Shade(toLight, lightColor, normal, toCamera, surfaceColor)` (diffuse plus specular), gebruikt door de zon en elk puntlicht, en in 28b door de spot. Ambient blijft in `main`. Sandbox krijgt een lamp-entity met een warme kleur, `range` ongeveer 8 en `intensity` hoger dan 1 |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -584,12 +589,39 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: 28a puntlichten (bezig)
 
-Stap 27 (de debug-UI, besluiten 210 tot en met 225) is af. Voor de hand liggend: puntlichten in de
-Renderer (een blok met een lijst lichten en een maximum, een loop in `lit.frag`; `LightType::Point`
-bestaat al en de kamer heeft een lamp nodig), daarna spotlichten; verder gamma-correctie, een
-`MaterialHandle`, of de inspector (besluit 217).
+Stap 28 (puntlichten en spotlichten, besluiten 226 tot en met 230) is begonnen met 28a. Klaar en
+gecommit (bouwt in Debug en Release, nog niet zichtbaar in Sandbox):
+
+- `Renderer/PointLight.h`: `struct PointLight { Vec3 position; Vec3 color; float range = 10; }`.
+- `Renderer`: `c_pointLightBindingPoint = 2` en `c_maxPointLights = 16`; de std140-structs
+  `PointLightData` (32 bytes) en `PointLightDataArray` (aantal op offset 512); de buffer
+  `m_pointLightBuffer`, gemaakt in `Create` met een begininhoud van nullen (aantal 0) en opgeruimd
+  in de destructor; `SetPointLights(std::span<const PointLight>)` vult de eerste 16 en waarschuwt
+  één keer (`m_pointLightWarningLogged`) bij meer. `SetPointLights` is op verzoek van de gebruiker
+  door Claude afgemaakt.
+- `lit.frag`: het blok `PointLights` op binding 2 staat erin, maar wordt nog niet gelezen.
+
+Nog te doen in 28a (de gebruiker schrijft):
+
+1. **`lit.frag`**: Blinn-Phong uit `main` naar een function
+   `vec3 Shade(vec3 toLight, vec3 lightColor, vec3 normal, vec3 toCamera, vec3 surfaceColor)`, die
+   diffuse plus specular teruggeeft (`toLight` genormaliseerd). De zon gebruikt hem; ambient
+   blijft in `main`. Daarna in `main` een loop `for (int i = 0; i < u_pointLightCount; ++i)`:
+   `toLight = position - worldPosition`, eerst de lengte `d`, pas daarna normaliseren; afname
+   `window = clamp(1 - (d / range)^4, 0, 1)` en `attenuation = window * window / (d * d + 1)`;
+   `Shade(...) * attenuation` optellen bij het resultaat. Denkvraag: waarom moet de lengte vóór het
+   normaliseren worden genomen?
+2. **`LightSystem`**: in de loop bij `LightType::Point` een `PointLight` toevoegen aan een lokale
+   `std::vector<PointLight>` (positie uit de `Transform`, `color * intensity`, `light.range`); na
+   de loop `m_renderer.SetPointLights(...)`.
+3. **Sandbox**: een lamp-entity boven de voorwerpen (bijvoorbeeld `(0, 0, 0)`; de kubussen staan
+   op y = -2) met `LightType::Point`, een warme kleur (ongeveer `(1, 0.8, 0.6)`), `range` ongeveer 8
+   en `intensity` ongeveer 5 (door `1 / (d² + 1)` is het licht op 2 meter nog een vijfde). Bij het
+   testen de zon in het paneel "Light" op 0 zetten.
+
+Daarna 28b (spotlichten in een eigen lijst) en 28c (het paneel "Light" met lamp en spot).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

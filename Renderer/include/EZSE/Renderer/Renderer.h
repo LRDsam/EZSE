@@ -4,6 +4,8 @@
 #include "EZSE/Renderer/Shader.h"
 #include "EZSE/Renderer/Texture.h"
 #include "EZSE/Renderer/Material.h"
+#include "EZSE/Renderer/PointLight.h"
+
 
 #include "EZSE/Math/Transform.h"
 #include "EZSE/Math/Vec3.h"
@@ -50,6 +52,10 @@ public:
     // not black. color: red, green and blue, usually small (0.1 to 0.2). Stays until the next call.
     void SetAmbientLight(const Vec3& color);
 
+    // All point lights for this frame; only the first 16 are drawn (a warning is logged once).
+    // Stays until the next call.
+    void SetPointLights(std::span<const PointLight> lights);
+
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
     ~Renderer();
@@ -91,6 +97,9 @@ private:
 
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
+    unsigned int m_pointLightBuffer = 0;
+    // Set after the first warning about too many point lights, so it is logged only once.
+    bool m_pointLightWarningLogged = false;
     // 1x1 white, drawn when a draw call has no texture
     TextureHandle m_whiteTexture;
 
