@@ -228,6 +228,22 @@ int main() {
     world.AddComponent(ambient, ezse::Light{
         .type = ezse::LightType::Ambient,
         .color = {0.15f, 0.15f, 0.15f}});
+    // A warm lamp just in front of the middle cube (its front face is at z = 0.5).
+    const ezse::Entity lamp = world.CreateEntity();
+    world.AddComponent(lamp, ezse::Transform{.position = {0.0f, -2.0f, 1.25f}});
+    world.AddComponent(lamp, ezse::Light{
+        .type = ezse::LightType::Point,
+        .color = {1.0f, 0.8f, 0.6f},
+        .intensity = 2.0f,
+        .range = 8.0f});
+    // A cool lamp behind and to the left of Suzanne, so both lamps can be told apart.
+    const ezse::Entity blueLamp = world.CreateEntity();
+    world.AddComponent(blueLamp, ezse::Transform{.position = {-3.0f, -1.5f, -1.5f}});
+    world.AddComponent(blueLamp, ezse::Light{
+        .type = ezse::LightType::Point,
+        .color = {0.6f, 0.7f, 1.0f},
+        .intensity = 2.0f,
+        .range = 6.0f});
 
     // Debug panel for the sun and the ambient light.
     engine->GetDebugUI().AddPanel("Light", [sun, ambient](ezse::World& world) {

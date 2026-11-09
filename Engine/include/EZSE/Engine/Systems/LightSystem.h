@@ -5,8 +5,8 @@
 
 namespace ezse {
 
-// Sends the first directional light and the first ambient light to the renderer every frame,
-// black when there is none. Point and spot lights wait until the renderer supports a list.
+// Sends the first directional light, the first ambient light (black when there is none) and all
+// point lights to the renderer every frame. Spot lights are not supported yet.
 class LightSystem : public System {
 public:
     explicit LightSystem(Renderer& renderer);
