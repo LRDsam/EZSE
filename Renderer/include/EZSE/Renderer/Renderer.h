@@ -5,7 +5,7 @@
 #include "EZSE/Renderer/Texture.h"
 #include "EZSE/Renderer/Material.h"
 #include "EZSE/Renderer/PointLight.h"
-
+#include "EZSE/Renderer/SpotLight.h"
 
 #include "EZSE/Math/Transform.h"
 #include "EZSE/Math/Vec3.h"
@@ -14,7 +14,6 @@
 #include <span>
 #include <vector>
 #include <string_view>
-
 
 namespace ezse {
 
@@ -55,6 +54,10 @@ public:
     // All point lights for this frame; only the first 16 are drawn (a warning is logged once).
     // Stays until the next call.
     void SetPointLights(std::span<const PointLight> lights);
+
+    // All spot lights for this frame; only the first 16 are drawn (a warning is logged once).
+    // Stays until the next call.
+    void SetSpotLights(std::span<const SpotLight> lights);
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -98,8 +101,10 @@ private:
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
     unsigned int m_pointLightBuffer = 0;
-    // Set after the first warning about too many point lights, so it is logged only once.
+    unsigned int m_spotLightBuffer = 0;
+    // Set after the first warning about too many point/spot lights, so it is logged only once.
     bool m_pointLightWarningLogged = false;
+    bool m_spotLightWarningLogged = false;
     // 1x1 white, drawn when a draw call has no texture
     TextureHandle m_whiteTexture;
 

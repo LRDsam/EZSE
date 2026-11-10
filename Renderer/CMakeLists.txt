@@ -4,6 +4,7 @@ add_library(EZSERenderer STATIC
     include/EZSE/Renderer/PointLight.h
     include/EZSE/Renderer/Renderer.h
     include/EZSE/Renderer/Shader.h
+    include/EZSE/Renderer/SpotLight.h
     include/EZSE/Renderer/Texture.h
     src/Renderer.cpp
 )

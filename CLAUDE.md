@@ -363,6 +363,14 @@ Regels die de Renderer herbruikbaar houden:
 | 229 | Afname met de afstand | inverse square met een venster op `range`, zoals Unreal en Frostbite: `window = clamp(1 - (d / range)^4, 0, 1)`, `attenuation = window * window / (d * d + 1)`. Natuurkundig `1 / d²`, de `+ 1` voorkomt delen door 0, en bij `range` is het licht zacht precies 0. Geen constant, linear en quadratic (drie velden extra, nooit 0) |
 | 230 | Shader | Blinn-Phong in `lit.frag` naar een function `Shade(toLight, lightColor, normal, toCamera, surfaceColor)` (diffuse plus specular), gebruikt door de zon en elk puntlicht, en in 28b door de spot. Ambient blijft in `main`. Sandbox krijgt een lamp-entity met een warme kleur, `range` ongeveer 8 en `intensity` hoger dan 1 |
 | 231 | Lampen in Sandbox | twee puntlichten, zodat te zien is dat lichten optellen: een warme lamp `(1, 0.8, 0.6)` op `(0, -2, 1.25)`, net voor de kubus met het schaakbord, en een koele `(0.6, 0.7, 1)` op `(-3, -1.5, -1.5)`, links achter Suzanne (`range` 6). Beide `intensity` 2 in plaats van 5: op 0,75 meter is de afname al ongeveer 0,64, en met 5 wordt het vlak wit. Door Claude toegevoegd, op verzoek van de gebruiker |
+| 232 | Hoeken van een spot | `innerAngle` en `outerAngle` in `Light` zijn de halve hoek, gemeten vanaf de as van de kegel (zoals Godot), in radialen. Met de defaults (30° en 45°) is de kegel 60° tot 90° breed. Het commentaar in `Light.h` zegt dat |
+| 233 | Cosinus | de Renderer krijgt hoeken en rekent in `SetSpotLights` één keer `std::cos` uit; de shader vergelijkt `dot(as, richting)` met `cosInner` en `cosOuter`. De aanroeper denkt in hoeken, de shader rekent niet per pixel een cosinus van een vaste waarde |
+| 234 | Spots naar de Renderer | `struct SpotLight { Vec3 position; Vec3 direction; Vec3 color; float range; float innerAngle; float outerAngle; }` in `Renderer/SpotLight.h` (ruwe gegevens, kleur al maal `intensity`, zoals `PointLight`), en `void SetSpotLights(std::span<const SpotLight>)`: de hele lijst per frame, richting genormaliseerd door de Renderer (zoals `SetDirectionalLight`), hooguit 16 met één `LogWarn` bij meer |
+| 235 | Opslag op de GPU | een eigen blok `SpotLights` op bindpunt 3 (`c_spotLightBindingPoint`), zoals de puntlichten (besluit 228): `SpotLight u_spotLights[16]; int u_spotLightCount;`. Per licht 48 bytes in std140, met de floats in de gaten na de `vec3`'s: `position` + `range`, `direction` + `cosInner`, `color` + `cosOuter`; het aantal op offset 768. Maximum `c_maxSpotLights = 16`. Geen gezamenlijke lijst met een veld `type` |
+| 236 | Rand van de kegel | `smoothstep(cosOuter, cosInner, cosTheta)`: vol binnen `innerAngle`, 0 buiten `outerAngle`, aan beide kanten zacht. Geen lineaire `clamp` zoals LearnOpenGL (knik aan de randen) |
+| 237 | Afname gedeeld | `float Attenuation(float d, float range)` in `lit.frag` met de formule van besluit 229, gebruikt door de loop van de puntlichten en die van de spots |
+| 238 | `innerAngle` niet kleiner dan `outerAngle` | een assert `innerAngle < outerAngle` in `SetSpotLights` (alleen code zet de waarden, dus een programmeerfout). Strikt kleiner, omdat `smoothstep(e0, e1, x)` in GLSL ongedefinieerd is als `e0 >= e1`; een harde rand maak je met een klein verschil (bijvoorbeeld 0,001 radiaal). Niet in de shader afgevangen. Als in 28c een slider het kan veroorzaken, begrenst het paneel de slider |
+| 239 | Spot in Sandbox | wit, recht boven de oranje kubus op `(1.5, 1, 0)`, naar beneden gericht met `rotation.x = -90°` (een licht schijnt langs zijn eigen -Z, besluit 220), `range` 6, `intensity` 3, `innerAngle` 0,4 en `outerAngle` 0,45 radialen (ongeveer 23° en 26°): een smalle kegel met een duidelijke rand, gekozen door de gebruiker. De twee lampen van besluit 231 blijven staan. De richting van zon en spot komt uit één hulpfunction `LightDirection(const Transform&)` in een naamloze namespace in `LightSystem.cpp`. Deel 3 van 28b is op verzoek van de gebruiker door Claude geschreven |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -473,7 +481,12 @@ uniform buffer met tot 16 puntlichten (`SetPointLights`), `lit.frag` rekent Blin
 function `Shade` voor de zon en voor elk puntlicht (met afname met de afstand, besluit 229), en
 het `LightSystem` stuurt alle puntlichten door. Sandbox heeft een warme en een blauwe lamp
 (besluit 231); het licht van beide is te zien op de voorwerpen, de vloer en de muren (door de
-gebruiker gezien). `docs/screenshot.png` en de README tonen dit beeld.
+gebruiker gezien). `docs/screenshot.png` en de README tonen dit beeld. Deel 28b: spotlichten,
+op dezelfde manier: `SpotLight` en `SetSpotLights` in de Renderer (blok op bindpunt 3, de cosinus
+van de hoeken vooraf uitgerekend), in `lit.frag` een loop met `smoothstep` voor de rand en de
+gedeelde function `Attenuation`, en het `LightSystem` stuurt alle spots door. Sandbox heeft een
+witte spot recht boven de oranje kubus (besluit 239); de kegel is te zien (door de gebruiker
+gezien).
 
 Publieke interface van `Renderer`:
 
@@ -490,6 +503,7 @@ void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& pos
 void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
 void         SetAmbientLight(const Vec3& color);
 void         SetPointLights(std::span<const PointLight> lights);
+void         SetSpotLights(std::span<const SpotLight> lights);
 void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
 ```
@@ -520,16 +534,19 @@ Bekende beperkingen, bewust zo gelaten:
   te roepen, tekent met onbepaalde waarden. Het licht krijgt sinds 27c elk frame een waarde van
   het `LightSystem` (zwart als er geen licht is), zolang dat system is toegevoegd.
 - Het `LightSystem` gebruikt het eerste richtingslicht en het eerste ambient licht, en alle
-  puntlichten; spotlichten worden nog overgeslagen. Bij meer richtingslichten of ambient lichten is
-  "de eerste" willekeurig (zoals bij de camera).
-- Er is precies één richtingslicht. Puntlichten: hooguit 16; de rest wordt overgeslagen met één
-  `LogWarn`. Het getal 16 in `lit.frag` en `c_maxPointLights` in de Renderer zijn een afspraak die
-  nergens wordt afgedwongen, net als de indeling van het blok `PointLights` op bindpunt 2.
-- Elke pixel rekent elk puntlicht uit, ook als het buiten `range` ligt; bij 16 lichten en een
-  scherm vol pixels is dat merkbaar, voor twee lampen niet.
-- Een puntlicht met `range` 0 deelt in de shader door 0.
+  punt- en spotlichten. Bij meer richtingslichten of ambient lichten is "de eerste" willekeurig
+  (zoals bij de camera).
+- Er is precies één richtingslicht. Punt- en spotlichten: elk hooguit 16; de rest wordt
+  overgeslagen met één `LogWarn`. Het getal 16 in `lit.frag` en `c_maxPointLights` en
+  `c_maxSpotLights` in de Renderer zijn een afspraak die nergens wordt afgedwongen, net als de
+  indeling van de blokken `PointLights` (bindpunt 2) en `SpotLights` (bindpunt 3).
+- Elke pixel rekent elk punt- en spotlicht uit, ook als het buiten `range` of de kegel ligt; bij
+  32 lichten en een scherm vol pixels is dat merkbaar, voor een paar lampen niet.
+- Een punt- of spotlicht met `range` 0 deelt in de shader door 0.
+- Een spot met `innerAngle` niet kleiner dan `outerAngle` is een assert (besluit 238); in Release
+  is het resultaat dan ongedefinieerd.
 - Er zijn geen schaduwen: licht van zon en lampen gaat door voorwerpen heen.
-- Het `LightSystem` maakt elk frame een nieuwe `std::vector` voor de puntlichten (een allocatie
+- Het `LightSystem` maakt elk frame een nieuwe `std::vector` voor de punt- en spotlichten (een allocatie
   op de heap zodra er een lamp is).
 - Elke entity heeft een eigen kopie van zijn `Material` (besluit 174): een materiaal veranderen
   voor alle voorwerpen tegelijk kan niet. Delen komt met een `MaterialHandle` en de resource manager.
@@ -603,16 +620,12 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 28b spotlichten
+## Volgende stap: 28c het paneel "Light"
 
-28a (puntlichten) is af en gecommit. Volgende deel: 28b, spotlichten in een eigen lijst
-(besluit 226), op dezelfde manier als de puntlichten: een struct `SpotLight` in de Renderer met
-`SetSpotLights`, een eigen blok in `lit.frag` dat `Shade` gebruikt met een afname naar de rand van
-de kegel (`innerAngle` en `outerAngle` uit `Light`), en het `LightSystem` dat `LightType::Spot`
-doorstuurt met de richting uit de `Transform` (besluit 220). De keuzes (indeling van het blok,
-maximum, hoe de kegel zacht afloopt, cosinus vooraf in C++ of in de shader) worden eerst besproken.
-
-Daarna 28c (het paneel "Light" met lamp en spot).
+28a (puntlichten) en 28b (spotlichten) zijn af. Volgende deel: 28c, het paneel "Light" in Sandbox
+uitbreiden met de lampen en de spot (besluit 226), zoals zon en ambient in besluit 224. De keuzes
+(welke velden per licht, plek en richting van de spot, hoe de slider van `innerAngle` onder
+`outerAngle` blijft, besluit 238) worden eerst besproken.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 

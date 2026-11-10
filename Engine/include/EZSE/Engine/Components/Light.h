@@ -15,8 +15,8 @@ struct Light {
     Vec3 color = {1.0f, 1.0f, 1.0f};
     float intensity = 1.0f;
     float range = 10.0f; // Point and Spot: how far the light reaches, in meters
-    float innerAngle = std::numbers::pi_v<float> / 6.0f; // Spot: full brightness inside, radians (30 degrees)
-    float outerAngle = std::numbers::pi_v<float> / 4.0f; // Spot: no light outside, radians (45 degrees)
+    float innerAngle = std::numbers::pi_v<float> / 6.0f; // Spot: full brightness inside, half angle from the axis, radians (30 degrees)
+    float outerAngle = std::numbers::pi_v<float> / 4.0f; // Spot: no light outside, half angle from the axis, radians (45 degrees)
 };
 
 } // namespace ezse

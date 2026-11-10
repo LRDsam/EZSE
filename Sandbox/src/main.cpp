@@ -244,6 +244,17 @@ int main() {
         .color = {0.6f, 0.7f, 1.0f},
         .intensity = 2.0f,
         .range = 6.0f});
+    // A white spot light above the orange cube, turned to shine straight down.
+    const ezse::Entity spot = world.CreateEntity();
+    world.AddComponent(spot, ezse::Transform{
+        .position = {1.5f, 1.0f, 0.0f},
+        .rotation = {-90.0f * degrees, 0.0f, 0.0f}});
+    world.AddComponent(spot, ezse::Light{
+        .type = ezse::LightType::Spot,
+        .intensity = 3.0f,
+        .range = 6.0f,
+        .innerAngle = 0.4f,
+        .outerAngle = 0.45f});
 
     // Debug panel for the sun and the ambient light.
     engine->GetDebugUI().AddPanel("Light", [sun, ambient](ezse::World& world) {
