@@ -3,6 +3,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Components/Light.h
     include/EZSE/Engine/Components/MeshRenderer.h
     include/EZSE/Engine/Components/Transform.h
+    include/EZSE/Engine/Debug/ComponentEditors.h
     include/EZSE/Engine/Debug/DebugUI.h
     include/EZSE/Engine/Debug/DebugWidgets.h
     include/EZSE/Engine/Engine.h
@@ -15,6 +16,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Systems/LightSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
     src/Components/Transform.cpp
+    src/Debug/ComponentEditors.cpp
     src/Debug/DebugUI.cpp
     src/Debug/DebugWidgets.cpp
     src/Engine.cpp

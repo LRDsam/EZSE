@@ -5,6 +5,7 @@
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Debug/DebugWidgets.h"
+#include "EZSE/Engine/Debug/ComponentEditors.h"
 
 #include "EZSE/Engine/Systems/CameraSystem.h"
 #include "EZSE/Engine/Systems/LightSystem.h"
@@ -141,6 +142,19 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
     }
 }
 
+// Draws the Transform (not for ambient light, which has no place or direction) and the Light of
+// one entity in the debug UI, under a heading.
+void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
+    ImGui::SeparatorText(label);
+    ImGui::PushID(static_cast<int>(entity.id));
+    ezse::Light& light = world.GetComponent<ezse::Light>(entity);
+    if (light.type != ezse::LightType::Ambient) {
+        ezse::EditTransform(world.GetComponent<ezse::Transform>(entity));
+    }
+    ezse::EditLight(light);
+    ImGui::PopID();
+}
+
 } // namespace
 
 int main() {
@@ -256,19 +270,13 @@ int main() {
         .innerAngle = 0.4f,
         .outerAngle = 0.45f});
 
-    // Debug panel for the sun and the ambient light.
-    engine->GetDebugUI().AddPanel("Light", [sun, ambient](ezse::World& world) {
-        ezse::Vec3& sunRotation = world.GetComponent<ezse::Transform>(sun).rotation;
-        ezse::Light& sunLight = world.GetComponent<ezse::Light>(sun);
-        ezse::Light& ambientLight = world.GetComponent<ezse::Light>(ambient);
-        ImGui::SeparatorText("Sun");
-        ImGui::SliderAngle("Pitch", &sunRotation.x, -90.0f, 90.0f);
-        ImGui::SliderAngle("Yaw", &sunRotation.y, -180.0f, 180.0f);
-        ezse::ColorEditVec3("Color##sun", sunLight.color);
-        ImGui::SliderFloat("Intensity##sun", &sunLight.intensity, 0.0f, 2.0f);
-        ImGui::SeparatorText("Ambient");
-        ezse::ColorEditVec3("Color##ambient", ambientLight.color);
-        ImGui::SliderFloat("Intensity##ambient", &ambientLight.intensity, 0.0f, 2.0f);
+    // Debug panel for all lights in the Sandbox.
+    engine->GetDebugUI().AddPanel("Light", [sun, ambient, lamp, blueLamp, spot](ezse::World& world) {
+        DebugLight("Sun", sun, world);
+        DebugLight("Ambient", ambient, world);
+        DebugLight("Lamp", lamp, world);
+        DebugLight("Blue lamp", blueLamp, world);
+        DebugLight("Spot", spot, world);
     });
 
     // The camera begins at (0, 0, 3) and looks down the negative Z axis.

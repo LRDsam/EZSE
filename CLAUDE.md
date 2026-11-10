@@ -94,7 +94,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
 | `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
-| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `GetDebugUI`): bezit venster, Renderer, `ResourceManager`, `DebugUI` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`, `Light` met `LightType`; systems in `Systems/`: `CameraSystem`, `LightSystem` en `RenderSystem`; in `Debug/`: `DebugUI` (`AddPanel`, `SetVisible`, `IsVisible`, `Draw`) en de hulpfunctions `DragVec3` en `ColorEditVec3`; in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
+| `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `GetDebugUI`): bezit venster, Renderer, `ResourceManager`, `DebugUI` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`, `Light` met `LightType`; systems in `Systems/`: `CameraSystem`, `LightSystem` en `RenderSystem`; in `Debug/`: `DebugUI` (`AddPanel`, `SetVisible`, `IsVisible`, `Draw`), de hulpfunctions `DragVec3` en `ColorEditVec3`, en de editors `EditTransform` en `EditLight` (`ComponentEditors.h`); in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key`; de GLFW-backend van de debug-UI | Core, GLFW, imgui_glfw (PRIVATE) |
 | `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen; de OpenGL-backend van de debug-UI | Math (PUBLIC), Core, glad, imgui_opengl3 (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
@@ -371,6 +371,11 @@ Regels die de Renderer herbruikbaar houden:
 | 237 | Afname gedeeld | `float Attenuation(float d, float range)` in `lit.frag` met de formule van besluit 229, gebruikt door de loop van de puntlichten en die van de spots |
 | 238 | `innerAngle` niet kleiner dan `outerAngle` | een assert `innerAngle < outerAngle` in `SetSpotLights` (alleen code zet de waarden, dus een programmeerfout). Strikt kleiner, omdat `smoothstep(e0, e1, x)` in GLSL ongedefinieerd is als `e0 >= e1`; een harde rand maak je met een klein verschil (bijvoorbeeld 0,001 radiaal). Niet in de shader afgevangen. Als in 28c een slider het kan veroorzaken, begrenst het paneel de slider |
 | 239 | Spot in Sandbox | wit, recht boven de oranje kubus op `(1.5, 1, 0)`, naar beneden gericht met `rotation.x = -90°` (een licht schijnt langs zijn eigen -Z, besluit 220), `range` 6, `intensity` 3, `innerAngle` 0,4 en `outerAngle` 0,45 radialen (ongeveer 23° en 26°): een smalle kegel met een duidelijke rand, gekozen door de gebruiker. De twee lampen van besluit 231 blijven staan. De richting van zon en spot komt uit één hulpfunction `LightDirection(const Transform&)` in een naamloze namespace in `LightSystem.cpp`. Deel 3 van 28b is op verzoek van de gebruiker door Claude geschreven |
+| 240 | Debug-UI voor components | losse functions per component in `Engine/Debug/ComponentEditors.h`/`.cpp`, naast `DragVec3`: `bool EditTransform(Transform&)` en `bool EditLight(Light&)`, met `true` als er iets veranderde. Geen member function op de component (die blijft een kale struct zonder ImGui, besluit 72) en nog geen inspector (besluit 217): deze functions zijn de bouwstenen die een latere inspector per soort registreert. Aanleiding: vijf lichten in Sandbox met dezelfde velden, en `Light` is een component van de engine die elk spel wil aanpassen |
+| 241 | `EditTransform` | positie (`DragVec3`), rotatie als pitch, yaw en roll in graden (`SliderAngle` per as) en schaal (`DragVec3`); ook voor voorwerpen bruikbaar. Bij lichten doet de schaal niets |
+| 242 | `EditLight` | alleen de velden die bij `light.type` horen: kleur en sterkte voor alle soorten, `range` voor point en spot, de twee hoeken voor spot. Het type is niet te kiezen (de velden betekenen per type iets anders; een combo-box kan met de inspector). Sliders: sterkte 0 tot 10, `range` 0,1 tot 20 (niet 0: dan deelt de shader door 0), `outerAngle` 1° tot 89°, `innerAngle` 0° tot 89°, en daarna `innerAngle = std::min(innerAngle, outerAngle - 0.001f)` (besluit 238), zodat geen slider de assert kan raken |
+| 243 | Namen van widgets | de functions gebruiken gewone labels (`"Color"`); de aanroeper zet per entity `ImGui::PushID` en `PopID` eromheen, zodat twee lichten elkaar niet storen. Zon en ambient gaan ook zo, de `##sun`-achtervoegsels verdwijnen |
+| 244 | Paneel "Light" (28c) | blijft één paneel in Sandbox met een `SeparatorText` per licht ("Sun", "Ambient", "Lamp", "Blue lamp", "Spot"); de lambda neemt de vijf entities mee en roept per licht een hulpfunction `DebugLight(label, entity, world)` aan in de naamloze namespace van `main.cpp`: kopje, `PushID` met de id van de entity, `EditTransform` (niet bij ambient: die heeft geen plek of richting) en `EditLight`, `PopID`. De oude grenzen van de zon (pitch -90 tot 90) zijn weg: `EditTransform` gebruikt de standaardgrenzen van `SliderAngle`. De gebruiker schrijft functions en paneel |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -486,7 +491,10 @@ op dezelfde manier: `SpotLight` en `SetSpotLights` in de Renderer (blok op bindp
 van de hoeken vooraf uitgerekend), in `lit.frag` een loop met `smoothstep` voor de rand en de
 gedeelde function `Attenuation`, en het `LightSystem` stuurt alle spots door. Sandbox heeft een
 witte spot recht boven de oranje kubus (besluit 239); de kegel is te zien (door de gebruiker
-gezien).
+gezien). Deel 28c: `EditTransform` en `EditLight` in `Engine/Debug/ComponentEditors.h` (besluiten
+240 tot en met 243), en het paneel "Light" in Sandbox toont alle vijf lichten met een hulpfunction
+`DebugLight` (besluit 244). De sliders kunnen de assert op de hoeken en `range` 0 niet bereiken.
+Daarmee is stap 28 af.
 
 Publieke interface van `Renderer`:
 
@@ -620,12 +628,11 @@ Bekende beperkingen, bewust zo gelaten:
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
 
-## Volgende stap: 28c het paneel "Light"
+## Volgende stap: nog te kiezen
 
-28a (puntlichten) en 28b (spotlichten) zijn af. Volgende deel: 28c, het paneel "Light" in Sandbox
-uitbreiden met de lampen en de spot (besluit 226), zoals zon en ambient in besluit 224. De keuzes
-(welke velden per licht, plek en richting van de spot, hoe de slider van `innerAngle` onder
-`outerAngle` blijft, besluit 238) worden eerst besproken.
+Stap 28 (puntlichten, spotlichten en het paneel "Light") is af en gecommit. De volgende stap is
+nog niet gekozen; kandidaten staan onder Daarna (bijvoorbeeld schaduwen, de inspector van besluit
+217, gamma-correctie of `LookAt`). Claude legt de opties met een advies voor.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
