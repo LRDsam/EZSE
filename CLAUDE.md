@@ -92,7 +92,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | Module | Bevat | Hangt af van |
 |---|---|---|
 | `Core` | logging (`LogInfo` enz.), `EZSE_ASSERT`, `ReadTextFile`, `ReadBinaryFile` | niets |
-| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, unary `operator-` en `operator*` (maal `float`), `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
+| `Math` | `Mat4` met `operator*` (maal `Mat4` en maal `Vec4`), `Vec3` met `operator+`, `operator-` (binary en unary) en `operator*` (maal `float`), `Dot`, `Cross`, `Length` en `Normalize`, `Vec4`; `Translation`, `Scale`, `RotationX`, `RotationY`, `RotationZ`, `LookAt`, `Orthographic`, `Perspective` en `TransformDirection` (in `Transform.h`); testprogramma `MathTests` in `Math/tests/` | niets |
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `GetDebugUI`): bezit venster, Renderer, `ResourceManager`, `DebugUI` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`, `Light` met `LightType`; systems in `Systems/`: `CameraSystem`, `LightSystem` en `RenderSystem`; in `Debug/`: `DebugUI` (`AddPanel`, `SetVisible`, `IsVisible`, `Draw`), de hulpfunctions `DragVec3` en `ColorEditVec3`, en de editors `EditTransform` en `EditLight` (`ComponentEditors.h`); in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key`; de GLFW-backend van de debug-UI | Core, GLFW, imgui_glfw (PRIVATE) |
@@ -381,6 +381,11 @@ Regels die de Renderer herbruikbaar houden:
 | 247 | ImGui | `DrawDebugUI` zet `GL_FRAMEBUFFER_SRGB` uit vóór `RenderDrawData` en daarna weer aan: de kleuren van ImGui zijn al sRGB, en de backend bewaart deze schakelaar niet |
 | 248 | Textures (29b) | altijd `GL_SRGB8_ALPHA8`: de GPU zet de kleur bij het samplen om naar lineair, vóór het filteren; alfa blijft lineair. De witte texture verandert niet (0 en 1 blijven gelijk). Het upload-format (`GL_RGBA`, `GL_UNSIGNED_BYTE`) blijft. De eerste texture die lineair moet blijven (een normal map) brengt een parameter of een `TextureDesc` mee (besluit 163) |
 | 249 | Kleuren uit code (29c) | zijn lineair en gaan ongewijzigd naar de shader: tint, kleur van een licht, achtergrond en `ColorEditVec3`. Geen omzetting van sRGB naar lineair in de engine (zoals Unity), want dat is een verborgen stap op elke plek waar een kleur binnenkomt; die kan later in de debug-UI. Sandbox heeft zijn kleuren omgerekend met `((c + 0.055) / 1.055)^2.4` (ongeveer `c^2.2`), zodat ze er hetzelfde uitzien; sterktes, `range` en glans zijn geen kleuren en bleven gelijk. Door Claude ingevoerd, op verzoek van de gebruiker; het beeld is zo goed bevonden |
+| 250 | Opdeling van stap 30 | 30a `a - b`, `Dot` en `Cross` op `Vec3`; 30b `LookAt`; 30c `Orthographic`. Alles met controles in `MathTests` (door Claude geschreven, op verzoek van de gebruiker), nog niets in Sandbox: de eerste gebruiker is de zon in stap 31 |
+| 251 | `a - b`, `Dot` en `Cross` | losse functions in `Vec3.h`/`.cpp` (vervolg op besluit 63 en 131), namen zoals in GLSL. `Cross` volgt de rechterhandregel: `Cross(X, Y) = Z` |
+| 252 | `LookAt` | `Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up)` in `Math/Transform.h`/`.cpp`, zoals glm: geeft direct de view-matrix (het omgekeerde van de plaatsing van de camera). `f = Normalize(target - eye)`, `r = Normalize(Cross(f, up))`, `u = Cross(r, f)` (de gebruiker normaliseert `u` ook, onschuldig); `r`, `u` en `-f` zijn de rijen, de verschuiving is `(-Dot(r, eye), -Dot(u, eye), Dot(f, eye))`. `up` hoeft niet loodrecht op de kijkrichting te staan of lengte 1 te hebben. Een `up` evenwijdig aan de kijkrichting wordt niet afgevangen (geen assert: `Math` hangt niet van `Core` af); het commentaar in de header zegt het. De camera van Sandbox blijft `ViewMatrix(transform)` gebruiken |
+| 253 | `Orthographic` | `Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane)`, zoals `glOrtho`: het blok wordt de kubus van -1 tot 1, de camera kijkt langs -Z en de diepte loopt van -1 (dichtbij) tot 1, zoals `Perspective` (besluit 46). Per as een schaal (`m[0][0]`, `m[1][1]`, `m[2][2]`, die van z negatief) en een verschuiving (`m[3]`); `w` blijft 1. Op verzoek van de gebruiker door Claude uitgeschreven |
+| 254 | Controle van stap 30 | op wat een matrix met punten doet, niet op zijn elementen (zoals bij `Perspective`): `LookAt` zet `eye` in de oorsprong en `target` op de negatieve Z-as; `Orthographic` zet de hoeken van een blok dat niet om de camera gecentreerd is op ±1 en het midden op 0 |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -503,7 +508,11 @@ Daarmee is stap 28 af. Stap 29 (gamma-correctie): het venster heeft een sRGB-fra
 Renderer zet `GL_FRAMEBUFFER_SRGB` aan (uit tijdens het tekenen van ImGui), textures zijn
 `GL_SRGB8_ALPHA8`, en alle kleuren in Sandbox zijn omgerekend naar lineaire waarden (besluiten 245
 tot en met 249). Het licht loopt nu zachter af; kleuren zien er hetzelfde uit als eerst (door de
-gebruiker gezien). Daarmee is stap 29 af.
+gebruiker gezien). Daarmee is stap 29 af. Stap 30: `Vec3` heeft `a - b`, `Dot` en `Cross`, en
+`Math` heeft `LookAt` (een view-matrix naar een punt) en `Orthographic` (een projectie zonder
+perspectief), allebei voor de schaduwen van de zon; Sandbox gebruikt ze nog niet (besluiten 250
+tot en met 254). `MathTests` heeft nu 90 controles (allemaal `[PASS]`, in Debug en Release).
+Daarmee is stap 30 af.
 
 Publieke interface van `Renderer`:
 
@@ -642,15 +651,22 @@ Bekende beperkingen, bewust zo gelaten:
   map) kan nog niet.
 - Kleuren uit code zijn lineair (besluit 249): in `ColorEdit3` voelen middentonen te licht aan, en
   een kleur uit een tekenprogramma moet eerst worden omgerekend.
+- `LookAt` met een `up` evenwijdig aan de kijkrichting (recht omhoog of omlaag kijken met
+  `up = {0, 1, 0}`) geeft een kapotte matrix zonder melding: `Cross` is dan nul en `Normalize`
+  geeft de nulvector (besluit 132). De aanroeper kiest dan een andere `up`.
+- `Orthographic` en `Perspective` controleren niet op `left == right`, `bottom == top` of
+  `nearPlane == farPlane` (delen door 0).
 - `glGenerateTextureMipmap` middelt sRGB-textures volgens de specificatie "bij voorkeur" in
   lineaire ruimte; het is geen garantie.
 
-## Volgende stap: stap 30, `LookAt` en `Orthographic`
+## Volgende stap: stap 31, schaduwen van de zon
 
-Stap 29 (gamma-correctie) is af en gecommit. Volgens de route van besluit 245 komt nu stap 30:
-`Dot`, `Cross` en `a - b` op `Vec3`, een view-matrix `LookAt(eye, target, up)` en een
-orthografische projectie, met controles in `MathTests`. Daarna stap 31, schaduwen van de zon.
-Claude legt eerst de keuzes (namen, signaturen, opdeling) met een advies voor.
+Stap 30 (`LookAt` en `Orthographic`) is af en gecommit. Volgens de route van besluit 245 komt nu
+stap 31: schaduwen van de zon met een shadow map (een dieptebeeld vanuit de zon, gemaakt met
+`LookAt` en `Orthographic`, en in `lit.frag` vergelijken). Dit vraagt nieuwe dingen in de
+Renderer (een framebuffer met een dieptetexture, een tweede pass, een eigen shader). Claude legt
+eerst de keuzes (opdeling, waar het blok van de zon vandaan komt, API van de Renderer) met een
+advies voor.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -709,8 +725,7 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
 
-Op de lijst, zonder vaste volgorde: `LookAt` met `Dot`, `Cross` en `a - b` op `Vec3` (besluit 49),
-het vrije vertex-formaat (besluit 153), schaduwen, de normal matrix in C++
+Op de lijst, zonder vaste volgorde: het vrije vertex-formaat (besluit 153), schaduwen, de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
 als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174), een inspector voor
 entities en components in de debug-UI (besluit 217, de opstap naar een editor),

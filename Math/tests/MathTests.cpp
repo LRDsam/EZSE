@@ -28,6 +28,10 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
+bool NearlyEqual(float a, float b) {
+    return std::abs(a - b) <= 0.0001f;
+}
+
 bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
     return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
            std::abs(a.z - b.z) <= 0.0001f;
@@ -139,6 +143,54 @@ void TestVec3Normalize() {
         "Normalize of the zero vector gives the zero vector");
     Check(NearlyEqual(ezse::Normalize(ezse::Vec3{ 1e-8f, 0.0f, 0.0f }), ezse::Vec3{}),
         "Normalize of a nearly zero vector gives the zero vector");
+}
+
+void TestVec3Subtract() {
+    const ezse::Vec3 first{ 5.0f, 7.0f, 9.0f };
+    const ezse::Vec3 second{ 1.0f, 2.0f, 3.0f };
+
+    Check(NearlyEqual(first - second, ezse::Vec3{ 4.0f, 5.0f, 6.0f }),
+        "Vec3 - Vec3 subtracts each coordinate");
+    Check(NearlyEqual(first - first, ezse::Vec3{}),
+        "a Vec3 minus itself is the zero vector");
+    Check(NearlyEqual(first - second, first + -second),
+        "a - b is the same as a + (-b)");
+}
+
+void TestVec3Dot() {
+    const ezse::Vec3 x{ 1.0f, 0.0f, 0.0f };
+    const ezse::Vec3 y{ 0.0f, 1.0f, 0.0f };
+    const ezse::Vec3 vec{ 1.0f, 2.0f, 3.0f };
+
+    Check(NearlyEqual(ezse::Dot(vec, ezse::Vec3{ 4.0f, -5.0f, 6.0f }), 12.0f),
+        "Dot of (1, 2, 3) and (4, -5, 6) is 4 - 10 + 18 = 12");
+    Check(NearlyEqual(ezse::Dot(x, y), 0.0f),
+        "Dot of two perpendicular vectors is 0");
+    Check(NearlyEqual(ezse::Dot(x, -x), -1.0f),
+        "Dot of two opposite unit vectors is -1");
+    Check(NearlyEqual(ezse::Dot(vec, vec), ezse::Length(vec) * ezse::Length(vec)),
+        "Dot of a vector with itself is its length squared");
+}
+
+void TestVec3Cross() {
+    const ezse::Vec3 x{ 1.0f, 0.0f, 0.0f };
+    const ezse::Vec3 y{ 0.0f, 1.0f, 0.0f };
+    const ezse::Vec3 z{ 0.0f, 0.0f, 1.0f };
+
+    Check(NearlyEqual(ezse::Cross(x, y), z), "Cross(X, Y) is Z (right-handed)");
+    Check(NearlyEqual(ezse::Cross(y, z), x), "Cross(Y, Z) is X");
+    Check(NearlyEqual(ezse::Cross(z, x), y), "Cross(Z, X) is Y");
+    Check(NearlyEqual(ezse::Cross(y, x), -z), "Cross(Y, X) is -Z: the order matters");
+
+    const ezse::Vec3 first{ 1.0f, 2.0f, 3.0f };
+    const ezse::Vec3 second{ -2.0f, 0.5f, 4.0f };
+    const ezse::Vec3 cross = ezse::Cross(first, second);
+    Check(NearlyEqual(cross, ezse::Vec3{ 6.5f, -10.0f, 4.5f }),
+        "Cross of (1, 2, 3) and (-2, 0.5, 4) is (6.5, -10, 4.5)");
+    Check(NearlyEqual(ezse::Dot(cross, first), 0.0f) && NearlyEqual(ezse::Dot(cross, second), 0.0f),
+        "Cross is perpendicular to both vectors");
+    Check(NearlyEqual(ezse::Cross(first, first * 2.0f), ezse::Vec3{}),
+        "Cross of two parallel vectors is the zero vector");
 }
 
 void TestMultiply() {
@@ -307,6 +359,65 @@ void TestTransformVector() {
         "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
 }
 
+void TestLookAt() {
+    const ezse::Vec3 up{ 0.0f, 1.0f, 0.0f };
+
+    // The default camera of the Sandbox: the view is only a translation.
+    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{ 0.0f, 0.0f, 3.0f }, ezse::Vec3{}, up),
+                      MakeTranslation(0.0f, 0.0f, -3.0f)),
+        "LookAt from (0, 0, 3) to the origin is a translation by (0, 0, -3)");
+
+    // A camera at (1, 2, 3) looking along +X: its right is +Z in the world, its up is +Y.
+    const ezse::Mat4 alongX = ezse::LookAt(ezse::Vec3{ 1.0f, 2.0f, 3.0f }, ezse::Vec3{ 5.0f, 2.0f, 3.0f }, up);
+    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 2.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
+        "LookAt moves the eye to the origin");
+    Check(NearlyEqual(alongX * ezse::Vec4{ 5.0f, 2.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, -4.0f, 1.0f }),
+        "LookAt puts the target on the negative Z axis, at its distance");
+    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 2.0f, 4.0f, 1.0f }, ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f }),
+        "LookAt puts a point to the right of the camera on +X");
+    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 3.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 1.0f, 0.0f, 1.0f }),
+        "LookAt puts a point above the camera on +Y");
+
+    // up does not have to be perpendicular to the view direction, or have length 1.
+    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{}, ezse::Vec3{ 0.0f, 0.0f, -1.0f }, ezse::Vec3{ 0.0f, 2.0f, 2.0f }),
+                      ezse::Mat4{}),
+        "LookAt straightens an up that is not perpendicular and not of length 1");
+
+    // An arbitrary camera: the eye goes to the origin, the target to (0, 0, -distance).
+    const ezse::Mat4 tilted = ezse::LookAt(ezse::Vec3{ 2.0f, 1.0f, 5.0f }, ezse::Vec3{ -1.0f, 0.0f, -2.0f }, up);
+    Check(NearlyEqual(tilted * ezse::Vec4{ 2.0f, 1.0f, 5.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
+        "LookAt with a tilted view moves the eye to the origin");
+    Check(NearlyEqual(tilted * ezse::Vec4{ -1.0f, 0.0f, -2.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, -std::sqrt(59.0f), 1.0f }),
+        "LookAt with a tilted view puts the target at (0, 0, -sqrt(59))");
+}
+
+void TestOrthographic() {
+    // A box that is not centered on the camera, so the shifts are checked too.
+    const float left = -2.0f;
+    const float right = 6.0f;
+    const float bottom = 1.0f;
+    const float top = 5.0f;
+    const float nearPlane = 1.0f;
+    const float farPlane = 11.0f;
+    const ezse::Mat4 projection = ezse::Orthographic(left, right, bottom, top, nearPlane, farPlane);
+
+    Check(NearlyEqual(projection * ezse::Vec4{ left, bottom, -nearPlane, 1.0f }, ezse::Vec4{ -1.0f, -1.0f, -1.0f, 1.0f }),
+        "Orthographic maps the near bottom left corner to (-1, -1, -1)");
+    Check(NearlyEqual(projection * ezse::Vec4{ right, top, -farPlane, 1.0f }, ezse::Vec4{ 1.0f, 1.0f, 1.0f, 1.0f }),
+        "Orthographic maps the far top right corner to (1, 1, 1)");
+    Check(NearlyEqual(projection * ezse::Vec4{ right, bottom, -farPlane, 1.0f }, ezse::Vec4{ 1.0f, -1.0f, 1.0f, 1.0f }),
+        "Orthographic maps the far bottom right corner to (1, -1, 1)");
+    Check(NearlyEqual(projection * ezse::Vec4{ 2.0f, 3.0f, -6.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
+        "Orthographic maps the center of the box to the origin");
+
+    // No perspective: the same x and y give the same result at any depth, and w stays 1.
+    const ezse::Vec4 nearPoint = projection * ezse::Vec4{ 4.0f, 2.0f, -2.0f, 1.0f };
+    const ezse::Vec4 farPoint = projection * ezse::Vec4{ 4.0f, 2.0f, -9.0f, 1.0f };
+    Check(NearlyEqual(nearPoint.x, farPoint.x) && NearlyEqual(nearPoint.y, farPoint.y),
+        "Orthographic does not make things smaller further away");
+    Check(NearlyEqual(farPoint.w, 1.0f), "Orthographic keeps w at 1");
+}
+
 void TestPerspective() {
     const float fovY = std::numbers::pi_v<float> / 3.0f;
     const float aspect = 2.0f;
@@ -348,6 +459,9 @@ int main() {
     TestVec3Scale();
     TestVec3Length();
     TestVec3Normalize();
+    TestVec3Subtract();
+    TestVec3Dot();
+    TestVec3Cross();
     TestMultiply();
     TestTranslation();
     TestScale();
@@ -357,6 +471,8 @@ int main() {
     TestRotationOrder();
     TestTransformVector();
     TestTransformDirection();
+    TestLookAt();
+    TestOrthographic();
     TestPerspective();
 
     std::cout << failureCount << " check(s) failed\n";

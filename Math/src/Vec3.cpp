@@ -8,12 +8,28 @@ Vec3 operator+(const Vec3& a, const Vec3& b) {
     return Vec3{ a.x + b.x, a.y + b.y, a.z + b.z };
 }
 
+Vec3 operator-(const Vec3& a, const Vec3& b) {
+    return Vec3{ a.x - b.x, a.y - b.y, a.z - b.z };
+}
+
 Vec3 operator-(const Vec3& a) {
     return Vec3{ -a.x, -a.y, -a.z };
 }
 
 Vec3 operator*(const Vec3& vec, float scalar) {
     return Vec3{ vec.x * scalar, vec.y * scalar, vec.z * scalar };
+}
+
+Vec3 Cross(const Vec3& a, const Vec3& b) {
+    return Vec3{
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+float Dot(const Vec3& a, const Vec3& b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 float Length(const Vec3& vec) {
