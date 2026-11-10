@@ -295,7 +295,7 @@ Regels die de Renderer herbruikbaar houden:
 | 161 | Omvang van 23c | alleen `CreateTexture` en `DestroyTexture`, nog niet tekenen (besluit 152). Gecontroleerd doordat Sandbox een texture maakt en de debug-callback niets meldt |
 | 162 | `TextureHandle` | in `Renderer/Texture.h`, zoals `MeshHandle` en `ShaderHandle`; privé `TextureData { unsigned int textureObj; }` in `m_textureData` met `GetTextureData`, opgeruimd door `DestroyTexture` en de destructor |
 | 163 | `CreateTexture` | `TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels)`: ruwe gegevens, de Renderer kent `Image` niet (regel 3). Altijd RGBA8; asserts op een breedte of hoogte van 0 of kleiner en op `pixels.size() != width * height * 4` (programmeerfouten). Kan niet mislukken. Een `TextureDesc` komt bij het eerste tweede formaat of de eerste tweede filtering |
-| 164 | Kleurruimte | `GL_RGBA8`, niet `GL_SRGB8_ALPHA8`: de waarden gaan ongewijzigd naar de shader, zoals de vertex-kleuren, de achtergrond en het licht nu ook. Gamma-correctie (sRGB-texturen, `GL_FRAMEBUFFER_SRGB` en een sRGB-venster) wordt een eigen stap, omdat die alle kleuren en lichtwaarden verandert (zie Daarna) |
+| 164 | Kleurruimte (vervangen door de besluiten 245 tot en met 249 in stap 29) | `GL_RGBA8`, niet `GL_SRGB8_ALPHA8`: de waarden gaan ongewijzigd naar de shader, zoals de vertex-kleuren, de achtergrond en het licht nu ook. Gamma-correctie (sRGB-texturen, `GL_FRAMEBUFFER_SRGB` en een sRGB-venster) wordt een eigen stap, omdat die alle kleuren en lichtwaarden verandert (zie Daarna) |
 | 165 | Mipmaps, filtering en wrapping | immutable storage met `glTextureStorage2D` en alle niveaus (`std::bit_width` van de grootste zijde: 256 geeft 9), niveau 0 vullen en dan `glGenerateTextureMipmap`. Min-filter `GL_LINEAR_MIPMAP_LINEAR` (trilinear), mag-filter `GL_LINEAR`, wrapping `GL_REPEAT` op S en T, expliciet gezet. De instellingen staan op de texture zelf (`glTextureParameteri`); sampler objects komen bij een texture die op twee manieren gelezen moet worden. Nearest, anisotrope filtering en `GL_CLAMP_TO_EDGE` bij aanleiding |
 | 166 | Plaatje in Sandbox | `Sandbox/assets/textures/checker.png`, door een script gemaakt: een schaakbord van 256 bij 256 pixels met vakken van 32 en een rood vak linksboven, zodat in 23d te zien is of het plaatje omgedraaid of gespiegeld is. Sandbox leest het vóór `Engine::Create` (stopt met `return 1` als dat mislukt, zoals bij de shaders) en maakt er na `Create` een texture van |
 | 167 | Texture kiezen bij het tekenen | een parameter: `DrawMesh(MeshHandle, ShaderHandle, TextureHandle, const Mat4& model)`, alles voor één draw in één aanroep. `MeshRenderer` krijgt `TextureHandle texture` en het `RenderSystem` geeft die door. Geen `BindTexture` die blijft staan (verborgen toestand). In stap 24 wordt de texture een materiaal |
@@ -376,6 +376,11 @@ Regels die de Renderer herbruikbaar houden:
 | 242 | `EditLight` | alleen de velden die bij `light.type` horen: kleur en sterkte voor alle soorten, `range` voor point en spot, de twee hoeken voor spot. Het type is niet te kiezen (de velden betekenen per type iets anders; een combo-box kan met de inspector). Sliders: sterkte 0 tot 10, `range` 0,1 tot 20 (niet 0: dan deelt de shader door 0), `outerAngle` 1° tot 89°, `innerAngle` 0° tot 89°, en daarna `innerAngle = std::min(innerAngle, outerAngle - 0.001f)` (besluit 238), zodat geen slider de assert kan raken |
 | 243 | Namen van widgets | de functions gebruiken gewone labels (`"Color"`); de aanroeper zet per entity `ImGui::PushID` en `PopID` eromheen, zodat twee lichten elkaar niet storen. Zon en ambient gaan ook zo, de `##sun`-achtervoegsels verdwijnen |
 | 244 | Paneel "Light" (28c) | blijft één paneel in Sandbox met een `SeparatorText` per licht ("Sun", "Ambient", "Lamp", "Blue lamp", "Spot"); de lambda neemt de vijf entities mee en roept per licht een hulpfunction `DebugLight(label, entity, world)` aan in de naamloze namespace van `main.cpp`: kopje, `PushID` met de id van de entity, `EditTransform` (niet bij ambient: die heeft geen plek of richting) en `EditLight`, `PopID`. De oude grenzen van de zon (pitch -90 tot 90) zijn weg: `EditTransform` gebruikt de standaardgrenzen van `SliderAngle`. De gebruiker schrijft functions en paneel |
+| 245 | Route na stap 28 | 29 gamma-correctie (eerst, omdat de afname van besluit 229 pas in lineaire ruimte klopt en alle kleuren daarna opnieuw ingesteld moeten worden), 30 `LookAt` en `Orthographic` in `Math` (wat de zon voor schaduwen nodig heeft), 31 schaduwen van de zon. Stap 29 in delen: 29a de uitgang, 29b de textures, 29c de kleuren van Sandbox |
+| 246 | Omzetting bij de uitgang (29a) | door de hardware: `glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE)` in `Window::Create` en `glEnable(GL_FRAMEBUFFER_SRGB)` in `Renderer::Create` (geen DSA-vorm). Geen `pow(color, 1 / 2.2)` in elke shader (een afspraak per shader, en sRGB is niet precies 2,2) en geen post-process pass (vraagt een framebuffer en hoort bij HDR en tone mapping). `Create` vraagt met `glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, ...)` op wat het venster kreeg en geeft een `LogWarn` als het niet `GL_SRGB` is; geen fout, het programma werkt dan nog |
+| 247 | ImGui | `DrawDebugUI` zet `GL_FRAMEBUFFER_SRGB` uit vóór `RenderDrawData` en daarna weer aan: de kleuren van ImGui zijn al sRGB, en de backend bewaart deze schakelaar niet |
+| 248 | Textures (29b) | altijd `GL_SRGB8_ALPHA8`: de GPU zet de kleur bij het samplen om naar lineair, vóór het filteren; alfa blijft lineair. De witte texture verandert niet (0 en 1 blijven gelijk). Het upload-format (`GL_RGBA`, `GL_UNSIGNED_BYTE`) blijft. De eerste texture die lineair moet blijven (een normal map) brengt een parameter of een `TextureDesc` mee (besluit 163) |
+| 249 | Kleuren uit code (29c) | zijn lineair en gaan ongewijzigd naar de shader: tint, kleur van een licht, achtergrond en `ColorEditVec3`. Geen omzetting van sRGB naar lineair in de engine (zoals Unity), want dat is een verborgen stap op elke plek waar een kleur binnenkomt; die kan later in de debug-UI. Sandbox heeft zijn kleuren omgerekend met `((c + 0.055) / 1.055)^2.4` (ongeveer `c^2.2`), zodat ze er hetzelfde uitzien; sterktes, `range` en glans zijn geen kleuren en bleven gelijk. Door Claude ingevoerd, op verzoek van de gebruiker; het beeld is zo goed bevonden |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -494,7 +499,11 @@ witte spot recht boven de oranje kubus (besluit 239); de kegel is te zien (door 
 gezien). Deel 28c: `EditTransform` en `EditLight` in `Engine/Debug/ComponentEditors.h` (besluiten
 240 tot en met 243), en het paneel "Light" in Sandbox toont alle vijf lichten met een hulpfunction
 `DebugLight` (besluit 244). De sliders kunnen de assert op de hoeken en `range` 0 niet bereiken.
-Daarmee is stap 28 af.
+Daarmee is stap 28 af. Stap 29 (gamma-correctie): het venster heeft een sRGB-framebuffer en de
+Renderer zet `GL_FRAMEBUFFER_SRGB` aan (uit tijdens het tekenen van ImGui), textures zijn
+`GL_SRGB8_ALPHA8`, en alle kleuren in Sandbox zijn omgerekend naar lineaire waarden (besluiten 245
+tot en met 249). Het licht loopt nu zachter af; kleuren zien er hetzelfde uit als eerst (door de
+gebruiker gezien). Daarmee is stap 29 af.
 
 Publieke interface van `Renderer`:
 
@@ -627,12 +636,21 @@ Bekende beperkingen, bewust zo gelaten:
 - De hoeken in `Transform::rotation` worden bij het draaien steeds groter; na lange tijd wordt
   een `float` van duizenden radialen onnauwkeurig en gaat het draaien schokken. Terugbrengen
   tot 0 tot 2π (`std::fmod`) komt als het ergens speelt.
+- Of het venster een sRGB-framebuffer heeft, beslist de driver; zonder komt er alleen een
+  `LogWarn` en is het beeld te donker. Niet elke driver geeft een betrouwbaar antwoord op de vraag.
+- Elke texture is sRGB (besluit 248): een texture met gegevens in plaats van kleuren (een normal
+  map) kan nog niet.
+- Kleuren uit code zijn lineair (besluit 249): in `ColorEdit3` voelen middentonen te licht aan, en
+  een kleur uit een tekenprogramma moet eerst worden omgerekend.
+- `glGenerateTextureMipmap` middelt sRGB-textures volgens de specificatie "bij voorkeur" in
+  lineaire ruimte; het is geen garantie.
 
-## Volgende stap: nog te kiezen
+## Volgende stap: stap 30, `LookAt` en `Orthographic`
 
-Stap 28 (puntlichten, spotlichten en het paneel "Light") is af en gecommit. De volgende stap is
-nog niet gekozen; kandidaten staan onder Daarna (bijvoorbeeld schaduwen, de inspector van besluit
-217, gamma-correctie of `LookAt`). Claude legt de opties met een advies voor.
+Stap 29 (gamma-correctie) is af en gecommit. Volgens de route van besluit 245 komt nu stap 30:
+`Dot`, `Cross` en `a - b` op `Vec3`, een view-matrix `LookAt(eye, target, up)` en een
+orthografische projectie, met controles in `MathTests`. Daarna stap 31, schaduwen van de zon.
+Claude legt eerst de keuzes (namen, signaturen, opdeling) met een advies voor.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -702,6 +720,6 @@ toestand (de gameplay-systems slaan hun `Update` over, tekenen gaat door), een h
 `World` (scene) die de `Engine` als actieve wereld kan wisselen; beide vragen een interface over
 het beeld (tekst, knoppen) in de Renderer. Assets verder: een assetsysteem in de engine,
 voorbewerken (texturen comprimeren) en inpakken in archieven met een virtual file system,
-shaders opnieuw laden terwijl het programma draait, gamma-correctie (sRGB-texturen en een
-sRGB-framebuffer, besluit 164), en een aparte map voor instellingen en
+shaders opnieuw laden terwijl het programma draait, HDR en tone mapping (een framebuffer met
+floats en een post-process pass), en een aparte map voor instellingen en
 opgeslagen spellen (`AppData`).

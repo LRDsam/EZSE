@@ -164,6 +164,14 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
+    // Shaders write linear colors; the GPU converts them to sRGB when writing to the window.
+    glEnable(GL_FRAMEBUFFER_SRGB);
+    int encoding = 0;
+    glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &encoding);
+    if (encoding != GL_SRGB) {
+        LogWarn("The window has no sRGB framebuffer; colors are not converted to sRGB");
+    }
+
     return renderer;
 }
 
@@ -259,7 +267,9 @@ TextureHandle Renderer::CreateTexture(int width, int height, std::span<const std
 
     GPUTexture gpuTexture;
     glCreateTextures(GL_TEXTURE_2D, 1, &gpuTexture.textureObj);
-    glTextureStorage2D(gpuTexture.textureObj, levels, GL_RGBA8, width, height);
+    // sRGB storage: the GPU converts the colors to linear when sampling, before filtering.
+    // The upload format (GL_RGBA, GL_UNSIGNED_BYTE) only describes the bytes we pass in.
+    glTextureStorage2D(gpuTexture.textureObj, levels, GL_SRGB8_ALPHA8, width, height);
     glTextureSubImage2D(gpuTexture.textureObj, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
     glGenerateTextureMipmap(gpuTexture.textureObj);
 
@@ -437,8 +447,12 @@ void Renderer::BeginDebugUIFrame() {
 }
 
 void Renderer::DrawDebugUI() {
-    // The backend saves the OpenGL state (depth test, culling, blending) and restores it after.
+    // The backend saves the OpenGL state (depth test, culling, blending) and restores it after,
+    // but not the sRGB conversion. ImGui colors are already sRGB, so converting them again
+    // would wash out the UI.
+    glDisable(GL_FRAMEBUFFER_SRGB);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    glEnable(GL_FRAMEBUFFER_SRGB);
 }
 
 void Renderer::ShutdownDebugUI() {

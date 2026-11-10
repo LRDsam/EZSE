@@ -31,6 +31,7 @@ public:
     void DestroyMesh(MeshHandle mesh);
 
     // Creates a texture from RGBA pixels, 4 bytes per pixel, row by row (the first row is the bottom).
+    // The color channels are sRGB and are read as linear values in the shader; alpha is linear.
     // width, height: in pixels, both larger than 0. pixels: exactly width * height * 4 bytes.
     TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
     void DestroyTexture(TextureHandle texture);

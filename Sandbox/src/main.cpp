@@ -202,12 +202,14 @@ int main() {
     world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, {.shader = shader, .texture = checkerTexture}});
 
     //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
+    // All colors in this file are linear: they go to the shader unchanged, and the window converts
+    // the result to sRGB. An sRGB color c becomes roughly c^2.2 (0.5 becomes 0.214).
     // A second cube with the same mesh: no texture (white), an orange tint and a different shine.
     const ezse::Entity orangeCube = world.CreateEntity();
     world.AddComponent(orangeCube, ezse::Transform{1.5f, -2.0f, 0.0f});
     world.AddComponent(orangeCube, ezse::MeshRenderer{cubeMesh, {
         .shader = shader,
-        .tint = {1.0f, 0.5f, 0.1f},
+        .tint = {1.0f, 0.214f, 0.010f},
         .shininess = 16.0f,
         .specularStrength = 1.0f}});
 
@@ -226,7 +228,7 @@ int main() {
     world.AddComponent(room, ezse::MeshRenderer{roomMesh, {
         .shader = shader,
         .texture = checkerTexture,
-        .tint = {0.6f, 0.6f, 0.6f},
+        .tint = {0.319f, 0.319f, 0.319f},
         .shininess = 8.0f,
         .specularStrength = 0.1f}});
 
@@ -241,13 +243,13 @@ int main() {
     world.AddComponent(ambient, ezse::Transform{});
     world.AddComponent(ambient, ezse::Light{
         .type = ezse::LightType::Ambient,
-        .color = {0.15f, 0.15f, 0.15f}});
+        .color = {0.019f, 0.019f, 0.019f}});
     // A warm lamp just in front of the middle cube (its front face is at z = 0.5).
     const ezse::Entity lamp = world.CreateEntity();
     world.AddComponent(lamp, ezse::Transform{.position = {0.0f, -2.0f, 1.25f}});
     world.AddComponent(lamp, ezse::Light{
         .type = ezse::LightType::Point,
-        .color = {1.0f, 0.8f, 0.6f},
+        .color = {1.0f, 0.604f, 0.319f},
         .intensity = 2.0f,
         .range = 8.0f});
     // A cool lamp behind and to the left of Suzanne, so both lamps can be told apart.
@@ -255,7 +257,7 @@ int main() {
     world.AddComponent(blueLamp, ezse::Transform{.position = {-3.0f, -1.5f, -1.5f}});
     world.AddComponent(blueLamp, ezse::Light{
         .type = ezse::LightType::Point,
-        .color = {0.6f, 0.7f, 1.0f},
+        .color = {0.319f, 0.448f, 1.0f},
         .intensity = 2.0f,
         .range = 6.0f});
     // A white spot light above the orange cube, turned to shine straight down.
@@ -303,7 +305,7 @@ int main() {
     world.AddSystem<ezse::LightSystem>(ezse::MakeSignature<ezse::Transform, ezse::Light>(),
                                        renderer);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
-                                        renderer, ezse::Vec3{0.1f, 0.2f, 0.3f});
+                                        renderer, ezse::Vec3{0.010f, 0.033f, 0.073f});
 
     // Capturing mouse in window and running game
     engine->GetWindow().SetCursorCaptured(true);
