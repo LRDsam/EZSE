@@ -8,6 +8,7 @@
 #include "EZSE/Renderer/PointLight.h"
 #include "EZSE/Renderer/SpotLight.h"
 
+#include <cmath>
 #include <vector>
 
 namespace ezse {
@@ -21,9 +22,22 @@ Vec3 LightDirection(const Transform& transform) {
         Vec3{0.0f, 0.0f, -1.0f});
 }
 
+// The view and projection of the directional light: a cube with half size extent around the
+// origin, seen from the side the light comes from.
+Mat4 DirectionalShadowMatrix(const Vec3& direction, float extent) {
+    // LookAt fails when up is parallel to the view direction, so a light straight up or down
+    // uses Z as up instead.
+    const Vec3 up = std::abs(direction.y) > 0.99f ? Vec3{0.0f, 0.0f, 1.0f} : Vec3{0.0f, 1.0f, 0.0f};
+    const Vec3 eye = -direction * extent;
+    const Mat4 view = LookAt(eye, Vec3{}, up);
+    const Mat4 projection = Orthographic(-extent, extent, -extent, extent, 0.0f, 2.0f * extent);
+    return projection * view;
+}
+
 } // namespace
 
-LightSystem::LightSystem(Renderer& renderer) : m_renderer(renderer) {}
+LightSystem::LightSystem(Renderer& renderer, float shadowExtent)
+    : m_renderer(renderer), m_shadowExtent(shadowExtent) {}
 
 void LightSystem::Update(World& world, float) {
     bool directionalFound = false;
@@ -75,6 +89,7 @@ void LightSystem::Update(World& world, float) {
         }
     }
     m_renderer.SetDirectionalLight(directionalDirection, directionalColor);
+    m_renderer.SetDirectionalShadow(DirectionalShadowMatrix(directionalDirection, m_shadowExtent));
     m_renderer.SetAmbientLight(ambientColor);
     m_renderer.SetPointLights(pointLights);
     m_renderer.SetSpotLights(spotLights);

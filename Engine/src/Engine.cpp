@@ -51,6 +51,9 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
         const float framerate = ImGui::GetIO().Framerate;
         ImGui::Text("%.2f ms (%.0f FPS)", 1000.0f / framerate, framerate);
     });
+    m_debugUI.AddPanel("Shadow map", [&renderer = *m_renderer](World&) {
+        renderer.DrawShadowMapDebugUI();
+    });
 }
 
 Engine::~Engine() {

@@ -302,8 +302,9 @@ int main() {
     // The engine systems come last: camera, then lights, then drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
+    // The sun casts shadows in a cube of 20 meters around the origin; the room is 12 by 12.
     world.AddSystem<ezse::LightSystem>(ezse::MakeSignature<ezse::Transform, ezse::Light>(),
-                                       renderer);
+                                       renderer, 10.0f);
     world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.010f, 0.033f, 0.073f});
 

@@ -11,6 +11,14 @@ RenderSystem::RenderSystem(Renderer& renderer, Vec3 clearColor)
     : m_renderer(renderer), m_clearColor(clearColor) {}
 
 void RenderSystem::Update(World& world, float) {
+    m_renderer.BeginShadowPass();
+    for (const Entity entity : GetEntities()) {
+        const Transform& transform = world.GetComponent<Transform>(entity);
+        const MeshRenderer& meshRenderer = world.GetComponent<MeshRenderer>(entity);
+        m_renderer.DrawShadowCaster(meshRenderer.mesh, ModelMatrix(transform));
+    }
+    m_renderer.EndShadowPass();
+
     m_renderer.Clear(m_clearColor.x, m_clearColor.y, m_clearColor.z);
 
     for (const Entity entity : GetEntities()) {

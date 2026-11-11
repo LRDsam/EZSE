@@ -23,6 +23,30 @@ constexpr GLuint c_spotLightBindingPoint = 3;
 constexpr GLuint c_maxPointLights = 16;
 constexpr GLuint c_maxSpotLights = 16;
 constexpr GLuint c_textureUnit = 0;
+constexpr GLsizei c_shadowMapSize = 2048;
+constexpr std::string_view c_shadowVertexSource = R"(
+#version 460 core
+
+layout(location = 0) in vec3 a_position;
+
+uniform mat4 u_model;
+
+layout(std140, binding = 1) uniform Light {
+    vec3 u_lightDirection;      // offset 0, 12 bytes, then 4 bytes padding
+    vec3 u_lightColor;          // offset 16, 12 bytes, then 4 bytes padding
+    vec3 u_ambientColor;        // offset 32, 12 bytes, then 4 bytes padding
+    mat4 u_lightViewProjection; // offset 48, 64 bytes
+};
+
+void main() {
+    gl_Position = u_lightViewProjection * u_model * vec4(a_position, 1.0);
+}
+)";
+constexpr std::string_view c_shadowFragmentSource = R"(
+#version 460 core
+
+void main() {}
+)";
 
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
@@ -67,8 +91,10 @@ struct LightData {
     float padding1 = 0.0f;
     float ambient[3];
     float padding2 = 0.0f;
+    Mat4 lightViewProjection;
 };
-static_assert(sizeof(LightData) == 48);
+static_assert(sizeof(LightData) == 112);
+static_assert(offsetof(LightData, lightViewProjection) == 48);
 
 // One element of u_pointLights in the PointLights block, laid out as std140: range fills the hole
 // after position, and color is followed by one float of padding (32 bytes in all).
@@ -161,13 +187,47 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     const std::uint8_t whitePixel[] = { 255, 255, 255, 255 };
     renderer->m_whiteTexture = renderer->CreateTexture(1, 1, whitePixel);
 
+    // Create the shadow map texture
+    glCreateTextures(GL_TEXTURE_2D, 1, &renderer->m_shadowMap);
+    glTextureStorage2D(renderer->m_shadowMap, 1, GL_DEPTH_COMPONENT32F, c_shadowMapSize, c_shadowMapSize);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_SWIZZLE_G, GL_RED);
+    glTextureParameteri(renderer->m_shadowMap, GL_TEXTURE_SWIZZLE_B, GL_RED);
+
+    const float borderColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTextureParameterfv(renderer->m_shadowMap, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    // Framebuffer that the shadow pass of the sun draws into
+    glCreateFramebuffers(1, &renderer->m_shadowFramebuffer);
+    glNamedFramebufferTexture(renderer->m_shadowFramebuffer, GL_DEPTH_ATTACHMENT,
+                              renderer->m_shadowMap, 0);
+    glNamedFramebufferDrawBuffer(renderer->m_shadowFramebuffer, GL_NONE);
+    glNamedFramebufferReadBuffer(renderer->m_shadowFramebuffer, GL_NONE);
+    const GLenum frameBufferStatus = glCheckNamedFramebufferStatus(renderer->m_shadowFramebuffer,
+                                                                   GL_FRAMEBUFFER);
+    if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+        LogError("Framebuffer for shadowmap not created successfully: {:#x}", frameBufferStatus);
+        return nullptr;
+    }
+
+    // The shader of the shadow pass: only positions, writes depth
+    renderer->m_shadowMapShader = renderer->CreateShader(c_shadowVertexSource, c_shadowFragmentSource);
+    if (renderer->m_shadowMapShader.id == 0) {
+        LogError("Failed to create the shadow map shader");
+        return nullptr;
+    }
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
 
     // Shaders write linear colors; the GPU converts them to sRGB when writing to the window.
     glEnable(GL_FRAMEBUFFER_SRGB);
     int encoding = 0;
-    glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &encoding);
+    glGetNamedFramebufferAttachmentParameteriv(0, GL_BACK_LEFT,
+                                               GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &encoding);
     if (encoding != GL_SRGB) {
         LogWarn("The window has no sRGB framebuffer; colors are not converted to sRGB");
     }
@@ -177,6 +237,8 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
 
 void Renderer::SetViewport(int width, int height) {
     if (width > 0 && height > 0) {
+        m_viewportWidth = width;
+        m_viewportHeight = height;
         glViewport(0, 0, width, height);
     }
 }
@@ -355,6 +417,14 @@ void Renderer::SetDirectionalLight(const Vec3& direction, const Vec3& color) {
         &lightData);
 }
 
+void Renderer::SetDirectionalShadow(const Mat4& lightViewProjection) {
+    glNamedBufferSubData(
+        m_lightBuffer,
+        offsetof(LightData, lightViewProjection),
+        sizeof(Mat4),
+        &lightViewProjection);
+}
+
 void Renderer::SetAmbientLight(const Vec3& color) {
     const float ambient[3] = {color.x, color.y, color.z};
     glNamedBufferSubData(
@@ -438,6 +508,36 @@ void Renderer::Clear(float red, float green, float blue) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+void Renderer::BeginShadowPass() {
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFramebuffer);
+    glViewport(0, 0, c_shadowMapSize, c_shadowMapSize);
+
+    const float depth = 1.0f;
+    glClearNamedFramebufferfv(m_shadowFramebuffer, GL_DEPTH, 0, &depth);
+
+    glUseProgram(GetGPUShader(m_shadowMapShader).shaderProgram);
+}
+
+void Renderer::DrawShadowCaster(MeshHandle mesh, const Mat4& model) {
+    const GPUMesh& gpuMesh = GetGPUMesh(mesh);
+    const GPUShader& gpuShader = GetGPUShader(m_shadowMapShader);
+
+    glBindVertexArray(gpuMesh.vertexArrayObj);
+
+    glProgramUniformMatrix4fv(
+        gpuShader.shaderProgram,
+        gpuShader.modelLocation,
+        1,
+        GL_FALSE,
+        &model.m[0][0]);
+    glDrawElements(GL_TRIANGLES, gpuMesh.indexCount, GL_UNSIGNED_INT, nullptr);
+}
+
+void Renderer::EndShadowPass() {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    SetViewport(m_viewportWidth, m_viewportHeight);
+}
+
 void Renderer::InitDebugUI() {
     ImGui_ImplOpenGL3_Init("#version 460");
 }
@@ -453,6 +553,10 @@ void Renderer::DrawDebugUI() {
     glDisable(GL_FRAMEBUFFER_SRGB);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glEnable(GL_FRAMEBUFFER_SRGB);
+}
+
+void Renderer::DrawShadowMapDebugUI() {
+    ImGui::Image(static_cast<ImTextureID>(m_shadowMap), ImVec2(256.0f, 256.0f), ImVec2(0, 1), ImVec2(1, 0));
 }
 
 void Renderer::ShutdownDebugUI() {
@@ -478,6 +582,8 @@ Renderer::~Renderer() {
     glDeleteBuffers(1, &m_lightBuffer);
     glDeleteBuffers(1, &m_pointLightBuffer);
     glDeleteBuffers(1, &m_spotLightBuffer);
+    glDeleteFramebuffers(1, &m_shadowFramebuffer);
+    glDeleteTextures(1, &m_shadowMap);
 
 }
 

@@ -48,6 +48,10 @@ public:
     // color: red, green and blue, usually 0 to 1.
     void SetDirectionalLight(const Vec3& direction, const Vec3& color);
 
+    // The matrix that takes a point in the world to the shadow map of the directional light:
+    // projection * view of the light. Stays until the next call.
+    void SetDirectionalShadow(const Mat4& lightViewProjection);
+
     // The light that reaches every surface from all sides, so the side away from the light is
     // not black. color: red, green and blue, usually small (0.1 to 0.2). Stays until the next call.
     void SetAmbientLight(const Vec3& color);
@@ -66,11 +70,21 @@ public:
 
     void Clear(float red, float green, float blue);
 
+    // The shadow pass of the directional light, drawn before the normal image each frame:
+    // BeginShadowPass, then DrawShadowCaster for every mesh that casts a shadow, then EndShadowPass.
+    // The light comes from SetDirectionalShadow. EndShadowPass draws to the window again.
+    void BeginShadowPass();
+    void DrawShadowCaster(MeshHandle mesh, const Mat4& model);
+    void EndShadowPass();
+
     // Debug UI (Dear ImGui), drawn over the image. InitDebugUI once after ImGui::CreateContext;
     // BeginDebugUIFrame at the start of a frame; DrawDebugUI after ImGui::Render.
     void InitDebugUI();
     void BeginDebugUIFrame();
     void DrawDebugUI();
+    // Shows the shadow map as a gray image inside the ImGui window that is open (call it from a
+    // debug panel). Darker is closer to the light; white is nothing, or outside the shadow cube.
+    void DrawShadowMapDebugUI();
     void ShutdownDebugUI();
 
 private:
@@ -99,15 +113,29 @@ private:
     GPUShader& GetGPUShader(ShaderHandle shader);
     GPUTexture& GetGPUTexture(TextureHandle texture);
 
+    // Size of the window, from SetViewport; EndShadowPass sets the viewport back to it.
+    int m_viewportWidth = 0;
+    int m_viewportHeight = 0;
+
+    // Shadow map of the sun: a depth texture and the framebuffer that draws into it
+    unsigned int m_shadowFramebuffer = 0;
+    unsigned int m_shadowMap = 0;
+
+    // Uniform buffers
     unsigned int m_cameraBuffer = 0;
     unsigned int m_lightBuffer = 0;
     unsigned int m_pointLightBuffer = 0;
     unsigned int m_spotLightBuffer = 0;
+
     // Set after the first warning about too many point/spot lights, so it is logged only once.
     bool m_pointLightWarningLogged = false;
     bool m_spotLightWarningLogged = false;
+
     // 1x1 white, drawn when a draw call has no texture
     TextureHandle m_whiteTexture;
+
+    // The shader of the shadow pass: only positions, writes depth
+    ShaderHandle m_shadowMapShader;
 
     std::vector<GPUMesh> m_gpuMeshes;
     std::vector<GPUShader> m_gpuShaders;
