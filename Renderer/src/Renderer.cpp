@@ -23,6 +23,7 @@ constexpr GLuint c_spotLightBindingPoint = 3;
 constexpr GLuint c_maxPointLights = 16;
 constexpr GLuint c_maxSpotLights = 16;
 constexpr GLuint c_textureUnit = 0;
+constexpr GLuint c_shadowMapUnit = 1;
 constexpr GLsizei c_shadowMapSize = 2048;
 constexpr std::string_view c_shadowVertexSource = R"(
 #version 460 core
@@ -298,6 +299,7 @@ void Renderer::DrawMesh(MeshHandle mesh, const Material& material, const Mat4& m
     // Id 0 draws with the white texture, so a shader always has a texture to read.
     const TextureHandle drawTexture = material.texture.id == 0 ? m_whiteTexture : material.texture;
     glBindTextureUnit(c_textureUnit, GetGPUTexture(drawTexture).textureObj);
+    glBindTextureUnit(c_shadowMapUnit, m_shadowMap);
     glProgramUniformMatrix4fv(
         gpuShader.shaderProgram,
         gpuShader.modelLocation,

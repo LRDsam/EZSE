@@ -1,17 +1,19 @@
 #version 460 core
 
-in  vec3 normal;
-in  vec3 worldPosition;
-in  vec2 uv;
+in vec3 normal;
+in vec3 worldPosition;
+in vec2 uv;
+in vec4 lightSpacePosition;
 
 layout(std140, binding = 0) uniform Camera {
     mat4 u_viewProjection;
     vec3 u_cameraPosition;
 };
 layout(std140, binding = 1) uniform Light {
-    vec3 u_lightDirection;   // offset 0, 12 bytes, then 4 bytes padding
-    vec3 u_lightColor;       // offset 16
-    vec3 u_ambientColor;     // offset 32
+    vec3 u_lightDirection;      // offset 0, 12 bytes, then 4 bytes padding
+    vec3 u_lightColor;          // offset 16, 12 bytes, then 4 bytes padding
+    vec3 u_ambientColor;        // offset 32, 12 bytes, then 4 bytes padding
+    mat4 u_lightViewProjection; // offset 48, 64 bytes
 };
 
 struct PointLight {
@@ -38,6 +40,7 @@ layout(std140, binding = 3) uniform SpotLights {
 };
 
 layout(binding = 0) uniform sampler2D u_texture;
+layout(binding = 1) uniform sampler2D u_shadowMap;
 
 uniform vec3 u_tint;
 uniform float u_shininess;
@@ -59,12 +62,29 @@ float Attenuation(float d, float range) {
     return window * window / (d * d + 1.0);
 }
 
+// 1 when the sun reaches this point, 0 when something closer to the sun is in the way.
+float SunVisibility(vec4 lightSpacePosition) {
+    vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
+    // From -1..1 to 0..1: xy is the uv in the shadow map, z the depth as stored there.
+    projected = projected * 0.5 + 0.5;
+    // Beyond the far side of the shadow cube: nothing there was drawn, so no shadow.
+    if (projected.z > 1.0) {
+        return 1.0;
+    }
+    float closest = texture(u_shadowMap, projected.xy).r;
+    if (projected.z > closest) {
+        return 0.0;
+    }
+    return 1.0;
+}
+
 void main() {
     vec3 worldNormal = normalize(normal);
     vec3 toLight = -u_lightDirection;
     vec3 toCamera = normalize(u_cameraPosition - worldPosition);
     vec3 surfaceColor = texture(u_texture, uv).rgb * u_tint;
-    vec3 sunShade = Shade(toLight, u_lightColor, worldNormal, toCamera, surfaceColor);
+    float sunVisibility = SunVisibility(lightSpacePosition);
+    vec3 sunShade = Shade(toLight, u_lightColor, worldNormal, toCamera, surfaceColor) * sunVisibility;
     vec3 color = surfaceColor * u_ambientColor + sunShade;
     for (int i = 0; i < u_pointLightCount; ++i) {
         PointLight light = u_pointLights[i];
