@@ -96,7 +96,7 @@ Aparte statische libraries met afhankelijkheden in één richting. De build dwin
 | `ECS` | `World` (de ingang: `CreateEntity`, `DestroyEntity`, `IsAlive`, `RegisterComponent`, `AddComponent`, `RemoveComponent`, `GetComponent`, `HasComponent`, `AddSystem`, `Update`); `Entity` en `EntityManager` (`CreateEntity`, `DestroyEntity`, `IsAlive`, `GetCreatedCount`); `ComponentArray<T>` (`Add`, `Remove`, `Get`, `Has`) met basisklasse `IComponentArray`; `ComponentType<T>()`; `ComponentManager` (`Register`, `Add`, `Remove`, `Get`, `Has`, `EntityDestroyed`, `GetSignature`); `Signature` en `c_maxComponentTypes`; `EntitySet` (`Insert`, `Remove`, `Contains`, `GetEntities`); `MakeSignature<Ts...>()`; basisklasse `System` met pure virtual `Update` en `SystemManager` (`Add`, `EntitySignatureChanged`, `EntityDestroyed`, `Update`); testprogramma `ECSTests` in `ECS/tests/` | Core (PUBLIC, want `ComponentArray.h` gebruikt `EZSE_ASSERT`) |
 | `Engine` | `Engine` (`Create`, `Run`, `Quit`, `GetWorld`, `GetWindow`, `GetRenderer`, `GetResources`, `GetDebugUI`): bezit venster, Renderer, `ResourceManager`, `DebugUI` en `World`, draait de game loop en het frame van de debug-UI (Dear ImGui); ingebouwde components in `Components/` (door de `Engine` zelf geregistreerd): `Transform` met `ModelMatrix` en `ViewMatrix`, `MeshRenderer`, `Camera`, `Light` met `LightType`; systems in `Systems/`: `CameraSystem`, `LightSystem` en `RenderSystem`; in `Debug/`: `DebugUI` (`AddPanel`, `SetVisible`, `IsVisible`, `Draw`), de hulpfunctions `DragVec3` en `ColorEditVec3`, en de editors `EditTransform` en `EditLight` (`ComponentEditors.h`); in `Resources/`: `Image` met `DecodeImage` en `ReadImageFile`, `MeshData` met `ParseObj` en `ReadObjFile`, `ResourceManager` (`LoadMesh`, `UnloadMesh`, `LoadTexture`, `UnloadTexture`, `LoadShader`, `UnloadShader`) met de boekhouding in `ResourceCache<Handle>` (`Acquire`, `Add`, `Release`, `GetKey`, `GetHandles`); testprogramma `EngineTests` in `Engine/tests/` | Platform, Renderer, ECS en Core (PUBLIC, want `ResourceCache.h` gebruikt `EZSE_ASSERT`), imgui (PUBLIC, zodat het spel `ImGui::` kan aanroepen), stb (PRIVATE) |
 | `Platform` | `GetExecutableDirectory` (Windows); `Window` (GLFW, verborgen achter eigen interface) met `IsKeyDown`, `GetMouseDelta` en `SetCursorCaptured`, `WindowEvent` (`FramebufferResized`, `KeyPressed`, `KeyReleased`) en `Key`; de GLFW-backend van de debug-UI | Core, GLFW, imgui_glfw (PRIVATE) |
-| `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen; de OpenGL-backend van de debug-UI | Math (PUBLIC), Core, glad, imgui_opengl3 (PRIVATE) |
+| `Renderer` | OpenGL laden, meshes, shaders, textures, `Material`, tekenen, de shadow map van de zon met een diepte-pass; de OpenGL-backend van de debug-UI | Math (PUBLIC), Core, glad, imgui_opengl3 (PRIVATE) |
 | `Sandbox` | testprogramma: het "spel" dat de engine gebruikt | Engine |
 | `ThirdParty` | GLFW via FetchContent; gegenereerde glad-bestanden in `glad/`; `stb_image.h` in `stb/` (INTERFACE-target `stb`); Dear ImGui v1.93.0 via FetchContent (targets `imgui`, `imgui_glfw`, `imgui_opengl3`) | |
 
@@ -386,6 +386,15 @@ Regels die de Renderer herbruikbaar houden:
 | 252 | `LookAt` | `Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up)` in `Math/Transform.h`/`.cpp`, zoals glm: geeft direct de view-matrix (het omgekeerde van de plaatsing van de camera). `f = Normalize(target - eye)`, `r = Normalize(Cross(f, up))`, `u = Cross(r, f)` (de gebruiker normaliseert `u` ook, onschuldig); `r`, `u` en `-f` zijn de rijen, de verschuiving is `(-Dot(r, eye), -Dot(u, eye), Dot(f, eye))`. `up` hoeft niet loodrecht op de kijkrichting te staan of lengte 1 te hebben. Een `up` evenwijdig aan de kijkrichting wordt niet afgevangen (geen assert: `Math` hangt niet van `Core` af); het commentaar in de header zegt het. De camera van Sandbox blijft `ViewMatrix(transform)` gebruiken |
 | 253 | `Orthographic` | `Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane)`, zoals `glOrtho`: het blok wordt de kubus van -1 tot 1, de camera kijkt langs -Z en de diepte loopt van -1 (dichtbij) tot 1, zoals `Perspective` (besluit 46). Per as een schaal (`m[0][0]`, `m[1][1]`, `m[2][2]`, die van z negatief) en een verschuiving (`m[3]`); `w` blijft 1. Op verzoek van de gebruiker door Claude uitgeschreven |
 | 254 | Controle van stap 30 | op wat een matrix met punten doet, niet op zijn elementen (zoals bij `Perspective`): `LookAt` zet `eye` in de oorsprong en `target` op de negatieve Z-as; `Orthographic` zet de hoeken van een blok dat niet om de camera gecentreerd is op ±1 en het midden op 0 |
+| 255 | Opdeling van stap 31 | 31a een framebuffer met een dieptetexture; 31b de diepte-pass, in drie opdrachten (31b-1 de matrix van de zon, 31b-2 de pass met shader en functions, 31b-3 het paneel "Shadow map"); 31c de schaduw in `lit` met een harde vergelijking, zonder bias, zodat de acne eerst te zien is (zoals besluit 56); 31d in twee opdrachten (31d-1 bias en face culling, 31d-2 zachte randen) |
+| 256 | Shadow map (31a) | privé members `m_shadowMap` en `m_shadowFramebuffer` in de Renderer, geen handle (een ander formaat en gebruik dan een gewone texture; het spel krijgt hem nooit). Vast `c_shadowMapSize = 2048`; `GL_DEPTH_COMPONENT32F` met één niveau; `GL_NEAREST`; `GL_CLAMP_TO_BORDER` met randkleur 1 (buiten het blok geen schaduw); `glNamedFramebufferDrawBuffer` en `ReadBuffer` op `GL_NONE`. Is de framebuffer niet compleet, dan `LogError` met de status (`{:#x}`) en geeft `Create` een lege `unique_ptr`. Swizzle `G` en `B` op `GL_RED`, zodat het plaatje grijs is (31b) |
+| 257 | API van de pass | expliciet: `BeginShadowPass()` (framebuffer binden, viewport 2048, diepte leeg met `glClearNamedFramebufferfv`, shader kiezen), `DrawShadowCaster(MeshHandle, const Mat4& model)` en `EndShadowPass()` (framebuffer 0 en de viewport terug via `SetViewport`, dat daarvoor `m_viewportWidth`/`m_viewportHeight` bewaart). Het `RenderSystem` doet de pass met een eigen loop vóór `Clear`. Geen render queue (de Renderer verzamelt draws en doet zelf de passes): die komt bij de eerste van twee aanleidingen, doorzichtige voorwerpen (sorteren) of een tweede licht met schaduw (meer passes over dezelfde lijst) |
+| 258 | Matrix van de zon (31b-1) | de Renderer bewaart hem, omdat ook `lit` hem nodig heeft: `void SetDirectionalShadow(const Mat4& lightViewProjection)`, achteraan in het blok `Light` (offset 48, `LightData` 112 bytes, met `static_assert`s). Het `LightSystem` krijgt `LightSystem(Renderer&, float shadowExtent)` en rekent elk frame `DirectionalShadowMatrix(direction, extent)` uit (naamloze namespace): een kubus met halve breedte `extent` rond de oorsprong, oog op `-direction * extent`, `LookAt` naar de oorsprong met `up` = Y, of Z als `std::abs(direction.y) > 0.99` (beperking van besluit 252), en `Orthographic(-e, e, -e, e, 0, 2e)`. Ook zonder zon (standaardrichting recht omlaag). Sandbox geeft 10 |
+| 259 | Shader van de pass | als raw string literals (`R"(...)"`) in `Renderer.cpp` (`c_shadowVertexSource`, `c_shadowFragmentSource`), gemaakt met de eigen `CreateShader` in `Create` (`m_shadowMapShader`); mislukt dat, dan `LogError` en een lege `unique_ptr`. Vertex: alleen de positie, `u_lightViewProjection * u_model`, met het hele blok `Light` (de `vec3`'s ervóór bepalen de offset). Fragment: een lege `main`. Moet later naar een bestand: zodra de engine eigen standaard-assets meelevert (standaardshader, standaardtextures in een eigen assetmap), verhuist deze shader daarheen (wens van de gebruiker) |
+| 260 | Paneel "Shadow map" (31b-3) | `Renderer::DrawShadowMapDebugUI()` tekent de shadow map met `ImGui::Image` (256 bij 256, `uv0 = (0, 1)` en `uv1 = (1, 0)` omdat ImGui bovenaan begint) in het open ImGui-venster; het OpenGL-nummer verlaat de Renderer niet. De `Engine` voegt het paneel zelf toe, zoals "Stats", met capture `[&renderer = *m_renderer]`. Blijft als gereedschap |
+| 261 | Schaduw in `lit` (31c) | de shadow map op texture unit 1 (`c_shadowMapUnit`, in de shader `layout(binding = 1) uniform sampler2D u_shadowMap`), gebonden in `DrawMesh` bij elke draw (geen verborgen toestand, besluit 167). `lit.vert` rekent `lightSpacePosition` uit (het blok `Light` met de matrix staat nu ook daar). `lit.frag` heeft `float SunVisibility(vec4)`: delen door `w` (nodig bij een latere spot met `Perspective`), `* 0.5 + 0.5`, `z > 1` geeft 1 (voorbij het blok), anders de vergelijking met `.r`. Alleen `sunShade` wordt ermee vermenigvuldigd; ambient, lampen en spots niet. Zonder bias: acne te zien (door de gebruiker gezien) |
+| 262 | Acne en face culling (31d-1) | bias met polygon offset tijdens de diepte-pass: `glEnable(GL_POLYGON_OFFSET_FILL)` en `glPolygonOffset(factor, units)` in `BeginShadowPass`, uit in `EndShadowPass`, met twee constanten in `Renderer.cpp` (begin met 2 en 2). Schaalt vanzelf met de helling; `lit` merkt er niets van. Blijft er acne of laten schaduwen los ("peter panning"), dan komt normal offset erbij (het punt in `lit.vert` langs de normaal verschuiven). Face culling uit tijdens de pass (`glDisable(GL_CULL_FACE)` in `Begin`, weer aan in `End`), zodat de muren en andere open vormen schaduw werpen. Geen vaste bias of bias per hoek in de shader, en geen truc met voorkanten wegsnijden (werkt alleen bij gesloten vormen) |
+| 263 | Zachte randen (31d-2) | PCF met de vergelijking door de hardware plus een 3×3-loop: `sampler2DShadow` (een `texture(u_shadowMap, vec3(uv, z))` vergelijkt 4 texels en middelt ze), negen keer met `textureOffset`, gemiddeld. De instellingen voor het vergelijken (`GL_TEXTURE_COMPARE_MODE` op `GL_COMPARE_REF_TO_TEXTURE`, `GL_LINEAR`, clamp to border 1) staan in een sampler object `m_shadowSampler`, gebonden met `glBindSampler(c_shadowMapUnit, ...)` in `DrawMesh`; de texture zelf houdt gewone instellingen, zodat het paneel "Shadow map" blijft werken. Dit is de aanleiding voor sampler objects uit besluit 165 |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -512,7 +521,16 @@ gebruiker gezien). Daarmee is stap 29 af. Stap 30: `Vec3` heeft `a - b`, `Dot` e
 `Math` heeft `LookAt` (een view-matrix naar een punt) en `Orthographic` (een projectie zonder
 perspectief), allebei voor de schaduwen van de zon; Sandbox gebruikt ze nog niet (besluiten 250
 tot en met 254). `MathTests` heeft nu 90 controles (allemaal `[PASS]`, in Debug en Release).
-Daarmee is stap 30 af.
+Daarmee is stap 30 af. Stap 31 (schaduwen van de zon) is begonnen. Deel 31a: de Renderer heeft een
+shadow map (dieptetexture van 2048 bij 2048 met een framebuffer). Deel 31b: het `LightSystem`
+rekent elk frame de matrix van de zon uit (`SetDirectionalShadow`, een kubus van 20 meter rond de
+oorsprong), het `RenderSystem` tekent alles eerst vanuit de zon in de shadow map
+(`BeginShadowPass`, `DrawShadowCaster`, `EndShadowPass`, met een eigen shader in `Renderer.cpp`), en
+het paneel "Shadow map" in de debug-UI toont hem (door de gebruiker gezien). Deel 31c: `lit`
+vergelijkt met de shadow map, zodat de zon niet schijnt waar iets tussen de pixel en de zon zit:
+schaduwen van de kubussen en Suzanne op de vloer, met acne en harde randen, en de muren werpen
+nog geen schaduw (door de gebruiker gezien). 31a en 31b staan in commit `c0e7711`, 31c in
+`fee4f04`, beide als "work in progress" (besluiten 255 tot en met 263).
 
 Publieke interface van `Renderer`:
 
@@ -527,11 +545,16 @@ void         DestroyShader(ShaderHandle shader);
 void         DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model);
 void         SetCamera(const Mat4& view, const Mat4& projection, const Vec3& position);
 void         SetDirectionalLight(const Vec3& direction, const Vec3& color);
+void         SetDirectionalShadow(const Mat4& lightViewProjection);
 void         SetAmbientLight(const Vec3& color);
 void         SetPointLights(std::span<const PointLight> lights);
 void         SetSpotLights(std::span<const SpotLight> lights);
 void         SetViewport(int width, int height);
 void         Clear(float red, float green, float blue);
+void         BeginShadowPass();
+void         DrawShadowCaster(MeshHandle mesh, const Mat4& model);
+void         EndShadowPass();
+void         DrawShadowMapDebugUI();
 ```
 
 Publieke interface van `Window`, voor zover nieuw in stap 16, 17 en 18n:
@@ -571,7 +594,11 @@ Bekende beperkingen, bewust zo gelaten:
 - Een punt- of spotlicht met `range` 0 deelt in de shader door 0.
 - Een spot met `innerAngle` niet kleiner dan `outerAngle` is een assert (besluit 238); in Release
   is het resultaat dan ongedefinieerd.
-- Er zijn geen schaduwen: licht van zon en lampen gaat door voorwerpen heen.
+- Alleen de zon werpt schaduw, en alleen binnen een vaste kubus rond de oorsprong (`shadowExtent`
+  van het `LightSystem`); daarbuiten geen schaduw. Licht van lampen en spots gaat door voorwerpen
+  heen. Tot 31d af is: acne, harde randen, en de muren werpen geen schaduw (face culling).
+- Texture unit 1 (`c_shadowMapUnit`) en `binding = 1` van `u_shadowMap`, en de matrix achteraan in
+  het blok `Light`, zijn een afspraak tussen Renderer en shader die nergens wordt afgedwongen.
 - Het `LightSystem` maakt elk frame een nieuwe `std::vector` voor de punt- en spotlichten (een allocatie
   op de heap zodra er een lamp is).
 - Elke entity heeft een eigen kopie van zijn `Material` (besluit 174): een materiaal veranderen
@@ -659,14 +686,26 @@ Bekende beperkingen, bewust zo gelaten:
 - `glGenerateTextureMipmap` middelt sRGB-textures volgens de specificatie "bij voorkeur" in
   lineaire ruimte; het is geen garantie.
 
-## Volgende stap: stap 31, schaduwen van de zon
+## Volgende stap: stap 31d, acne, muren en zachte randen
 
-Stap 30 (`LookAt` en `Orthographic`) is af en gecommit. Volgens de route van besluit 245 komt nu
-stap 31: schaduwen van de zon met een shadow map (een dieptebeeld vanuit de zon, gemaakt met
-`LookAt` en `Orthographic`, en in `lit.frag` vergelijken). Dit vraagt nieuwe dingen in de
-Renderer (een framebuffer met een dieptetexture, een tweede pass, een eigen shader). Claude legt
-eerst de keuzes (opdeling, waar het blok van de zon vandaan komt, API van de Renderer) met een
-advies voor.
+Stap 31a tot en met 31c zijn af, gecommit en gepusht (`c0e7711`, `fee4f04`). De keuzes voor 31d
+zijn gemaakt (besluiten 262 en 263); de gebruiker schrijft de code, Claude geeft per opdracht de
+functions met uitleg en loopt na.
+
+- **31d-1:** in `Renderer.cpp` twee constanten voor polygon offset (factor en units, beide 2);
+  `BeginShadowPass` zet `GL_POLYGON_OFFSET_FILL` aan met `glPolygonOffset` en zet face culling
+  uit, `EndShadowPass` draait beide terug. Controle: de acne is weg en de muren werpen schaduw in
+  de kamer. Blijft er acne of laten schaduwen los, dan de waarden bijstellen of normal offset
+  bespreken.
+- **31d-2:** een sampler object `m_shadowSampler` (`glCreateSamplers`, `glSamplerParameteri` met
+  compare mode, `GL_LEQUAL`, `GL_LINEAR` en clamp to border 1; opruimen met `glDeleteSamplers`),
+  gebonden met `glBindSampler(c_shadowMapUnit, ...)` in `DrawMesh`. In `lit.frag` wordt
+  `u_shadowMap` een `sampler2DShadow` en `SunVisibility` middelt 3×3 keer
+  `textureOffset(u_shadowMap, vec3(uv, z), ivec2(x, y))`. Controle: zachte randen, en het paneel
+  "Shadow map" toont nog steeds een grijs plaatje.
+
+Aan het eind van stap 31: de Huidige stand afronden, de beperkingen bijwerken (acne, harde randen
+en muren weg), één commit zonder "work in progress", en de volgende stap kiezen.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -725,7 +764,10 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
 
-Op de lijst, zonder vaste volgorde: het vrije vertex-formaat (besluit 153), schaduwen, de normal matrix in C++
+Op de lijst, zonder vaste volgorde: het vrije vertex-formaat (besluit 153), standaard-assets van de
+engine in een eigen assetmap (standaardshader, standaardtextures), waarna de shader van de
+schaduw-pass naar een bestand verhuist (besluit 259), een render queue (besluit 257), schaduwen
+van spots en lampen, een blok van de zon dat de camera volgt (cascades), de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
 als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174), een inspector voor
 entities en components in de debug-UI (besluit 217, de opstap naar een editor),
