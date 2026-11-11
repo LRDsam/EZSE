@@ -40,7 +40,8 @@ layout(std140, binding = 3) uniform SpotLights {
 };
 
 layout(binding = 0) uniform sampler2D u_texture;
-layout(binding = 1) uniform sampler2D u_shadowMap;
+// Compares depths when read (see the shadow sampler in the Renderer): returns 0 to 1.
+layout(binding = 1) uniform sampler2DShadow u_shadowMap;
 
 uniform vec3 u_tint;
 uniform float u_shininess;
@@ -62,7 +63,8 @@ float Attenuation(float d, float range) {
     return window * window / (d * d + 1.0);
 }
 
-// 1 when the sun reaches this point, 0 when something closer to the sun is in the way.
+// 1 when the sun reaches this point, 0 when something closer to the sun is in the way, and in
+// between at the edge of a shadow.
 float SunVisibility(vec4 lightSpacePosition) {
     vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
     // From -1..1 to 0..1: xy is the uv in the shadow map, z the depth as stored there.
@@ -71,11 +73,17 @@ float SunVisibility(vec4 lightSpacePosition) {
     if (projected.z > 1.0) {
         return 1.0;
     }
-    float closest = texture(u_shadowMap, projected.xy).r;
-    if (projected.z > closest) {
-        return 0.0;
+    // Percentage-closer filtering: compare 3x3 points one texel apart and average the results.
+    // Each read already compares and averages 4 texels, which makes the edge soft.
+    vec2 texelSize = 1.0 / vec2(textureSize(u_shadowMap, 0));
+    float visibility = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            vec2 offset = vec2(x, y) * texelSize;
+            visibility += texture(u_shadowMap, vec3(projected.xy + offset, projected.z));
+        }
     }
-    return 1.0;
+    return visibility / 9.0;
 }
 
 void main() {

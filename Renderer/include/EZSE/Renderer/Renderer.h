@@ -72,7 +72,8 @@ public:
 
     // The shadow pass of the directional light, drawn before the normal image each frame:
     // BeginShadowPass, then DrawShadowCaster for every mesh that casts a shadow, then EndShadowPass.
-    // The light comes from SetDirectionalShadow. EndShadowPass draws to the window again.
+    // The light comes from SetDirectionalShadow. During the pass face culling is off and the depth
+    // is offset against shadow acne; EndShadowPass sets both back and draws to the window again.
     void BeginShadowPass();
     void DrawShadowCaster(MeshHandle mesh, const Mat4& model);
     void EndShadowPass();
@@ -120,6 +121,9 @@ private:
     // Shadow map of the sun: a depth texture and the framebuffer that draws into it
     unsigned int m_shadowFramebuffer = 0;
     unsigned int m_shadowMap = 0;
+    // How lit reads the shadow map: compares depths (with linear filtering, so 4 texels at once).
+    // The texture itself keeps plain settings, so the debug panel can show it as an image.
+    unsigned int m_shadowSampler = 0;
 
     // Uniform buffers
     unsigned int m_cameraBuffer = 0;

@@ -394,7 +394,7 @@ Regels die de Renderer herbruikbaar houden:
 | 260 | Paneel "Shadow map" (31b-3) | `Renderer::DrawShadowMapDebugUI()` tekent de shadow map met `ImGui::Image` (256 bij 256, `uv0 = (0, 1)` en `uv1 = (1, 0)` omdat ImGui bovenaan begint) in het open ImGui-venster; het OpenGL-nummer verlaat de Renderer niet. De `Engine` voegt het paneel zelf toe, zoals "Stats", met capture `[&renderer = *m_renderer]`. Blijft als gereedschap |
 | 261 | Schaduw in `lit` (31c) | de shadow map op texture unit 1 (`c_shadowMapUnit`, in de shader `layout(binding = 1) uniform sampler2D u_shadowMap`), gebonden in `DrawMesh` bij elke draw (geen verborgen toestand, besluit 167). `lit.vert` rekent `lightSpacePosition` uit (het blok `Light` met de matrix staat nu ook daar). `lit.frag` heeft `float SunVisibility(vec4)`: delen door `w` (nodig bij een latere spot met `Perspective`), `* 0.5 + 0.5`, `z > 1` geeft 1 (voorbij het blok), anders de vergelijking met `.r`. Alleen `sunShade` wordt ermee vermenigvuldigd; ambient, lampen en spots niet. Zonder bias: acne te zien (door de gebruiker gezien) |
 | 262 | Acne en face culling (31d-1) | bias met polygon offset tijdens de diepte-pass: `glEnable(GL_POLYGON_OFFSET_FILL)` en `glPolygonOffset(factor, units)` in `BeginShadowPass`, uit in `EndShadowPass`, met twee constanten in `Renderer.cpp` (begin met 2 en 2). Schaalt vanzelf met de helling; `lit` merkt er niets van. Blijft er acne of laten schaduwen los ("peter panning"), dan komt normal offset erbij (het punt in `lit.vert` langs de normaal verschuiven). Face culling uit tijdens de pass (`glDisable(GL_CULL_FACE)` in `Begin`, weer aan in `End`), zodat de muren en andere open vormen schaduw werpen. Geen vaste bias of bias per hoek in de shader, en geen truc met voorkanten wegsnijden (werkt alleen bij gesloten vormen) |
-| 263 | Zachte randen (31d-2) | PCF met de vergelijking door de hardware plus een 3×3-loop: `sampler2DShadow` (een `texture(u_shadowMap, vec3(uv, z))` vergelijkt 4 texels en middelt ze), negen keer met `textureOffset`, gemiddeld. De instellingen voor het vergelijken (`GL_TEXTURE_COMPARE_MODE` op `GL_COMPARE_REF_TO_TEXTURE`, `GL_LINEAR`, clamp to border 1) staan in een sampler object `m_shadowSampler`, gebonden met `glBindSampler(c_shadowMapUnit, ...)` in `DrawMesh`; de texture zelf houdt gewone instellingen, zodat het paneel "Shadow map" blijft werken. Dit is de aanleiding voor sampler objects uit besluit 165 |
+| 263 | Zachte randen (31d-2) | PCF met de vergelijking door de hardware plus een 3×3-loop: `sampler2DShadow` (een `texture(u_shadowMap, vec3(uv, z))` vergelijkt 4 texels en middelt ze), negen punten één texel uit elkaar (de grootte van een texel uit `textureSize`), gemiddeld. Niet `textureOffset`, zoals eerst gekozen: de offset daarvan moet volgens de specificatie een constante zijn, en een loopvariabele is dat niet (NVIDIA accepteert het, AMD en Intel misschien niet). De instellingen voor het vergelijken (`GL_TEXTURE_COMPARE_MODE` op `GL_COMPARE_REF_TO_TEXTURE`, `GL_LINEAR`, clamp to border 1) staan in een sampler object `m_shadowSampler`, gebonden met `glBindSampler(c_shadowMapUnit, ...)` in `DrawMesh`; de texture zelf houdt gewone instellingen, zodat het paneel "Shadow map" blijft werken. Dit is de aanleiding voor sampler objects uit besluit 165 |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -530,7 +530,12 @@ het paneel "Shadow map" in de debug-UI toont hem (door de gebruiker gezien). Dee
 vergelijkt met de shadow map, zodat de zon niet schijnt waar iets tussen de pixel en de zon zit:
 schaduwen van de kubussen en Suzanne op de vloer, met acne en harde randen, en de muren werpen
 nog geen schaduw (door de gebruiker gezien). 31a en 31b staan in commit `c0e7711`, 31c in
-`fee4f04`, beide als "work in progress" (besluiten 255 tot en met 263).
+`fee4f04`, beide als "work in progress" (besluiten 255 tot en met 263). Deel 31d: polygon offset
+(factor en units 2) en face culling uit tijdens de diepte-pass, zodat de acne weg is en de muren
+schaduw werpen; daarna een sampler object met hardware-vergelijken en 3×3 PCF in `lit.frag`,
+zodat de randen zacht zijn. Het paneel "Shadow map" werkt nog (door de gebruiker gezien). De
+gebruiker is nog niet helemaal tevreden over de schaduwen, maar laat het voor nu zo. Daarmee is
+stap 31 af.
 
 Publieke interface van `Renderer`:
 
@@ -596,7 +601,13 @@ Bekende beperkingen, bewust zo gelaten:
   is het resultaat dan ongedefinieerd.
 - Alleen de zon werpt schaduw, en alleen binnen een vaste kubus rond de oorsprong (`shadowExtent`
   van het `LightSystem`); daarbuiten geen schaduw. Licht van lampen en spots gaat door voorwerpen
-  heen. Tot 31d af is: acne, harde randen, en de muren werpen geen schaduw (face culling).
+  heen.
+- Schaduwen laten een klein beetje los van het voorwerp (peter panning, door de polygon offset),
+  en bij een lage zon zijn de texels van de shadow map op de vloer groot, zodat de rand ondanks
+  PCF wat grof is. Bijstellen kan met `c_shadowOffsetFactor`/`Units`, een kleinere
+  `shadowExtent`, normal offset of een grotere PCF.
+- De diepte-pass tekent elk voorwerp met een `MeshRenderer`; een voorwerp zonder schaduw kan
+  niet.
 - Texture unit 1 (`c_shadowMapUnit`) en `binding = 1` van `u_shadowMap`, en de matrix achteraan in
   het blok `Light`, zijn een afspraak tussen Renderer en shader die nergens wordt afgedwongen.
 - Het `LightSystem` maakt elk frame een nieuwe `std::vector` voor de punt- en spotlichten (een allocatie
@@ -686,26 +697,14 @@ Bekende beperkingen, bewust zo gelaten:
 - `glGenerateTextureMipmap` middelt sRGB-textures volgens de specificatie "bij voorkeur" in
   lineaire ruimte; het is geen garantie.
 
-## Volgende stap: stap 31d, acne, muren en zachte randen
+## Volgende stap: kiezen
 
-Stap 31a tot en met 31c zijn af, gecommit en gepusht (`c0e7711`, `fee4f04`). De keuzes voor 31d
-zijn gemaakt (besluiten 262 en 263); de gebruiker schrijft de code, Claude geeft per opdracht de
-functions met uitleg en loopt na.
-
-- **31d-1:** in `Renderer.cpp` twee constanten voor polygon offset (factor en units, beide 2);
-  `BeginShadowPass` zet `GL_POLYGON_OFFSET_FILL` aan met `glPolygonOffset` en zet face culling
-  uit, `EndShadowPass` draait beide terug. Controle: de acne is weg en de muren werpen schaduw in
-  de kamer. Blijft er acne of laten schaduwen los, dan de waarden bijstellen of normal offset
-  bespreken.
-- **31d-2:** een sampler object `m_shadowSampler` (`glCreateSamplers`, `glSamplerParameteri` met
-  compare mode, `GL_LEQUAL`, `GL_LINEAR` en clamp to border 1; opruimen met `glDeleteSamplers`),
-  gebonden met `glBindSampler(c_shadowMapUnit, ...)` in `DrawMesh`. In `lit.frag` wordt
-  `u_shadowMap` een `sampler2DShadow` en `SunVisibility` middelt 3×3 keer
-  `textureOffset(u_shadowMap, vec3(uv, z), ivec2(x, y))`. Controle: zachte randen, en het paneel
-  "Shadow map" toont nog steeds een grijs plaatje.
-
-Aan het eind van stap 31: de Huidige stand afronden, de beperkingen bijwerken (acne, harde randen
-en muren weg), één commit zonder "work in progress", en de volgende stap kiezen.
+Stap 31 (schaduwen van de zon) is af. De route van besluit 245 (29 gamma-correctie, 30 `LookAt` en
+`Orthographic`, 31 schaduwen) is daarmee klaar. Claude legt een paar kandidaten uit Daarna voor
+met een advies; de gebruiker kiest. Voor de hand liggend: de schaduwen verbeteren (de gebruiker is
+nog niet helemaal tevreden: normal offset, een kleinere of meelopende kubus, een grotere PCF),
+standaard-assets van de engine (waarna de shader van de pass naar een bestand gaat, besluit 259),
+of iets buiten rendering (muisknoppen, de inspector).
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
@@ -767,7 +766,8 @@ vast; een `Mat4` van ons past daar precies op een `mat4`.
 Op de lijst, zonder vaste volgorde: het vrije vertex-formaat (besluit 153), standaard-assets van de
 engine in een eigen assetmap (standaardshader, standaardtextures), waarna de shader van de
 schaduw-pass naar een bestand verhuist (besluit 259), een render queue (besluit 257), schaduwen
-van spots en lampen, een blok van de zon dat de camera volgt (cascades), de normal matrix in C++
+van spots en lampen, een blok van de zon dat de camera volgt (cascades), betere schaduwen (normal offset, een
+grotere of zachtere PCF), een schakelaar per voorwerp voor schaduw werpen, de normal matrix in C++
 (vraagt `Inverse`), muisknoppen en scrollen
 als `WindowEvent`, glTF (besluit 182), een `MaterialHandle` in de manager (besluit 174), een inspector voor
 entities en components in de debug-UI (besluit 217, de opstap naar een editor),

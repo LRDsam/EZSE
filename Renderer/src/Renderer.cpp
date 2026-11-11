@@ -25,6 +25,10 @@ constexpr GLuint c_maxSpotLights = 16;
 constexpr GLuint c_textureUnit = 0;
 constexpr GLuint c_shadowMapUnit = 1;
 constexpr GLsizei c_shadowMapSize = 2048;
+// Depth offset in the shadow pass against shadow acne: factor grows with the slope of a triangle
+// as seen from the light, units is a fixed number of the smallest depth steps.
+constexpr float c_shadowOffsetFactor = 2.0f;
+constexpr float c_shadowOffsetUnits = 2.0f;
 constexpr std::string_view c_shadowVertexSource = R"(
 #version 460 core
 
@@ -214,6 +218,18 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
         return nullptr;
     }
 
+    // Sampler for reading the shadow map in lit: the GPU compares the given depth with the stored
+    // depth of the 4 nearest texels and averages the results (0 is shadow, 1 is light).
+    glCreateSamplers(1, &renderer->m_shadowSampler);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    // A sampler replaces all settings of the texture, so it needs its own border.
+    glSamplerParameterfv(renderer->m_shadowSampler, GL_TEXTURE_BORDER_COLOR, borderColor);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glSamplerParameteri(renderer->m_shadowSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+
     // The shader of the shadow pass: only positions, writes depth
     renderer->m_shadowMapShader = renderer->CreateShader(c_shadowVertexSource, c_shadowFragmentSource);
     if (renderer->m_shadowMapShader.id == 0) {
@@ -300,6 +316,7 @@ void Renderer::DrawMesh(MeshHandle mesh, const Material& material, const Mat4& m
     const TextureHandle drawTexture = material.texture.id == 0 ? m_whiteTexture : material.texture;
     glBindTextureUnit(c_textureUnit, GetGPUTexture(drawTexture).textureObj);
     glBindTextureUnit(c_shadowMapUnit, m_shadowMap);
+    glBindSampler(c_shadowMapUnit, m_shadowSampler);
     glProgramUniformMatrix4fv(
         gpuShader.shaderProgram,
         gpuShader.modelLocation,
@@ -518,6 +535,11 @@ void Renderer::BeginShadowPass() {
     glClearNamedFramebufferfv(m_shadowFramebuffer, GL_DEPTH, 0, &depth);
 
     glUseProgram(GetGPUShader(m_shadowMapShader).shaderProgram);
+    // Both sides of every triangle cast a shadow, so open meshes like the walls of the room do too.
+    glDisable(GL_CULL_FACE);
+    // Push the stored depth slightly away from the light, so a surface does not shadow itself.
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(c_shadowOffsetFactor, c_shadowOffsetUnits);
 }
 
 void Renderer::DrawShadowCaster(MeshHandle mesh, const Mat4& model) {
@@ -538,6 +560,9 @@ void Renderer::DrawShadowCaster(MeshHandle mesh, const Mat4& model) {
 void Renderer::EndShadowPass() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     SetViewport(m_viewportWidth, m_viewportHeight);
+    // Back to the settings of the normal pass.
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glEnable(GL_CULL_FACE);
 }
 
 void Renderer::InitDebugUI() {
@@ -586,7 +611,7 @@ Renderer::~Renderer() {
     glDeleteBuffers(1, &m_spotLightBuffer);
     glDeleteFramebuffers(1, &m_shadowFramebuffer);
     glDeleteTextures(1, &m_shadowMap);
-
+    glDeleteSamplers(1, &m_shadowSampler);
 }
 
 } // namespace ezse
