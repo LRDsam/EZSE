@@ -66,6 +66,8 @@ cmake --build build
 in `Math`, `ECS` of `Engine`. `EngineTests` test alleen wat zonder venster kan.
 
 Release: `cmake --build build --config Release`. De map `build/` staat niet in git.
+Sandbox en de tests worden alleen gebouwd als EZSE zelf het hoofdproject is (`EZSE_BUILD_SANDBOX`
+en `EZSE_BUILD_TESTS`, besluit 264); in een game staan ze uit.
 In Visual Studio: open `build/EZSE.sln`. Bij een nieuw gegenereerde `build/` is Sandbox al
 het startproject (`VS_STARTUP_PROJECT`). In een map die al een `.vs/` heeft stel je dat
 eenmalig met de hand in (rechtsklik op Sandbox, *Set as Startup Project*); anders geeft F5
@@ -701,11 +703,19 @@ Bekende beperkingen, bewust zo gelaten:
 ## Volgende stap: kiezen
 
 Stap 31 (schaduwen van de zon) is af. De route van besluit 245 (29 gamma-correctie, 30 `LookAt` en
-`Orthographic`, 31 schaduwen) is daarmee klaar. Claude legt een paar kandidaten uit Daarna voor
-met een advies; de gebruiker kiest. Voor de hand liggend: de schaduwen verbeteren (de gebruiker is
-nog niet helemaal tevreden: normal offset, een kleinere of meelopende kubus, een grotere PCF),
-standaard-assets van de engine (waarna de shader van de pass naar een bestand gaat, besluit 259),
-of iets buiten rendering (muisknoppen, de inspector).
+`Orthographic`, 31 schaduwen) is daarmee klaar.
+
+**Sinds 12 november 2026 groeit EZSE mee met een game**: ZombieSurvival, in
+`D:/Projects/Zombie survival game` (privé repo `LRDsam/ZombieSurvival`, besluit 264). Een online
+multiplayer survival game met hordes van honderden zombies, 100+ spelers per server, first- en
+third-person en modding. De volgorde van het engine-werk komt voortaan uit de roadmap van de game
+(`ROADMAP.md` daar, met `docs/concept.md` en `docs/technical.md`). Fase 1 van die roadmap is
+engine-werk in EZSE: een vaste tick met simulatie en presentatie gescheiden, headless draaien (de
+`Engine` zonder venster en Renderer, voor de server), muisknoppen en scroll, invoer als acties,
+scenes en toestanden, events binnen het spel, debug-draw, standaard-assets en een virtueel
+bestandssysteem met mount points. Claude legt de volgorde binnen fase 1 voor met een advies; de
+gebruiker kiest. De punten uit Daarna die niet in de roadmap staan (zoals de schaduwen verbeteren)
+blijven mogelijk, maar wachten tot ze nodig zijn.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
