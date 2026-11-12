@@ -35,5 +35,7 @@ target_link_libraries(EZSEEngine
     PRIVATE stb
 )
 
-add_executable(EngineTests tests/EngineTests.cpp)
-target_link_libraries(EngineTests PRIVATE EZSE::Engine)
+if(EZSE_BUILD_TESTS)
+    add_executable(EngineTests tests/EngineTests.cpp)
+    target_link_libraries(EngineTests PRIVATE EZSE::Engine)
+endif()
