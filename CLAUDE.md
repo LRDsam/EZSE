@@ -47,6 +47,26 @@ vertalingen als "lus" werken verwarrend.
 De gebruiker heeft enige ervaring met C++; de basis van de taal hoeft niet uitgelegd, maar
 minder gangbare onderdelen wel (templates, `std::span`, macro's, linkage en dergelijke).
 
+### Branches
+
+Aan EZSE wordt gewerkt vanuit de game (ZombieSurvival) en los aan de render-kant, op deze pc en op
+een laptop. Afspraken (vanaf 12 november 2026):
+
+- **`main` is altijd heel**: alles bouwt in Debug en Release en de tests slagen. Niemand werkt
+  rechtstreeks op `main`.
+- **Elk stuk werk heeft een eigen branch** vanaf de nieuwste `main`: voor de game
+  `step-32-fixed-tick` en dergelijke, voor de render-kant `render-...`.
+- **Eén map per computer** (`D:/Projects/EZSE` op deze pc): de gebruiker werkt nooit tegelijk aan
+  twee dingen en wisselt zelf van branch. Commit (of stash) voor het wisselen. De game bouwt tegen
+  de branch die op dat moment uitgecheckt is.
+- **Een stap is af**: mergen in `main`, pushen, de branch weggooien. De andere branch haalt `main`
+  geregeld binnen (`git merge main`), zodat de verschillen klein blijven. Laptop en pc wisselen
+  alles via GitHub.
+- **Nummering van stappen**: de stappen voor de game zijn 32, 33, 34 en verder (zie de roadmap
+  van de game); de render-kant begint bij **stap 40**.
+- **Besluiten** worden bij het mergen hernummerd: wie als tweede in `main` merget, schuift zijn
+  besluiten op naar de eerstvolgende vrije nummers.
+
 ## Bouwen en starten
 
 Nodig: Visual Studio 2022 met de C++-workload, CMake 3.24 of nieuwer, git, en een videokaart
@@ -713,9 +733,13 @@ third-person en modding. De volgorde van het engine-werk komt voortaan uit de ro
 engine-werk in EZSE: een vaste tick met simulatie en presentatie gescheiden, headless draaien (de
 `Engine` zonder venster en Renderer, voor de server), muisknoppen en scroll, invoer als acties,
 scenes en toestanden, events binnen het spel, debug-draw, standaard-assets en een virtueel
-bestandssysteem met mount points. Claude legt de volgorde binnen fase 1 voor met een advies; de
-gebruiker kiest. De punten uit Daarna die niet in de roadmap staan (zoals de schaduwen verbeteren)
-blijven mogelijk, maar wachten tot ze nodig zijn.
+bestandssysteem met mount points. Afgesproken volgorde voor de game: stap 32 vaste tick met
+simulatie en presentatie gescheiden, stap 33 headless draaien, stap 34 standaard-assets en een
+virtueel bestandssysteem met mount points; de rest van fase 1 schuift naar het moment dat het nodig
+is (zie de roadmap van de game).
+
+Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
+branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
 
 De route van besluit 149 (22 assets, 23 texturen, 24 materialen) is af.
 
