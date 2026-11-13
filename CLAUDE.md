@@ -426,6 +426,7 @@ Regels die de Renderer herbruikbaar houden:
 | 270 | `EngineDesc` | `struct EngineDesc { WindowDesc window; int ticksPerSecond = 30; }` in `Engine.h`, en `Engine::Create(const EngineDesc&)` (vervangt `Create(const WindowDesc&)`). Niet `SetTickRate` na `Create`: de tick rate mag niet halverwege veranderen. Stap 33 (headless) breidt de struct uit. `ticksPerSecond <= 0` controleert `Create` als eerste, vóór er een venster opent, met `LogError` en een lege `unique_ptr` (ook in Release, waar een assert weg is en de tickduur door nul zou delen). Aanroepen met designated initializers: `{.window = {.title = "..."}}`, niet positioneel |
 | 271 | De accumulator (32a-2) | in `Engine::Run`: de frametijd (`now - lastFrame`) begrensd op `c_maxFrameTime` (250 ms, een constante in een anonieme namespace in `Engine.cpp`, tegen de spiral of death; de simulatie loopt dan even achter), opgeteld bij een lokale `accumulator`; zolang die minstens één tick bevat: `Update(Simulation, tickSeconds)`, `accumulator -= m_tickDuration` en `++m_tickCount`; daarna één keer `Update(Presentation, frameTime)`. Alle tijd als `std::chrono::steady_clock::duration` (gehele nanoseconden, geen drift door `float`); alleen bij `Update` naar `float`-seconden. `m_tickDuration` = `seconds{1} / ticksPerSecond` (afgekapt: 33.333.333 ns bij 30, ongeveer 0,9 ms per dag sneller dan de echte tijd; client en server gebruiken dezelfde waarde, dus dat telt niet) |
 | 272 | Tick-teller en "Stats" | `std::uint64_t m_tickCount` in de `Engine` (2⁶⁴ ticks bij 30 per seconde is ongeveer 19,5 miljard jaar; een `uint32_t` was na 4,5 jaar vol). Nog geen getter: die komt bij prediction in fase 4. Het paneel "Stats" toont het tick-nummer, de gemeten ticks per seconde (per venster van een seconde, bijgehouden in init-captures van een `mutable` lambda) en het doel (`seconds{1} / m_tickDuration`) |
+| 273 | Systems van Sandbox over de fasen (32b, vervangt de verdeling uit besluit 268) | `GameControlSystem` in `Presentation`: afsluiten, debug-UI en cursor gaan over het programma, niet over de wereld, en lezen de events van dit frame (in `Simulation` ging een toetsaanslag in frames zonder tick verloren en werd hij bij twee ticks dubbel gelezen). `CameraControlSystem` in `Presentation`: de vliegende camera is een debug-gereedschap, geen speler, en draait per frame met de echte frametijd. `SpinSystem` blijft in `Simulation` (een spelregel); het schokken bij 30 ticks lost 32c op. Niet gedaan: kijken (per frame) en lopen (per tick) splitsen, zoals shooters doen (kijkrichting elke frame direct, en per tick in het invoercommando naar de server); dat komt bij de speler in de game (fase 2 en 3), samen met invoer tussen ticks (het vroegere 32d, nu fase 4: invoer als acties) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -748,11 +749,10 @@ is (zie de roadmap van de game).
 
 Stap 32 (op branch `step-32-fixed-tick`) gaat in delen: 32a-1 fasen voor systems (af, besluiten 265
 tot en met 268), 32a-2 de accumulator in `Engine::Run` (af, besluiten 269 tot en met 272), 32b de
-systems van Sandbox verdelen over de fasen (nu), 32c interpolatie voor het tekenen, 32d invoer
-tussen ticks. Bekend sinds 32a-2 (door de gebruiker gezien): rondkijken stottert (de camera
-verandert maar 30 keer per seconde en muisbeweging gaat in frames zonder tick verloren of telt
-dubbel bij twee ticks), en F1 en Escape werken maar soms, omdat het `GameControlSystem` in
-`Simulation` events leest die per frame komen.
+systems van Sandbox verdelen over de fasen (af, besluit 273: de stotterende camera en de gemiste
+F1 en Escape uit 32a-2 zijn daarmee opgelost), 32c interpolatie voor het tekenen (nu: de aap
+draait nog met 30 stapjes per seconde). Het vroegere 32d (invoer tussen ticks) is verschoven naar
+fase 4 van de game.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.

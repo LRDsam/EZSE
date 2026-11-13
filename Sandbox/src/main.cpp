@@ -221,7 +221,7 @@ int main() {
         .position = {-1.75f, -2.0f, 0.0f},
         .scale = {0.5f, 0.5f, 0.5f}});
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
-    world.AddComponent(monkey, Spin{.speed = {0.0f, 0.5f, 0.0f}});
+    world.AddComponent(monkey, Spin{.speed = {0.0f, 2.5f, 0.0f}});
 
     // A room around everything: a floor under the cubes and four walls, open at the top. Grey
     // checkerboard with little shine, so it does not look like the cubes.
@@ -295,11 +295,14 @@ int main() {
     });
 
     // Registing the systems
-    world.AddSystem<GameControlSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>(),
+    // Program controls (quit, debug UI, cursor) read the events of this frame, so they run once per
+    // frame; in the simulation a key press would be missed in frames without a tick.
+    world.AddSystem<GameControlSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<>(),
         engine->GetWindow(), *engine);
     world.AddSystem<SpinSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<ezse::Transform, Spin>());
+    // The fly camera is a debug tool, not a player: per frame, so looking around stays smooth.
     world.AddSystem<CameraControlSystem>(
-        ezse::SystemPhase::Simulation, ezse::MakeSignature<ezse::Transform, CameraController>(),
+        ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, CameraController>(),
         engine->GetWindow(), *engine);
     // The engine systems come last: camera, then lights, then drawing (decision 115).
     world.AddSystem<ezse::CameraSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
