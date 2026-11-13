@@ -5,6 +5,7 @@
 #include "EZSE/ECS/EntitySet.h"
 #include "EZSE/ECS/Signature.h"
 #include "EZSE/ECS/SystemManager.h"
+#include "EZSE/ECS/SystemPhase.h"
 #include "EZSE/ECS/World.h"
 
 #include <iostream>
@@ -366,12 +367,12 @@ bool SystemHas(const ezse::System& system, ezse::Entity entity) {
 void TestSystemManagerAdd() {
     ezse::SystemManager systems;
     int counter = 0;
-    CountingSystem& counting = systems.Add<CountingSystem>(ezse::MakeSignature<Health>(), counter);
+    CountingSystem& counting = systems.Add<CountingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>(), counter);
     counter = 7;
     Check(counting.counter == 7, "SystemManager Add: a reference argument stays a reference");
 
     for (int i = 0; i < 20; ++i) {
-        systems.Add<PlainSystem>(ezse::MakeSignature<Speed>());
+        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Speed>());
     }
     counter = 8;
     Check(counting.counter == 8, "SystemManager Add: the returned reference stays valid as systems are added");
@@ -380,8 +381,8 @@ void TestSystemManagerAdd() {
 
 void TestSystemManagerSignatureChanged() {
     ezse::SystemManager systems;
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
-    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health, Speed>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health, Speed>());
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
@@ -405,8 +406,8 @@ void TestSystemManagerSignatureChanged() {
 
 void TestSystemManagerEntityDestroyed() {
     ezse::SystemManager systems;
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
-    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health, Speed>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
 
@@ -436,7 +437,7 @@ void TestWorldSystems() {
     ezse::World world;
     world.RegisterComponent<Health>();
     world.RegisterComponent<Speed>();
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
 
     const ezse::Entity healthy = world.CreateEntity();
     const ezse::Entity fast = world.CreateEntity();
@@ -453,7 +454,7 @@ void TestWorldSystems() {
 void TestWorldDestroyEntity() {
     ezse::World world;
     world.RegisterComponent<Health>();
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
 
     const ezse::Entity first = world.CreateEntity();
     const ezse::Entity second = world.CreateEntity();
@@ -480,7 +481,7 @@ void TestWorldAddSystemLater() {
     world.AddComponent(destroyed, Health{30});
     world.DestroyEntity(destroyed);
 
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
     Check(SystemHas(healthSystem, first) && SystemHas(healthSystem, second),
           "World AddSystem: a later system gets the existing entities it matches");
     Check(!SystemHas(healthSystem, destroyed), "World AddSystem: a later system skips destroyed entities");
@@ -492,10 +493,10 @@ void TestWorldUpdateOrder() {
     world.RegisterComponent<Health>();
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
-    world.AddSystem<LoggingSystem>(ezse::MakeSignature<Health>(), 1, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::MakeSignature<Health>(), 2, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>(), 1, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>(), 2, numbers, deltaTimes);
 
-    world.Update(0.5f);
+    world.Update(ezse::SystemPhase::Simulation, 0.5f);
     Check(numbers == std::vector<int>{1, 2}, "World Update: every system runs once, in the order they were added");
     Check(deltaTimes == std::vector<float>{0.5f, 0.5f}, "World Update: every system gets the delta time");
 }
@@ -504,23 +505,23 @@ void TestWorldUpdateComponents() {
     ezse::World world;
     world.RegisterComponent<Health>();
     world.RegisterComponent<Speed>();
-    world.AddSystem<HealSystem>(ezse::MakeSignature<Health>());
+    world.AddSystem<HealSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
 
     const ezse::Entity healthy = world.CreateEntity();
     const ezse::Entity fast = world.CreateEntity();
     world.AddComponent(healthy, Health{10});
     world.AddComponent(fast, Speed{2.0f});
 
-    world.Update(0.016f);
-    world.Update(0.016f);
+    world.Update(ezse::SystemPhase::Simulation, 0.016f);
+    world.Update(ezse::SystemPhase::Simulation, 0.016f);
     Check(world.GetComponent<Health>(healthy).value == 12, "World Update: a system changes the components of its entities");
     Check(!world.HasComponent<Health>(fast), "World Update: an entity outside the system is left alone");
 }
 
 void TestEmptySignatureSystem() {
     ezse::SystemManager systems;
-    PlainSystem& globalSystem = systems.Add<PlainSystem>(ezse::MakeSignature<>());
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::MakeSignature<Health>());
+    PlainSystem& globalSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::Signature{});
@@ -541,11 +542,54 @@ void TestWorldEmptySignatureSystem() {
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
     LoggingSystem& logging =
-        world.AddSystem<LoggingSystem>(ezse::MakeSignature<>(), 7, numbers, deltaTimes);
+        world.AddSystem<LoggingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>(), 7, numbers, deltaTimes);
     Check(logging.GetEntities().empty(), "World AddSystem: a later system with an empty signature gets no entities");
 
-    world.Update(0.1f);
+    world.Update(ezse::SystemPhase::Simulation, 0.1f);
     Check(numbers == std::vector<int>{7}, "World Update: a system with an empty signature still runs");
+}
+
+void TestSystemManagerPhasesEntities() {
+    ezse::SystemManager systems;
+    PlainSystem& simulation =
+        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<Health>());
+    PlainSystem& presentation =
+        systems.Add<PlainSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<Health>());
+
+    systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
+    Check(SystemHas(simulation, ezse::Entity{1}) && SystemHas(presentation, ezse::Entity{1}),
+          "SystemManager phases: an entity enters matching systems in every phase");
+
+    systems.EntityDestroyed(ezse::Entity{1});
+    Check(!SystemHas(simulation, ezse::Entity{1}) && !SystemHas(presentation, ezse::Entity{1}),
+          "SystemManager phases: a destroyed entity leaves the systems in every phase");
+}
+
+void TestWorldUpdatePhases() {
+    ezse::World world;
+    std::vector<int> numbers;
+    std::vector<float> deltaTimes;
+    // Added mixed on purpose: the order within a phase is the order of adding.
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<>(), 10, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>(), 1, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<>(), 20, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>(), 2, numbers, deltaTimes);
+
+    world.Update(ezse::SystemPhase::Simulation, 0.25f);
+    Check(numbers == std::vector<int>{1, 2},
+          "World Update phases: only the systems of the simulation phase run, in the order they were added");
+    Check(deltaTimes == std::vector<float>{0.25f, 0.25f}, "World Update phases: the systems get the delta time");
+
+    numbers.clear();
+    world.Update(ezse::SystemPhase::Presentation, 0.5f);
+    Check(numbers == std::vector<int>{10, 20},
+          "World Update phases: only the systems of the presentation phase run, in the order they were added");
+
+    numbers.clear();
+    world.Update(ezse::SystemPhase::Simulation, 0.25f);
+    world.Update(ezse::SystemPhase::Simulation, 0.25f);
+    Check(numbers == std::vector<int>{1, 2, 1, 2},
+          "World Update phases: a phase can run more than once without the other phase");
 }
 
 } // namespace
@@ -581,6 +625,8 @@ int main() {
     TestWorldUpdateComponents();
     TestEmptySignatureSystem();
     TestWorldEmptySignatureSystem();
+    TestSystemManagerPhasesEntities();
+    TestWorldUpdatePhases();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

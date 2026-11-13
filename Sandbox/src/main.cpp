@@ -11,6 +11,8 @@
 #include "EZSE/Engine/Systems/LightSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
 
+#include "EZSE/ECS/SystemPhase.h"
+
 #include "EZSE/Core/Log.h"
 
 #include "EZSE/Renderer/Mesh.h"
@@ -293,19 +295,19 @@ int main() {
     });
 
     // Registing the systems
-    world.AddSystem<GameControlSystem>(ezse::MakeSignature<>(),
+    world.AddSystem<GameControlSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<>(),
         engine->GetWindow(), *engine);
-    world.AddSystem<SpinSystem>(ezse::MakeSignature<ezse::Transform, Spin>());
+    world.AddSystem<SpinSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<ezse::Transform, Spin>());
     world.AddSystem<CameraControlSystem>(
-        ezse::MakeSignature<ezse::Transform, CameraController>(),
+        ezse::SystemPhase::Simulation, ezse::MakeSignature<ezse::Transform, CameraController>(),
         engine->GetWindow(), *engine);
     // The engine systems come last: camera, then lights, then drawing (decision 115).
-    world.AddSystem<ezse::CameraSystem>(ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
+    world.AddSystem<ezse::CameraSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
                                         engine->GetWindow(), renderer);
     // The sun casts shadows in a cube of 20 meters around the origin; the room is 12 by 12.
-    world.AddSystem<ezse::LightSystem>(ezse::MakeSignature<ezse::Transform, ezse::Light>(),
+    world.AddSystem<ezse::LightSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Light>(),
                                        renderer, 10.0f);
-    world.AddSystem<ezse::RenderSystem>(ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
+    world.AddSystem<ezse::RenderSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.010f, 0.033f, 0.073f});
 
     // Capturing mouse in window and running game

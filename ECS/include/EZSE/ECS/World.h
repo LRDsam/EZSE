@@ -5,6 +5,7 @@
 #include "EZSE/ECS/EntityManager.h"
 #include "EZSE/ECS/Signature.h"
 #include "EZSE/ECS/SystemManager.h"
+#include "EZSE/ECS/SystemPhase.h"
 
 #include "EZSE/Core/Assert.h"
 
@@ -26,9 +27,9 @@ public:
     template <typename T> bool HasComponent(Entity entity) const;
 
     template <typename T, typename... Args>
-    T& AddSystem(Signature signature, Args&&... args);
+    T& AddSystem(SystemPhase systemPhase, Signature signature, Args&&... args);
 
-    void Update(float deltaTime);
+    void Update(SystemPhase systemPhase, float deltaTime);
 
 private:
     EntityManager m_entities;
@@ -67,8 +68,8 @@ bool World::HasComponent(Entity entity) const {
 }
 
 template <typename T, typename... Args>
-T& World::AddSystem(Signature signature, Args&&... args) {
-    T& system = m_systems.Add<T>(signature, std::forward<Args>(args)...);
+T& World::AddSystem(SystemPhase systemPhase, Signature signature, Args&&... args) {
+    T& system = m_systems.Add<T>(systemPhase, signature, std::forward<Args>(args)...);
     for (std::uint32_t id = 1; id <= m_entities.GetCreatedCount(); ++id) {
         const Entity entity = Entity{ id };
         if (m_entities.IsAlive(entity)) {

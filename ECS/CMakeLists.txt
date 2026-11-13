@@ -8,6 +8,7 @@ add_library(EZSEECS STATIC
     include/EZSE/ECS/Signature.h
     include/EZSE/ECS/System.h
     include/EZSE/ECS/SystemManager.h
+    include/EZSE/ECS/SystemPhase.h
     include/EZSE/ECS/World.h
     src/ComponentManager.cpp
     src/EntityManager.cpp

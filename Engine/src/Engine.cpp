@@ -87,7 +87,8 @@ void Engine::Run() {
         lastFrame = now;
 
         // Systems may call ImGui:: functions during the update.
-        m_world.Update(deltaTime.count());
+        m_world.Update(SystemPhase::Simulation, deltaTime.count());
+        m_world.Update(SystemPhase::Presentation, deltaTime.count());
 
         m_debugUI.Draw(m_world);
         ImGui::Render();
