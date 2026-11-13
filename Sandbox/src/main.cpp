@@ -161,7 +161,7 @@ void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
 
 int main() {
     // Creating engine
-    auto engine = ezse::Engine::Create({.title = "EZSE Sandbox"});
+    auto engine = ezse::Engine::Create({.window = {.title = "EZSE Sandbox"}});
     if (!engine) {
         return 1;
     }

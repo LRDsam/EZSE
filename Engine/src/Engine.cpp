@@ -12,13 +12,30 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <chrono>
 #include <variant>
 
 namespace ezse {
 
-std::unique_ptr<Engine> Engine::Create(const WindowDesc& windowDesc) {
-    auto window = Window::Create(windowDesc);
+namespace {
+
+// Longer frames (a dragged window, a breakpoint) are cut off, so the loop never has to catch up
+// on hundreds of ticks at once. The simulation then runs behind real time for a moment.
+// The same type as the frame time, so std::min can compare them.
+constexpr std::chrono::steady_clock::duration c_maxFrameTime = std::chrono::milliseconds{250};
+
+} // namespace
+
+std::unique_ptr<Engine> Engine::Create(const EngineDesc& desc) {
+    // Checked first, before a window opens; also in Release, where an assert is gone and the
+    // tick duration below would divide by zero.
+    if (desc.ticksPerSecond <= 0) {
+        LogError("Ticks per second must be higher than 0, got {}", desc.ticksPerSecond);
+        return nullptr;
+    }
+
+    auto window = Window::Create(desc.window);
     if (!window) {
         LogError("Failed to create window");
         return nullptr;
@@ -30,13 +47,18 @@ std::unique_ptr<Engine> Engine::Create(const WindowDesc& windowDesc) {
         return nullptr;
     }
 
-    return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer)));
+    const std::chrono::steady_clock::duration tickDuration =
+        std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::seconds{1}) / desc.ticksPerSecond;
+
+    return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer), tickDuration));
 }
 
-Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer)
+Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer,
+               std::chrono::steady_clock::duration tickDuration)
     : m_window(std::move(window)),
       m_renderer(std::move(renderer)),
-      m_resources(*m_renderer, GetExecutableDirectory() / "assets") {
+      m_resources(*m_renderer, GetExecutableDirectory() / "assets"),
+      m_tickDuration(tickDuration) {
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
@@ -47,9 +69,27 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     ImGui::GetIO().IniFilename = nullptr;
     m_window->InitDebugUI();
     m_renderer->InitDebugUI();
-    m_debugUI.AddPanel("Stats", [](World&) {
+    // The init-captures belong to the lambda and keep their values between frames; mutable lets
+    // it change them.
+    m_debugUI.AddPanel("Stats", [this,
+                                 windowStart = std::chrono::steady_clock::now(),
+                                 ticksAtStart = std::uint64_t{0},
+                                 measured = 0.0f](World&) mutable {
         const float framerate = ImGui::GetIO().Framerate;
         ImGui::Text("%.2f ms (%.0f FPS)", 1000.0f / framerate, framerate);
+
+        // Measured over windows of one second, so the number is readable and shows when the
+        // simulation cannot keep up with real time.
+        const auto now = std::chrono::steady_clock::now();
+        const std::chrono::duration<float> elapsed = now - windowStart;
+        if (elapsed.count() >= 1.0f) {
+            measured = static_cast<float>(m_tickCount - ticksAtStart) / elapsed.count();
+            windowStart = now;
+            ticksAtStart = m_tickCount;
+        }
+        const auto targetTicksPerSecond = std::chrono::seconds{1} / m_tickDuration;
+        ImGui::Text("Tick %llu (%.1f ticks/s, target %lld)", static_cast<unsigned long long>(m_tickCount),
+                    measured, static_cast<long long>(targetTicksPerSecond));
     });
     m_debugUI.AddPanel("Shadow map", [&renderer = *m_renderer](World&) {
         renderer.DrawShadowMapDebugUI();
@@ -67,6 +107,9 @@ void Engine::Run() {
     auto framebufferSize = m_window->GetFramebufferSize();
     m_renderer->SetViewport(framebufferSize.width, framebufferSize.height);
     auto lastFrame = std::chrono::steady_clock::now();
+    // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
+    std::chrono::steady_clock::duration accumulator{0};
+    const float tickSeconds = std::chrono::duration<float>(m_tickDuration).count();
 
     while (!m_quitRequested && !m_window->ShouldClose()) {
         m_window->PollEvents();
@@ -83,12 +126,19 @@ void Engine::Run() {
         }
 
         const auto now = std::chrono::steady_clock::now();
-        const std::chrono::duration<float> deltaTime = now - lastFrame;
+        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
         lastFrame = now;
 
         // Systems may call ImGui:: functions during the update.
-        m_world.Update(SystemPhase::Simulation, deltaTime.count());
-        m_world.Update(SystemPhase::Presentation, deltaTime.count());
+        // The simulation runs zero or more fixed ticks, depending on the time that has passed.
+        accumulator += frameTime;
+        while (accumulator >= m_tickDuration) {
+            m_world.Update(SystemPhase::Simulation, tickSeconds);
+            accumulator -= m_tickDuration;
+            ++m_tickCount;
+        }
+
+        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
 
         m_debugUI.Draw(m_world);
         ImGui::Render();
