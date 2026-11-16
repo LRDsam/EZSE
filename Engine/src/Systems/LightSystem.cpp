@@ -15,10 +15,11 @@ namespace ezse {
 
 namespace {
 
-// A light shines along its own -Z, turned by the yaw and pitch of its Transform.
+// A light shines along its own -Z, turned by the rotation of its Transform (roll does not change
+// the direction).
 Vec3 LightDirection(const Transform& transform) {
     return TransformDirection(
-        RotationY(transform.rotation.y) * RotationX(transform.rotation.x),
+        Rotation(transform.rotation),
         Vec3{0.0f, 0.0f, -1.0f});
 }
 

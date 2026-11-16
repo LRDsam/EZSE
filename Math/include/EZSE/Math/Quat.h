@@ -46,4 +46,12 @@ Quat AxisAngle(const Vec3& axis, float angle);
 // a and b must have length 1; the result has length 1 as well.
 Quat Slerp(const Quat& a, const Quat& b, float t);
 
+// pitch (x), yaw (y) and roll (z) in radians, applied as Z, then X, then Y: the order the
+// Transform used before it had a Quat.
+Quat FromEuler(const Vec3& angles);
+
+// The angles back. At a pitch of (nearly) +-90 degrees yaw and roll turn around the same axis
+// (gimbal lock); then roll is 0 and the whole turn goes into yaw.
+Vec3 ToEuler(const Quat& q);
+
 } // namespace ezse

@@ -2,6 +2,8 @@
 
 #include "EZSE/Engine/Debug/DebugWidgets.h"
 
+#include "EZSE/Math/Quat.h"
+
 #include <imgui.h>
 #include <algorithm>
 
@@ -10,11 +12,21 @@ namespace ezse {
 bool EditTransform(Transform& transform) {
     bool changed = false;
     changed |= DragVec3("Position", transform.position, 0.05f);
-    changed |= ImGui::SliderAngle("Pitch", &transform.rotation.x);
-    changed |= ImGui::SliderAngle("Yaw", &transform.rotation.y);
-    changed |= ImGui::SliderAngle("Roll", &transform.rotation.z);
+
+    // The sliders show angles, computed again every frame. Only a change of an angle writes back,
+    // so moving the position or the scale does not round the rotation through angles. Near a
+    // pitch of +-90 degrees yaw and roll can jump in the sliders; the orientation stays correct.
+    Vec3 angles = ToEuler(transform.rotation);
+    bool rotationChanged = false;
+    rotationChanged |= ImGui::SliderAngle("Pitch", &angles.x);
+    rotationChanged |= ImGui::SliderAngle("Yaw", &angles.y);
+    rotationChanged |= ImGui::SliderAngle("Roll", &angles.z);
+    if (rotationChanged) {
+        transform.rotation = FromEuler(angles);
+    }
+
     changed |= DragVec3("Scale", transform.scale, 0.05f);
-    return changed;
+    return changed || rotationChanged;
 }
 
 bool EditLight(Light& light) {

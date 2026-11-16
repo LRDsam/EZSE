@@ -564,6 +564,50 @@ void TestQuatSlerp() {
         "Slerp between a Quat and itself gives that Quat");
 }
 
+// The matrix the Transform used before it had a Quat: Z, then X, then Y.
+ezse::Mat4 EulerMatrix(const ezse::Vec3& angles) {
+    return ezse::RotationY(angles.y) * ezse::RotationX(angles.x) * ezse::RotationZ(angles.z);
+}
+
+void TestQuatFromEuler() {
+    Check(NearlyEqual(ezse::FromEuler(ezse::Vec3{}), ezse::Quat{}),
+        "FromEuler of zero angles does not turn");
+    Check(NearlyEqual(ezse::FromEuler(ezse::Vec3{ 0.0f, 0.6f, 0.0f }), ezse::AxisAngle(c_axisY, 0.6f)),
+        "FromEuler with only yaw is a turn around Y");
+
+    const ezse::Vec3 angles{ 0.4f, -1.1f, 0.25f };
+    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(angles)), EulerMatrix(angles)),
+        "FromEuler turns like RotationY * RotationX * RotationZ: roll first, yaw last");
+    const ezse::Vec3 sun{ -0.883f, 0.620f, 0.0f };
+    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(sun)), EulerMatrix(sun)),
+        "FromEuler gives the same orientation as before for angles like the sun in the Sandbox");
+    Check(NearlyEqual(ezse::Length(ezse::FromEuler(angles)), 1.0f), "FromEuler gives a Quat of length 1");
+}
+
+void TestQuatToEuler() {
+    const ezse::Vec3 angles{ 0.4f, -1.1f, 0.25f };
+    Check(NearlyEqual(ezse::ToEuler(ezse::FromEuler(angles)), angles),
+        "ToEuler gives back the angles of FromEuler");
+    const ezse::Vec3 large{ -1.2f, 2.8f, -2.5f };
+    Check(NearlyEqual(ezse::ToEuler(ezse::FromEuler(large)), large),
+        "ToEuler gives back large angles (yaw and roll beyond 90 degrees)");
+    Check(NearlyEqual(ezse::ToEuler(ezse::Quat{}), ezse::Vec3{}),
+        "ToEuler of the default Quat is zero");
+    Check(NearlyEqual(ezse::ToEuler(ezse::AxisAngle(c_axisX, 0.7f)), ezse::Vec3{ 0.7f, 0.0f, 0.0f }),
+        "ToEuler of a turn around X is only pitch");
+
+    // Gimbal lock: at a pitch of 90 degrees yaw and roll turn around the same axis.
+    const ezse::Quat locked = ezse::FromEuler(ezse::Vec3{ c_quarterTurn, 0.5f, 0.3f });
+    const ezse::Vec3 lockedAngles = ezse::ToEuler(locked);
+    Check(NearlyEqual(lockedAngles.x, c_quarterTurn) && NearlyEqual(lockedAngles.z, 0.0f),
+        "ToEuler at a pitch of 90 degrees gives that pitch and a roll of 0");
+    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(lockedAngles)), ezse::Rotation(locked)),
+        "ToEuler at a pitch of 90 degrees still gives the same orientation");
+    const ezse::Quat lockedDown = ezse::FromEuler(ezse::Vec3{ -c_quarterTurn, -0.4f, 0.9f });
+    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(ezse::ToEuler(lockedDown))), ezse::Rotation(lockedDown)),
+        "ToEuler at a pitch of -90 degrees still gives the same orientation");
+}
+
 } // namespace
 
 int main() {
@@ -596,6 +640,8 @@ int main() {
     TestQuatDotLengthNormalize();
     TestQuatConjugate();
     TestQuatSlerp();
+    TestQuatFromEuler();
+    TestQuatToEuler();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

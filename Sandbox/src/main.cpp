@@ -35,13 +35,19 @@ namespace {
 // Components
 // Turns an entity at a fixed speed
 struct Spin {
-    ezse::Vec3 speed; // Radians per second around X, Y, Z
+    // Angular velocity: the direction is the axis (in world space), the length the radians per
+    // second.
+    ezse::Vec3 speed;
 };
 
 // Lets the keyboard and the mouse move and turn an entity.
 struct CameraController {
     float moveSpeed = 1.0f; // units per second.
     float lookSensitivity = 0.002f; // radians per pixel of mouse movement.
+    // The look angles are kept here as input and turned into the rotation of the Transform; with
+    // two angles the limit on pitch is easy, which it is not on a Quat.
+    float yaw = 0.0f;   // radians around Y, without limit
+    float pitch = 0.0f; // radians around X, kept within +-89 degrees
 };
 
 // Systems
@@ -78,7 +84,7 @@ void GameControlSystem::Update(ezse::World&, float) {
     }
 }
 
-// Adds the Spin speed of each entity to the rotation of its Transform.
+// Turns each entity by its Spin speed, around the world axes.
 class SpinSystem : public ezse::System {
 protected:
     void Update(ezse::World& world, float deltaTime) override;
@@ -88,7 +94,12 @@ void SpinSystem::Update(ezse::World& world, float deltaTime) {
     for (ezse::Entity entity : GetEntities()) {
         ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
         const Spin& spin = world.GetComponent<Spin>(entity);
-        transform.rotation = transform.rotation + spin.speed * deltaTime;
+        // A speed of zero gives a zero axis and angle, so AxisAngle does not turn.
+        const ezse::Quat step =
+            ezse::AxisAngle(ezse::Normalize(spin.speed), ezse::Length(spin.speed) * deltaTime);
+        // The step on the left turns around the world axes (on the right: the entity's own axes).
+        // Normalize undoes the rounding that builds up over many ticks.
+        transform.rotation = ezse::Normalize(step * transform.rotation);
     }
 }
 
@@ -132,12 +143,14 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
     const ezse::MouseDelta mouseDelta = m_window.GetMouseDelta();
     for (ezse::Entity entity : GetEntities()) {
         ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
-        const CameraController& cameraController = world.GetComponent<CameraController>(entity);
-        transform.rotation.y -= (mouseDelta.x * cameraController.lookSensitivity);
-        transform.rotation.x -= (mouseDelta.y * cameraController.lookSensitivity);
-        transform.rotation.x = std::clamp(transform.rotation.x, -maxPitch, maxPitch);
+        CameraController& cameraController = world.GetComponent<CameraController>(entity);
+        cameraController.yaw -= mouseDelta.x * cameraController.lookSensitivity;
+        cameraController.pitch -= mouseDelta.y * cameraController.lookSensitivity;
+        cameraController.pitch = std::clamp(cameraController.pitch, -maxPitch, maxPitch);
+        transform.rotation = ezse::FromEuler(ezse::Vec3{cameraController.pitch, cameraController.yaw, 0.0f});
+        // Walking follows only the yaw, so looking up or down does not slow it.
         const ezse::Vec3 moveEntity = ezse::TransformDirection(
-            ezse::RotationY(transform.rotation.y),
+            ezse::RotationY(cameraController.yaw),
             move);
         transform.position =
             transform.position + (moveEntity * (cameraController.moveSpeed * deltaTime));
@@ -238,7 +251,8 @@ int main() {
     // like the light that Sandbox set by hand before.
     const float degrees = std::numbers::pi_v<float> / 180.0f;
     const ezse::Entity sun = world.CreateEntity();
-    world.AddComponent(sun, ezse::Transform{.rotation = {-50.6f * degrees, 35.5f * degrees, 0.0f}});
+    world.AddComponent(sun, ezse::Transform{
+        .rotation = ezse::FromEuler(ezse::Vec3{-50.6f * degrees, 35.5f * degrees, 0.0f})});
     world.AddComponent(sun, ezse::Light{});
     // The light that reaches every surface from all sides.
     const ezse::Entity ambient = world.CreateEntity();
@@ -266,7 +280,7 @@ int main() {
     const ezse::Entity spot = world.CreateEntity();
     world.AddComponent(spot, ezse::Transform{
         .position = {1.5f, 1.0f, 0.0f},
-        .rotation = {-90.0f * degrees, 0.0f, 0.0f}});
+        .rotation = ezse::FromEuler(ezse::Vec3{-90.0f * degrees, 0.0f, 0.0f})});
     world.AddComponent(spot, ezse::Light{
         .type = ezse::LightType::Spot,
         .intensity = 3.0f,

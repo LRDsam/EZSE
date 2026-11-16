@@ -6,16 +6,13 @@ namespace ezse {
 
 Mat4 ModelMatrix(const Transform& transform) {
     return Translation(transform.position) *
-        RotationY(transform.rotation.y) *
-        RotationX(transform.rotation.x) *
-        RotationZ(transform.rotation.z) *
+        Rotation(transform.rotation) *
         Scale(transform.scale);
 }
 
 Mat4 ViewMatrix(const Transform& transform) {
-    return RotationZ(-transform.rotation.z) *
-        RotationX(-transform.rotation.x) *
-        RotationY(-transform.rotation.y) *
+    // The inverse of the camera's own placement: move back, then turn back with the Conjugate.
+    return Rotation(Conjugate(transform.rotation)) *
         Translation(-transform.position);
 }
 

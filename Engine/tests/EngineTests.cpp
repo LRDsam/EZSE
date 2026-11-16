@@ -70,23 +70,22 @@ void TestModelMatrix() {
     // A quarter turn around Y takes +X to -Z; the translation comes after the rotation.
     ezse::Transform turned;
     turned.position = ezse::Vec3{1.0f, 0.0f, 0.0f};
-    turned.rotation.y = quarterTurn;
+    turned.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
     Check(NearlyEqual(ezse::ModelMatrix(turned) * ezse::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
                       ezse::Vec4{1.0f, 0.0f, -1.0f, 1.0f}),
           "ModelMatrix: rotation first, then translation");
 
-    // X is applied before Y: +X stays on the X axis, then Y turns it to -Z.
+    // FromEuler applies X before Y: +X stays on the X axis, then Y turns it to -Z.
     // In the other order the point would end up on +Y.
     ezse::Transform tilted;
-    tilted.rotation.x = quarterTurn;
-    tilted.rotation.y = quarterTurn;
+    tilted.rotation = ezse::FromEuler(ezse::Vec3{quarterTurn, quarterTurn, 0.0f});
     Check(NearlyEqual(ezse::ModelMatrix(tilted) * ezse::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
                       ezse::Vec4{0.0f, 0.0f, -1.0f, 1.0f}),
           "ModelMatrix: the X rotation comes before the Y rotation");
 
     // Scaling comes first: (1, 0, 0) becomes (2, 0, 0) and then turns to (0, 0, -2).
     ezse::Transform stretched;
-    stretched.rotation.y = quarterTurn;
+    stretched.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
     stretched.scale = ezse::Vec3{2.0f, 1.0f, 1.0f};
     Check(NearlyEqual(ezse::ModelMatrix(stretched) * ezse::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
                       ezse::Vec4{0.0f, 0.0f, -2.0f, 1.0f}),
@@ -96,7 +95,7 @@ void TestModelMatrix() {
 void TestViewMatrix() {
     ezse::Transform camera;
     camera.position = ezse::Vec3{2.0f, 1.0f, 3.0f};
-    camera.rotation = ezse::Vec3{0.3f, -0.7f, 0.2f};
+    camera.rotation = ezse::FromEuler(ezse::Vec3{0.3f, -0.7f, 0.2f});
 
     Check(NearlyEqual(ezse::ViewMatrix(camera) * ezse::ModelMatrix(camera), ezse::Mat4{}),
           "ViewMatrix: undoes ModelMatrix of the same Transform (scale 1)");
@@ -109,7 +108,7 @@ void TestViewMatrix() {
     // A point two units in front of it must end up on the -Z axis of the view.
     ezse::Transform turnedLeft;
     turnedLeft.position = ezse::Vec3{0.0f, 0.0f, 3.0f};
-    turnedLeft.rotation.y = quarterTurn;
+    turnedLeft.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
     Check(NearlyEqual(ezse::ViewMatrix(turnedLeft) * ezse::Vec4{-2.0f, 0.0f, 3.0f, 1.0f},
                       ezse::Vec4{0.0f, 0.0f, -2.0f, 1.0f}),
           "ViewMatrix: a point in front of a turned camera lies on -Z");
