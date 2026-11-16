@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EZSE/Math/Mat4.h"
+#include "EZSE/Math/Quat.h"
 #include "EZSE/Math/Vec3.h"
 
 namespace ezse {
@@ -10,6 +11,9 @@ Mat4 Scale(const Vec3& factor);
 Mat4 RotationX(float angle);
 Mat4 RotationY(float angle);
 Mat4 RotationZ(float angle);
+
+// The rotation matrix of a quaternion of length 1; Rotation(AxisAngle(Y, a)) equals RotationY(a).
+Mat4 Rotation(const Quat& quat);
 
 // A view matrix for a camera at eye that looks at target. up is roughly "up" for the camera
 // (usually {0, 1, 0}) and must not be parallel to target - eye.

@@ -56,6 +56,34 @@ Mat4 RotationZ(float angle) {
     return mat;
 }
 
+Mat4 Rotation(const Quat& quat) {
+    // The usual formula is written per row; Mat4 is m[column][row], so each column below is one
+    // turned axis: column 0 is where the X axis ends up, column 1 the Y axis, column 2 the Z axis.
+    const float xx = quat.x * quat.x;
+    const float yy = quat.y * quat.y;
+    const float zz = quat.z * quat.z;
+    const float xy = quat.x * quat.y;
+    const float xz = quat.x * quat.z;
+    const float yz = quat.y * quat.z;
+    const float wx = quat.w * quat.x;
+    const float wy = quat.w * quat.y;
+    const float wz = quat.w * quat.z;
+
+    Mat4 mat;
+    mat.m[0][0] = 1.0f - 2.0f * (yy + zz);
+    mat.m[0][1] = 2.0f * (xy + wz);
+    mat.m[0][2] = 2.0f * (xz - wy);
+
+    mat.m[1][0] = 2.0f * (xy - wz);
+    mat.m[1][1] = 1.0f - 2.0f * (xx + zz);
+    mat.m[1][2] = 2.0f * (yz + wx);
+
+    mat.m[2][0] = 2.0f * (xz + wy);
+    mat.m[2][1] = 2.0f * (yz - wx);
+    mat.m[2][2] = 1.0f - 2.0f * (xx + yy);
+    return mat;
+}
+
 Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up) {
     const Vec3 f = Normalize(target - eye);
     const Vec3 r = Normalize(Cross(f, up));

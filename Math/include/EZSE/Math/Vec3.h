@@ -29,4 +29,7 @@ float Length(const Vec3& vec);
 // A vector that is (nearly) zero has no direction; then the zero vector is returned.
 Vec3 Normalize(const Vec3& vec);
 
+// The point a fraction t of the way from a to b: a + (b - a) * t. t = 0 gives a, t = 1 gives b.
+Vec3 Lerp(const Vec3& a, const Vec3& b, float t);
+
 } // namespace ezse

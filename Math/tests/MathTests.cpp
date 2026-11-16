@@ -1,3 +1,4 @@
+#include "EZSE/Math/Quat.h"
 #include "EZSE/Math/Transform.h"
 
 #include <cmath>
@@ -450,6 +451,119 @@ void TestPerspective() {
         "Perspective puts the distance to the camera (-z) in w");
 }
 
+bool NearlyEqual(const ezse::Quat& a, const ezse::Quat& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
+}
+
+const ezse::Vec3 c_axisX{ 1.0f, 0.0f, 0.0f };
+const ezse::Vec3 c_axisY{ 0.0f, 1.0f, 0.0f };
+const ezse::Vec3 c_axisZ{ 0.0f, 0.0f, 1.0f };
+
+void TestVec3Lerp() {
+    const ezse::Vec3 a{ 1.0f, 2.0f, 3.0f };
+    const ezse::Vec3 b{ 3.0f, -2.0f, 7.0f };
+    Check(NearlyEqual(ezse::Lerp(a, b, 0.0f), a), "Lerp at 0 gives the first vector");
+    Check(NearlyEqual(ezse::Lerp(a, b, 1.0f), b), "Lerp at 1 gives the second vector");
+    Check(NearlyEqual(ezse::Lerp(a, b, 0.5f), ezse::Vec3{ 2.0f, 0.0f, 5.0f }),
+        "Lerp at 0.5 gives the point halfway");
+}
+
+void TestQuatDefault() {
+    const ezse::Quat identity;
+    Check(identity.x == 0.0f && identity.y == 0.0f && identity.z == 0.0f && identity.w == 1.0f,
+        "a default Quat is (0, 0, 0, 1)");
+    Check(NearlyEqual(ezse::Rotation(identity), ezse::Mat4{}),
+        "the matrix of a default Quat is the identity: it does not turn");
+}
+
+void TestQuatAxisAngle() {
+    const float half = std::sqrt(0.5f);
+    Check(NearlyEqual(ezse::AxisAngle(c_axisY, c_quarterTurn), ezse::Quat{ 0.0f, half, 0.0f, half }),
+        "AxisAngle by a quarter turn around Y is (0, sin 45, 0, cos 45)");
+    Check(NearlyEqual(ezse::AxisAngle(c_axisX, 0.0f), ezse::Quat{}),
+        "AxisAngle by zero is the default Quat");
+    Check(NearlyEqual(ezse::Length(ezse::AxisAngle(Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.8f)), 1.0f),
+        "AxisAngle with an axis of length 1 gives a Quat of length 1");
+}
+
+void TestQuatRotation() {
+    // The matrix tests above check RotationX, Y and Z, so they can be used as the expected value.
+    // A mistake with columns and rows in Rotation shows up here as the opposite turn.
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisX, c_quarterTurn)), ezse::RotationX(c_quarterTurn)),
+        "Rotation of a quarter turn around X equals RotationX");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisY, c_quarterTurn)), ezse::RotationY(c_quarterTurn)),
+        "Rotation of a quarter turn around Y equals RotationY");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisZ, c_quarterTurn)), ezse::RotationZ(c_quarterTurn)),
+        "Rotation of a quarter turn around Z equals RotationZ");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisY, 0.3f)), ezse::RotationY(0.3f)),
+        "Rotation of a small angle around Y equals RotationY");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisX, -1.2f)), ezse::RotationX(-1.2f)),
+        "Rotation of a negative angle around X equals RotationX");
+}
+
+void TestQuatMultiply() {
+    const ezse::Quat eighthY = ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f);
+    Check(NearlyEqual(eighthY * eighthY, ezse::AxisAngle(c_axisY, c_quarterTurn)),
+        "two eighth turns around Y multiply into a quarter turn");
+
+    const ezse::Quat aroundX = ezse::AxisAngle(c_axisX, 0.4f);
+    const ezse::Quat aroundY = ezse::AxisAngle(c_axisY, 0.9f);
+    Check(NearlyEqual(ezse::Rotation(aroundY * aroundX), ezse::RotationY(0.9f) * ezse::RotationX(0.4f)),
+        "a * b turns like the matrices: first b, then a");
+    Check(!NearlyEqual(aroundY * aroundX, aroundX * aroundY),
+        "the order of multiplying matters: a * b is not b * a");
+    Check(NearlyEqual(ezse::Quat{} * aroundX, aroundX) && NearlyEqual(aroundX * ezse::Quat{}, aroundX),
+        "multiplying with the default Quat changes nothing");
+}
+
+void TestQuatDotLengthNormalize() {
+    Check(NearlyEqual(ezse::Dot(ezse::Quat{ 1.0f, 2.0f, 3.0f, 4.0f }, ezse::Quat{ 5.0f, 6.0f, 7.0f, 8.0f }), 70.0f),
+        "Dot multiplies the four parts and adds them up");
+    Check(NearlyEqual(ezse::Length(ezse::Quat{ 1.0f, 2.0f, 2.0f, 4.0f }), 5.0f),
+        "Length is the square root of the sum of the squares");
+    Check(NearlyEqual(ezse::Length(ezse::Normalize(ezse::Quat{ 1.0f, 2.0f, 3.0f, 4.0f })), 1.0f),
+        "Normalize gives a Quat of length 1");
+    Check(NearlyEqual(ezse::Normalize(ezse::Quat{ 0.0f, 0.0f, 0.0f, 0.0f }), ezse::Quat{}),
+        "Normalize of a zero Quat gives the default Quat");
+}
+
+void TestQuatConjugate() {
+    const ezse::Quat q = ezse::AxisAngle(Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.8f);
+    Check(NearlyEqual(ezse::Conjugate(q), ezse::Quat{ -q.x, -q.y, -q.z, q.w }),
+        "Conjugate flips x, y and z and keeps w");
+    Check(NearlyEqual(q * ezse::Conjugate(q), ezse::Quat{}),
+        "a Quat times its Conjugate does not turn: the Conjugate turns it back");
+    Check(NearlyEqual(ezse::Rotation(ezse::Conjugate(q)) * ezse::Rotation(q), ezse::Mat4{}),
+        "the matrix of the Conjugate undoes the matrix of the Quat");
+}
+
+void TestQuatSlerp() {
+    const ezse::Quat start;
+    const ezse::Quat quarterY = ezse::AxisAngle(c_axisY, c_quarterTurn);
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.0f), start), "Slerp at 0 gives the first Quat");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 1.0f), quarterY), "Slerp at 1 gives the second Quat");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.5f), ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f)),
+        "Slerp at 0.5 between zero and a quarter turn is an eighth turn");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.25f), ezse::AxisAngle(c_axisY, c_quarterTurn * 0.25f)),
+        "Slerp turns at a constant speed: at 0.25 a quarter of the angle");
+    Check(NearlyEqual(ezse::Length(ezse::Slerp(start, quarterY, 0.3f)), 1.0f),
+        "Slerp keeps the length at 1");
+
+    // q and -q are the same orientation; Slerp must take the short way to either of them.
+    const ezse::Quat negativeQuarterY = quarterY * -1.0f;
+    Check(NearlyEqual(ezse::Rotation(ezse::Slerp(start, negativeQuarterY, 0.5f)),
+                      ezse::Rotation(ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f))),
+        "Slerp to -q takes the short way, the same as to q");
+
+    // Almost the same orientation: the branch that mixes and normalizes.
+    const ezse::Quat almostStart = ezse::AxisAngle(c_axisY, 0.001f);
+    Check(NearlyEqual(ezse::Slerp(start, almostStart, 0.5f), ezse::AxisAngle(c_axisY, 0.0005f)),
+        "Slerp between two nearly equal Quats lands halfway");
+    Check(NearlyEqual(ezse::Slerp(quarterY, quarterY, 0.7f), quarterY),
+        "Slerp between a Quat and itself gives that Quat");
+}
+
 } // namespace
 
 int main() {
@@ -474,6 +588,14 @@ int main() {
     TestLookAt();
     TestOrthographic();
     TestPerspective();
+    TestVec3Lerp();
+    TestQuatDefault();
+    TestQuatAxisAngle();
+    TestQuatRotation();
+    TestQuatMultiply();
+    TestQuatDotLengthNormalize();
+    TestQuatConjugate();
+    TestQuatSlerp();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

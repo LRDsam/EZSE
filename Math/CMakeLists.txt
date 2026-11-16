@@ -1,9 +1,11 @@
 add_library(EZSEMath STATIC
     include/EZSE/Math/Mat4.h
+    include/EZSE/Math/Quat.h
     include/EZSE/Math/Transform.h
     include/EZSE/Math/Vec3.h
     include/EZSE/Math/Vec4.h
     src/Mat4.cpp
+    src/Quat.cpp
     src/Transform.cpp
     src/Vec3.cpp
 )

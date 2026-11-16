@@ -45,4 +45,8 @@ Vec3 Normalize(const Vec3& vec) {
     return Vec3{ vec.x / length, vec.y / length, vec.z / length };
 }
 
+Vec3 Lerp(const Vec3& a, const Vec3& b, float t) {
+    return a + (b - a) * t;
+}
+
 } // namespace ezse
