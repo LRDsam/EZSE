@@ -761,7 +761,8 @@ in besluiten 274 tot en met 277; de aap draait nog met 30 stapjes per seconde). 
 
 32c gaat in delen: 32c-1 `Quat` en `Lerp` in `Math` met tests (af, besluit 278), 32c-2
 `Transform::rotation` als `Quat` (af, besluit 279), **32c-3** `PreviousTransform`,
-`TransformHistorySystem` en `ResetInterpolation` (volgende), 32c-4 `SimulationTime`,
+`TransformHistorySystem` en `ResetInterpolation` (bezig: het component met `EnableInterpolation` en
+`ResetInterpolation` staat; het system, het registreren in de `Engine`, Sandbox en de tests volgen), 32c-4 `SimulationTime`,
 `WorldMatrix` met zijn system, en de drie systems die tekenen lezen `WorldMatrix`.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
