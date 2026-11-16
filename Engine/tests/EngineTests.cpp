@@ -1,10 +1,16 @@
 #include "EZSE/Engine/Components/Camera.h"
 #include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
+#include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 #include "EZSE/Engine/Resources/ResourceCache.h"
+#include "EZSE/Engine/Systems/TransformHistorySystem.h"
+
+#include "EZSE/ECS/Signature.h"
+#include "EZSE/ECS/SystemPhase.h"
+#include "EZSE/ECS/World.h"
 
 #include "EZSE/Math/Mat4.h"
 #include "EZSE/Math/Vec3.h"
@@ -270,6 +276,69 @@ void TestResourceCache() {
     Check(cache.Acquire("models/cube.obj").id == 12, "ResourceCache: a released key can be added again");
 }
 
+// Exact comparison: the system and ResetInterpolation copy, they do not compute.
+bool SameTransform(const ezse::Transform& a, const ezse::Transform& b) {
+    return a.position.x == b.position.x && a.position.y == b.position.y &&
+           a.position.z == b.position.z && a.rotation.x == b.rotation.x &&
+           a.rotation.y == b.rotation.y && a.rotation.z == b.rotation.z &&
+           a.rotation.w == b.rotation.w && a.scale.x == b.scale.x && a.scale.y == b.scale.y &&
+           a.scale.z == b.scale.z;
+}
+
+// The Engine needs a window, so the test builds the same World setup as the Engine constructor:
+// both components and the TransformHistorySystem in SystemPhase::Simulation.
+void TestInterpolationHistory() {
+    ezse::World world;
+    world.RegisterComponent<ezse::Transform>();
+    world.RegisterComponent<ezse::PreviousTransform>();
+    world.AddSystem<ezse::TransformHistorySystem>(
+        ezse::SystemPhase::Simulation,
+        ezse::MakeSignature<ezse::Transform, ezse::PreviousTransform>());
+
+    const ezse::Entity interpolated = world.CreateEntity();
+    world.AddComponent(interpolated, ezse::Transform{.position = {1.0f, 2.0f, 3.0f}});
+    ezse::EnableInterpolation(world, interpolated);
+    Check(world.HasComponent<ezse::PreviousTransform>(interpolated),
+          "EnableInterpolation: adds a PreviousTransform");
+    Check(SameTransform(world.GetComponent<ezse::PreviousTransform>(interpolated).transform,
+                        world.GetComponent<ezse::Transform>(interpolated)),
+          "EnableInterpolation: the previous state equals the current one");
+
+    const ezse::Entity plain = world.CreateEntity();
+    world.AddComponent(plain, ezse::Transform{});
+
+    // As a game system would do during a tick: move, turn and scale.
+    const ezse::Transform start = world.GetComponent<ezse::Transform>(interpolated);
+    const ezse::Transform moved{.position = {4.0f, 5.0f, 6.0f},
+                                .rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f}),
+                                .scale = {2.0f, 2.0f, 2.0f}};
+    world.GetComponent<ezse::Transform>(interpolated) = moved;
+    Check(SameTransform(world.GetComponent<ezse::PreviousTransform>(interpolated).transform, start),
+          "PreviousTransform: a change of the Transform does not change it by itself");
+
+    world.Update(ezse::SystemPhase::Presentation, 1.0f / 60.0f);
+    Check(SameTransform(world.GetComponent<ezse::PreviousTransform>(interpolated).transform, start),
+          "TransformHistorySystem: does not copy in Presentation");
+
+    world.Update(ezse::SystemPhase::Simulation, 1.0f / 30.0f);
+    Check(SameTransform(world.GetComponent<ezse::PreviousTransform>(interpolated).transform, moved),
+          "TransformHistorySystem: a tick copies position, rotation and scale");
+    Check(!world.HasComponent<ezse::PreviousTransform>(plain),
+          "TransformHistorySystem: an entity without interpolation gets no PreviousTransform");
+
+    // A teleport after the copy of this tick: without a reset the next frames would blend.
+    const ezse::Transform teleported{.position = {100.0f, 0.0f, 0.0f}};
+    world.GetComponent<ezse::Transform>(interpolated) = teleported;
+    ezse::ResetInterpolation(world, interpolated);
+    Check(SameTransform(world.GetComponent<ezse::PreviousTransform>(interpolated).transform,
+                        teleported),
+          "ResetInterpolation: the previous state equals the current one");
+
+    ezse::ResetInterpolation(world, plain);
+    Check(!world.HasComponent<ezse::PreviousTransform>(plain),
+          "ResetInterpolation: does nothing for an entity without interpolation");
+}
+
 } // namespace
 
 int main() {
@@ -279,6 +348,7 @@ int main() {
     TestDecodeImage();
     TestParseObj();
     TestResourceCache();
+    TestInterpolationHistory();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

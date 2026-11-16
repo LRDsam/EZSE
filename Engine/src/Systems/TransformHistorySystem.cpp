@@ -7,4 +7,11 @@
 
 namespace ezse {
 
+void TransformHistorySystem::Update(World& world, float) {
+    for (Entity entity : GetEntities()) {
+        world.GetComponent<PreviousTransform>(entity).transform =
+            world.GetComponent<Transform>(entity);
+    }
+}
+
 } // namespace ezse

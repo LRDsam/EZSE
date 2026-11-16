@@ -3,7 +3,9 @@
 #include "EZSE/Engine/Components/Camera.h"
 #include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
+#include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Systems/TransformHistorySystem.h"
 
 #include "EZSE/Platform/FileSystem.h"
 #include "EZSE/Platform/WindowEvent.h"
@@ -63,6 +65,10 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
     m_world.RegisterComponent<Light>();
+    m_world.RegisterComponent<PreviousTransform>();
+    m_world.AddSystem<TransformHistorySystem>(
+        SystemPhase::Simulation,
+        MakeSignature<Transform, PreviousTransform>());
 
     ImGui::CreateContext();
     // No imgui.ini with window positions in the working folder.

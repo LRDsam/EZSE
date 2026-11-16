@@ -1,6 +1,7 @@
 #include "EZSE/Engine/Components/Camera.h"
 #include "EZSE/Engine/Components/Light.h"
 #include "EZSE/Engine/Components/MeshRenderer.h"
+#include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
@@ -174,7 +175,9 @@ void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
 
 int main() {
     // Creating engine
-    auto engine = ezse::Engine::Create({.window = {.title = "EZSE Sandbox"}});
+    auto engine = ezse::Engine::Create(
+        {.window = {.title = "EZSE Sandbox"},
+        .ticksPerSecond = 5});
     if (!engine) {
         return 1;
     }
@@ -235,6 +238,7 @@ int main() {
         .scale = {0.5f, 0.5f, 0.5f}});
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
     world.AddComponent(monkey, Spin{.speed = {0.0f, 2.5f, 0.0f}});
+    ezse::EnableInterpolation(world, monkey);
 
     // A room around everything: a floor under the cubes and four walls, open at the top. Grey
     // checkerboard with little shine, so it does not look like the cubes.
