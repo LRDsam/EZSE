@@ -3,10 +3,13 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Components/WorldMatrix.h"
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 #include "EZSE/Engine/Resources/ResourceCache.h"
+#include "EZSE/Engine/SimulationTime.h"
 #include "EZSE/Engine/Systems/TransformHistorySystem.h"
+#include "EZSE/Engine/Systems/WorldMatrixSystem.h"
 
 #include "EZSE/ECS/Signature.h"
 #include "EZSE/ECS/SystemPhase.h"
@@ -339,6 +342,92 @@ void TestInterpolationHistory() {
           "ResetInterpolation: does nothing for an entity without interpolation");
 }
 
+bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f;
+}
+
+bool NearlyEqual(const ezse::Quat& a, const ezse::Quat& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
+}
+
+bool NearlyEqual(const ezse::Transform& a, const ezse::Transform& b) {
+    return NearlyEqual(a.position, b.position) && NearlyEqual(a.rotation, b.rotation) &&
+           NearlyEqual(a.scale, b.scale);
+}
+
+void TestInterpolate() {
+    const ezse::Transform a{.position = {0.0f, 0.0f, 0.0f}, .scale = {1.0f, 1.0f, 1.0f}};
+    const ezse::Transform b{.position = {2.0f, 4.0f, -6.0f},
+                            .rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f}),
+                            .scale = {3.0f, 3.0f, 3.0f}};
+
+    Check(NearlyEqual(ezse::Interpolate(a, b, 0.0f), a), "Interpolate: t = 0 gives a");
+    Check(NearlyEqual(ezse::Interpolate(a, b, 1.0f), b), "Interpolate: t = 1 gives b");
+
+    const ezse::Transform half = ezse::Interpolate(a, b, 0.5f);
+    Check(NearlyEqual(half.position, ezse::Vec3{1.0f, 2.0f, -3.0f}),
+          "Interpolate: t = 0.5 puts the position halfway");
+    Check(NearlyEqual(half.scale, ezse::Vec3{2.0f, 2.0f, 2.0f}),
+          "Interpolate: t = 0.5 puts the scale halfway");
+    // Halfway along a quarter turn around Y is an eighth turn around Y.
+    Check(NearlyEqual(half.rotation, ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn / 2.0f, 0.0f})),
+          "Interpolate: t = 0.5 turns the rotation halfway (Slerp)");
+}
+
+// The same World setup as the Engine constructor, with a SimulationTime of its own whose alpha the
+// test sets by hand.
+void TestWorldMatrixSystem() {
+    ezse::World world;
+    world.RegisterComponent<ezse::Transform>();
+    world.RegisterComponent<ezse::PreviousTransform>();
+    world.RegisterComponent<ezse::WorldMatrix>();
+    ezse::SimulationTime time;
+    world.AddSystem<ezse::WorldMatrixSystem>(
+        ezse::SystemPhase::Presentation,
+        ezse::MakeSignature<ezse::Transform>(),
+        time);
+
+    const ezse::Entity plain = world.CreateEntity();
+    world.AddComponent(plain, ezse::Transform{.position = {1.0f, 2.0f, 3.0f}});
+
+    const ezse::Entity interpolated = world.CreateEntity();
+    world.AddComponent(interpolated, ezse::Transform{});
+    ezse::EnableInterpolation(world, interpolated);
+    // As after a tick: the previous state is at the origin, the current one 2 along X.
+    world.GetComponent<ezse::Transform>(interpolated).position = ezse::Vec3{2.0f, 0.0f, 0.0f};
+
+    const ezse::Entity withoutTransform = world.CreateEntity();
+
+    time.alpha = 0.25f;
+    world.Update(ezse::SystemPhase::Presentation, 1.0f / 60.0f);
+    Check(world.HasComponent<ezse::WorldMatrix>(plain) &&
+              world.HasComponent<ezse::WorldMatrix>(interpolated),
+          "WorldMatrixSystem: adds a WorldMatrix to every entity with a Transform");
+    Check(!world.HasComponent<ezse::WorldMatrix>(withoutTransform),
+          "WorldMatrixSystem: an entity without a Transform gets no WorldMatrix");
+    Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(plain).matrix,
+                      MakeTranslation(1.0f, 2.0f, 3.0f)),
+          "WorldMatrixSystem: without interpolation the matrix is the ModelMatrix of the Transform");
+    Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(interpolated).matrix,
+                      MakeTranslation(0.5f, 0.0f, 0.0f)),
+          "WorldMatrixSystem: with interpolation the matrix is blended by alpha");
+
+    // The system holds a reference: a new alpha is seen without adding the system again.
+    time.alpha = 0.75f;
+    world.Update(ezse::SystemPhase::Presentation, 1.0f / 60.0f);
+    Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(interpolated).matrix,
+                      MakeTranslation(1.5f, 0.0f, 0.0f)),
+          "WorldMatrixSystem: reads the current alpha of the SimulationTime every frame");
+
+    world.GetComponent<ezse::Transform>(plain).position = ezse::Vec3{5.0f, 0.0f, 0.0f};
+    world.Update(ezse::SystemPhase::Simulation, 1.0f / 30.0f);
+    Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(plain).matrix,
+                      MakeTranslation(1.0f, 2.0f, 3.0f)),
+          "WorldMatrixSystem: does not run in Simulation");
+}
+
 } // namespace
 
 int main() {
@@ -349,6 +438,8 @@ int main() {
     TestParseObj();
     TestResourceCache();
     TestInterpolationHistory();
+    TestInterpolate();
+    TestWorldMatrixSystem();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

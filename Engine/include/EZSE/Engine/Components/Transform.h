@@ -16,5 +16,8 @@ struct Transform {
 
 Mat4 ModelMatrix(const Transform& transform);
 Mat4 ViewMatrix(const Transform& transform);
+// The Transform a fraction t of the way from a to b: Lerp for position and scale, Slerp for the
+// rotation. t = 0 gives a, t = 1 gives b.
+Transform Interpolate(const Transform& a, const Transform& b, float t);
 
 } // namespace ezse

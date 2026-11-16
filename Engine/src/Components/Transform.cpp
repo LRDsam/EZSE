@@ -16,4 +16,12 @@ Mat4 ViewMatrix(const Transform& transform) {
         Translation(-transform.position);
 }
 
+Transform Interpolate(const Transform& a, const Transform& b, float t) {
+    return Transform{
+        Lerp(a.position, b.position, t),
+        Slerp(a.rotation, b.rotation, t),
+        Lerp(a.scale, b.scale, t)
+    };
+}
+
 } // namespace ezse

@@ -4,6 +4,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Components/MeshRenderer.h
     include/EZSE/Engine/Components/PreviousTransform.h
     include/EZSE/Engine/Components/Transform.h
+    include/EZSE/Engine/Components/WorldMatrix.h
     include/EZSE/Engine/Debug/ComponentEditors.h
     include/EZSE/Engine/Debug/DebugUI.h
     include/EZSE/Engine/Debug/DebugWidgets.h
@@ -18,6 +19,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Systems/LightSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
     include/EZSE/Engine/Systems/TransformHistorySystem.h
+    include/EZSE/Engine/Systems/WorldMatrixSystem.h
     src/Components/PreviousTransform.cpp
     src/Components/Transform.cpp
     src/Debug/ComponentEditors.cpp
@@ -31,6 +33,7 @@ add_library(EZSEEngine STATIC
     src/Systems/LightSystem.cpp
     src/Systems/RenderSystem.cpp
     src/Systems/TransformHistorySystem.cpp
+    src/Systems/WorldMatrixSystem.cpp
 )
 add_library(EZSE::Engine ALIAS EZSEEngine)
 
