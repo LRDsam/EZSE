@@ -13,6 +13,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Resources/Obj.h
     include/EZSE/Engine/Resources/ResourceCache.h
     include/EZSE/Engine/Resources/ResourceManager.h
+    include/EZSE/Engine/SimulationTime.h
     include/EZSE/Engine/Systems/CameraSystem.h
     include/EZSE/Engine/Systems/LightSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h

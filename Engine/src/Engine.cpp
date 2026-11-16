@@ -60,7 +60,8 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     : m_window(std::move(window)),
       m_renderer(std::move(renderer)),
       m_resources(*m_renderer, GetExecutableDirectory() / "assets"),
-      m_tickDuration(tickDuration) {
+      m_tickDuration(tickDuration),
+      m_simulationTime{.tickSeconds = std::chrono::duration<float>(tickDuration).count()} {
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
@@ -89,13 +90,16 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
         const auto now = std::chrono::steady_clock::now();
         const std::chrono::duration<float> elapsed = now - windowStart;
         if (elapsed.count() >= 1.0f) {
-            measured = static_cast<float>(m_tickCount - ticksAtStart) / elapsed.count();
+            measured = static_cast<float>(m_simulationTime.tick - ticksAtStart) / elapsed.count();
             windowStart = now;
-            ticksAtStart = m_tickCount;
+            ticksAtStart = m_simulationTime.tick;
         }
         const auto targetTicksPerSecond = std::chrono::seconds{1} / m_tickDuration;
-        ImGui::Text("Tick %llu (%.1f ticks/s, target %lld)", static_cast<unsigned long long>(m_tickCount),
-                    measured, static_cast<long long>(targetTicksPerSecond));
+        ImGui::Text(
+            "Tick %llu (%.1f ticks/s, target %lld)",
+            static_cast<unsigned long long>(m_simulationTime.tick),
+            measured,
+            static_cast<long long>(targetTicksPerSecond));
     });
     m_debugUI.AddPanel("Shadow map", [&renderer = *m_renderer](World&) {
         renderer.DrawShadowMapDebugUI();
@@ -115,7 +119,6 @@ void Engine::Run() {
     auto lastFrame = std::chrono::steady_clock::now();
     // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
     std::chrono::steady_clock::duration accumulator{0};
-    const float tickSeconds = std::chrono::duration<float>(m_tickDuration).count();
 
     while (!m_quitRequested && !m_window->ShouldClose()) {
         m_window->PollEvents();
@@ -139,10 +142,13 @@ void Engine::Run() {
         // The simulation runs zero or more fixed ticks, depending on the time that has passed.
         accumulator += frameTime;
         while (accumulator >= m_tickDuration) {
-            m_world.Update(SystemPhase::Simulation, tickSeconds);
+            m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
             accumulator -= m_tickDuration;
-            ++m_tickCount;
+            ++m_simulationTime.tick;
         }
+        // What is left in the accumulator is always less than one tick, so alpha stays below 1.
+        m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
+                                 std::chrono::duration<float>(m_tickDuration);
 
         m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
 
@@ -155,6 +161,10 @@ void Engine::Run() {
 
 void Engine::Quit() {
     m_quitRequested = true;
+}
+
+const SimulationTime& Engine::GetSimulationTime() const {
+    return m_simulationTime;
 }
 
 World& Engine::GetWorld() {

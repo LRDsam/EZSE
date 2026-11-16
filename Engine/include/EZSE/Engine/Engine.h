@@ -2,6 +2,7 @@
 
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Resources/ResourceManager.h"
+#include "EZSE/Engine/SimulationTime.h"
 
 #include "EZSE/ECS/World.h"
 #include "EZSE/Platform/Window.h"
@@ -30,6 +31,8 @@ public:
     void Run();
     void Quit();
 
+    const SimulationTime& GetSimulationTime() const;
+
     World& GetWorld();
     Window& GetWindow();
     Renderer& GetRenderer();
@@ -49,7 +52,7 @@ private:
     World m_world;
     bool m_quitRequested = false;
     std::chrono::steady_clock::duration m_tickDuration;
-    std::uint64_t m_tickCount = 0; // Ticks run since the start; 64 bits last billions of years.
+    SimulationTime m_simulationTime;
 };
 
 } // namespace ezse
