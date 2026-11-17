@@ -70,13 +70,14 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_world.RegisterComponent<Light>();
     m_world.RegisterComponent<PreviousTransform>();
     m_world.RegisterComponent<WorldMatrix>();
-    m_world.AddSystem<TransformHistorySystem>(
-        SystemPhase::Simulation,
-        MakeSignature<Transform, PreviousTransform>());
-    m_world.AddSystem<WorldMatrixSystem>(
-        SystemPhase::Presentation,
-        MakeSignature<Transform>(),
-        m_simulationTime);
+    // The engine adds its own systems; the group sets their place, not the order of adding.
+    // PreUpdate keeps the previous Transform before the game changes it in this tick.
+    m_world.AddSystem<TransformHistorySystem>(SimulationGroup::PreUpdate,
+                                              MakeSignature<Transform, PreviousTransform>());
+    // PostUpdate computes the WorldMatrix after the game changed this frame, before drawing.
+    m_world.AddSystem<WorldMatrixSystem>(PresentationGroup::PostUpdate,
+                                         MakeSignature<Transform>(),
+                                         m_simulationTime);
 
     ImGui::CreateContext();
     // No imgui.ini with window positions in the working folder.

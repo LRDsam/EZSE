@@ -295,7 +295,7 @@ void TestInterpolationHistory() {
     world.RegisterComponent<ezse::Transform>();
     world.RegisterComponent<ezse::PreviousTransform>();
     world.AddSystem<ezse::TransformHistorySystem>(
-        ezse::SystemPhase::Simulation,
+        ezse::SimulationGroup::PreUpdate,
         ezse::MakeSignature<ezse::Transform, ezse::PreviousTransform>());
 
     const ezse::Entity interpolated = world.CreateEntity();
@@ -385,7 +385,7 @@ void TestWorldMatrixSystem() {
     world.RegisterComponent<ezse::WorldMatrix>();
     ezse::SimulationTime time;
     world.AddSystem<ezse::WorldMatrixSystem>(
-        ezse::SystemPhase::Presentation,
+        ezse::PresentationGroup::PostUpdate,
         ezse::MakeSignature<ezse::Transform>(),
         time);
 

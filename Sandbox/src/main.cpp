@@ -316,21 +316,31 @@ int main() {
     // Registing the systems
     // Program controls (quit, debug UI, cursor) read the events of this frame, so they run once per
     // frame; in the simulation a key press would be missed in frames without a tick.
-    world.AddSystem<GameControlSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<>(),
-        engine->GetWindow(), *engine);
-    world.AddSystem<SpinSystem>(ezse::SystemPhase::Simulation, ezse::MakeSignature<ezse::Transform, Spin>());
+    world.AddSystem<GameControlSystem>(ezse::PresentationGroup::Update,
+                                       ezse::MakeSignature<>(),
+                                       engine->GetWindow(),
+                                       *engine);
+    // Turns the monkey at a constant speed, per tick.
+    world.AddSystem<SpinSystem>(ezse::SimulationGroup::Update,
+                                ezse::MakeSignature<ezse::Transform, Spin>());
     // The fly camera is a debug tool, not a player: per frame, so looking around stays smooth.
-    world.AddSystem<CameraControlSystem>(
-        ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, CameraController>(),
-        engine->GetWindow(), *engine);
-    // The engine systems come last: camera, then lights, then drawing (decision 115).
-    world.AddSystem<ezse::CameraSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
-                                        engine->GetWindow(), renderer);
+    world.AddSystem<CameraControlSystem>(ezse::PresentationGroup::Update,
+                                         ezse::MakeSignature<ezse::Transform, CameraController>(),
+                                         engine->GetWindow(), *engine);
+    // The engine systems in Render: camera, then lights, then drawing. They move into the
+    // Engine in step 32c-4e-2.
+    world.AddSystem<ezse::CameraSystem>(ezse::PresentationGroup::Render,
+                                        ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
+                                        engine->GetWindow(),
+                                        renderer);
     // The sun casts shadows in a cube of 20 meters around the origin; the room is 12 by 12.
-    world.AddSystem<ezse::LightSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Light>(),
+    world.AddSystem<ezse::LightSystem>(ezse::PresentationGroup::Render,
+                                       ezse::MakeSignature<ezse::Transform, ezse::Light>(),
                                        renderer, 10.0f);
-    world.AddSystem<ezse::RenderSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::WorldMatrix, ezse::MeshRenderer>(),
-                                        renderer, ezse::Vec3{0.010f, 0.033f, 0.073f});
+    world.AddSystem<ezse::RenderSystem>(ezse::PresentationGroup::Render,
+                                        ezse::MakeSignature<ezse::WorldMatrix, ezse::MeshRenderer>(),
+                                        renderer,
+                                        ezse::Vec3{0.010f, 0.033f, 0.073f});
 
     // Capturing mouse in window and running game
     engine->GetWindow().SetCursorCaptured(true);

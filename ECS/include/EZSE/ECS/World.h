@@ -27,11 +27,18 @@ public:
     template <typename T> bool HasComponent(Entity entity) const;
 
     template <typename T, typename... Args>
-    T& AddSystem(SystemPhase systemPhase, Signature signature, Args&&... args);
+    T& AddSystem(SimulationGroup group, Signature signature, Args&&... args);
+    // The group sets the phase too: a PresentationGroup runs in SystemPhase::Presentation.
+    template <typename T, typename... Args>
+    T& AddSystem(PresentationGroup group, Signature signature, Args&&... args);
 
     void Update(SystemPhase systemPhase, float deltaTime);
 
 private:
+    // Puts every living entity in the systems whose signature it matches; for a system that was
+    // just added.
+    void AddExistingEntitiesToSystems();
+
     EntityManager m_entities;
     ComponentManager m_components;
     SystemManager m_systems;
@@ -68,14 +75,22 @@ bool World::HasComponent(Entity entity) const {
 }
 
 template <typename T, typename... Args>
-T& World::AddSystem(SystemPhase systemPhase, Signature signature, Args&&... args) {
-    T& system = m_systems.Add<T>(systemPhase, signature, std::forward<Args>(args)...);
-    for (std::uint32_t id = 1; id <= m_entities.GetCreatedCount(); ++id) {
-        const Entity entity = Entity{ id };
-        if (m_entities.IsAlive(entity)) {
-            m_systems.EntitySignatureChanged(entity, m_components.GetSignature(entity));
-        }
-    }
+T& World::AddSystem(SimulationGroup group, Signature signature, Args&&... args) {
+    T& system = m_systems.Add<T>(SystemPhase::Simulation,
+                                 static_cast<std::size_t>(group),
+                                 signature,
+                                 std::forward<Args>(args)...);
+    AddExistingEntitiesToSystems();
+    return system;
+}
+
+template <typename T, typename... Args>
+T& World::AddSystem(PresentationGroup group, Signature signature, Args&&... args) {
+    T& system = m_systems.Add<T>(SystemPhase::Presentation,
+                                 static_cast<std::size_t>(group),
+                                 signature,
+                                 std::forward<Args>(args)...);
+    AddExistingEntitiesToSystems();
     return system;
 }
 
