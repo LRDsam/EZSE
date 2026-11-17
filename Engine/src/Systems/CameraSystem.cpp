@@ -1,7 +1,7 @@
 #include "EZSE/Engine/Systems/CameraSystem.h"
 
 #include "EZSE/Engine/Components/Camera.h"
-#include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Components/WorldMatrix.h"
 
 #include "EZSE/ECS/World.h"
 #include "EZSE/Math/Transform.h"
@@ -27,11 +27,11 @@ void CameraSystem::Update(World& world, float) {
     const float aspect = static_cast<float>(framebufferSize.width) /
                          static_cast<float>(framebufferSize.height);
     const Camera& camera = world.GetComponent<Camera>(cameraEntity);
-    const Transform& transform = world.GetComponent<Transform>(cameraEntity);
+    const WorldMatrix& worldMatrix = world.GetComponent<WorldMatrix>(cameraEntity);
     m_renderer.SetCamera(
-        ViewMatrix(transform),
+        Inverse(worldMatrix.matrix),
         Perspective(camera.fovY, aspect, camera.nearPlane, camera.farPlane),
-        transform.position);
+        Position(worldMatrix));
 }
 
 } // namespace ezse

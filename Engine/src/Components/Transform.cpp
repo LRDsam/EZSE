@@ -10,12 +10,6 @@ Mat4 ModelMatrix(const Transform& transform) {
         Scale(transform.scale);
 }
 
-Mat4 ViewMatrix(const Transform& transform) {
-    // The inverse of the camera's own placement: move back, then turn back with the Conjugate.
-    return Rotation(Conjugate(transform.rotation)) *
-        Translation(-transform.position);
-}
-
 Transform Interpolate(const Transform& a, const Transform& b, float t) {
     return Transform{
         Lerp(a.position, b.position, t),

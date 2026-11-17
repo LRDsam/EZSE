@@ -22,6 +22,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Systems/WorldMatrixSystem.h
     src/Components/PreviousTransform.cpp
     src/Components/Transform.cpp
+    src/Components/WorldMatrix.cpp
     src/Debug/ComponentEditors.cpp
     src/Debug/DebugUI.cpp
     src/Debug/DebugWidgets.cpp

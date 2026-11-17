@@ -85,11 +85,11 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     // draws with what they hand to the Renderer in the same frame (the view, the lights and the
     // shadow matrix).
     m_world.AddSystem<CameraSystem>(PresentationGroup::Render,
-                                    MakeSignature<Transform, Camera>(),
+                                    MakeSignature<WorldMatrix, Camera>(),
                                     *m_window,
                                     *m_renderer);
     m_world.AddSystem<LightSystem>(PresentationGroup::Render,
-                                   MakeSignature<Transform, Light>(),
+                                   MakeSignature<WorldMatrix, Light>(),
                                    *m_renderer,
                                    desc.shadowExtent);
     m_world.AddSystem<RenderSystem>(PresentationGroup::Render,

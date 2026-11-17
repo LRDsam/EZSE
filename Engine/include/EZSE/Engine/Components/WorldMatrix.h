@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EZSE/Math/Mat4.h"
+#include "EZSE/Math/Vec3.h"
 
 namespace ezse {
 
@@ -10,5 +11,10 @@ namespace ezse {
 struct WorldMatrix {
     Mat4 matrix;
 };
+
+// Where the entity is in the world: the translation column of the matrix.
+Vec3 Position(const WorldMatrix& worldMatrix);
+// The direction the entity looks in the world: its own -Z, of length 1 also with a scale.
+Vec3 Forward(const WorldMatrix& worldMatrix);
 
 } // namespace ezse

@@ -6,8 +6,9 @@
 
 namespace ezse {
 
-// Sends the view and projection of the first entity with a Transform and a Camera to the
-// renderer, with the aspect taken from the window every frame.
+// Sends the view and projection of the first entity with a WorldMatrix and a Camera to the
+// renderer, with the aspect taken from the window every frame. The view is the inverse of the
+// WorldMatrix.
 class CameraSystem : public System {
 public:
     CameraSystem(Window& window, Renderer& renderer);

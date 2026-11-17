@@ -51,6 +51,11 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
+bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
+           std::abs(a.z - b.z) <= 0.0001f;
+}
+
 bool NearlyEqual(const ezse::Vec4& a, const ezse::Vec4& b) {
     return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
            std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
@@ -101,26 +106,50 @@ void TestModelMatrix() {
           "ModelMatrix: scaling comes before the rotation");
 }
 
-void TestViewMatrix() {
+void TestCameraView() {
+    // The CameraSystem draws with the inverse of the WorldMatrix of the camera as its view.
     ezse::Transform camera;
     camera.position = ezse::Vec3{2.0f, 1.0f, 3.0f};
     camera.rotation = ezse::FromEuler(ezse::Vec3{0.3f, -0.7f, 0.2f});
+    const ezse::Mat4 view = ezse::Inverse(ezse::ModelMatrix(camera));
 
-    Check(NearlyEqual(ezse::ViewMatrix(camera) * ezse::ModelMatrix(camera), ezse::Mat4{}),
-          "ViewMatrix: undoes ModelMatrix of the same Transform (scale 1)");
+    Check(NearlyEqual(view * ezse::ModelMatrix(camera), ezse::Mat4{}),
+          "Camera view: the inverse undoes ModelMatrix of the same Transform");
 
-    Check(NearlyEqual(ezse::ViewMatrix(camera) * ezse::Vec4{2.0f, 1.0f, 3.0f, 1.0f},
-                      ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
-          "ViewMatrix: the camera position ends up in the origin");
+    Check(NearlyEqual(view * ezse::Vec4{2.0f, 1.0f, 3.0f, 1.0f}, ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
+          "Camera view: the camera position ends up in the origin");
 
     // A camera at (0, 0, 3) turned a quarter to the left looks along -X.
     // A point two units in front of it must end up on the -Z axis of the view.
     ezse::Transform turnedLeft;
     turnedLeft.position = ezse::Vec3{0.0f, 0.0f, 3.0f};
     turnedLeft.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
-    Check(NearlyEqual(ezse::ViewMatrix(turnedLeft) * ezse::Vec4{-2.0f, 0.0f, 3.0f, 1.0f},
+    Check(NearlyEqual(ezse::Inverse(ezse::ModelMatrix(turnedLeft)) * ezse::Vec4{-2.0f, 0.0f, 3.0f, 1.0f},
                       ezse::Vec4{0.0f, 0.0f, -2.0f, 1.0f}),
-          "ViewMatrix: a point in front of a turned camera lies on -Z");
+          "Camera view: a point in front of a turned camera lies on -Z");
+}
+
+void TestWorldMatrixPositionForward() {
+    ezse::Transform transform;
+    transform.position = ezse::Vec3{1.0f, -2.0f, 3.0f};
+    const ezse::WorldMatrix moved{ezse::ModelMatrix(transform)};
+    Check(NearlyEqual(ezse::Position(moved), ezse::Vec3{1.0f, -2.0f, 3.0f}),
+          "WorldMatrix Position: the translation of the matrix");
+    Check(NearlyEqual(ezse::Forward(moved), ezse::Vec3{0.0f, 0.0f, -1.0f}),
+          "WorldMatrix Forward: an entity that is not turned looks along -Z, wherever it stands");
+
+    // A quarter to the left around Y: -Z turns to -X.
+    transform.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
+    const ezse::WorldMatrix turned{ezse::ModelMatrix(transform)};
+    Check(NearlyEqual(ezse::Forward(turned), ezse::Vec3{-1.0f, 0.0f, 0.0f}),
+          "WorldMatrix Forward: a quarter turn left around Y looks along -X");
+    Check(NearlyEqual(ezse::Position(turned), ezse::Vec3{1.0f, -2.0f, 3.0f}),
+          "WorldMatrix Position: a rotation does not move the position");
+
+    transform.scale = ezse::Vec3{2.0f, 3.0f, 4.0f};
+    const ezse::WorldMatrix scaled{ezse::ModelMatrix(transform)};
+    Check(NearlyEqual(ezse::Forward(scaled), ezse::Vec3{-1.0f, 0.0f, 0.0f}),
+          "WorldMatrix Forward: of length 1, also with a scale");
 }
 
 void TestComponentDefaults() {
@@ -342,11 +371,6 @@ void TestInterpolationHistory() {
           "ResetInterpolation: does nothing for an entity without interpolation");
 }
 
-bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
-    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
-           std::abs(a.z - b.z) <= 0.0001f;
-}
-
 bool NearlyEqual(const ezse::Quat& a, const ezse::Quat& b) {
     return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
            std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
@@ -432,7 +456,8 @@ void TestWorldMatrixSystem() {
 
 int main() {
     TestModelMatrix();
-    TestViewMatrix();
+    TestCameraView();
+    TestWorldMatrixPositionForward();
     TestComponentDefaults();
     TestDecodeImage();
     TestParseObj();

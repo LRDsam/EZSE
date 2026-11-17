@@ -1,7 +1,7 @@
 #include "EZSE/Engine/Systems/LightSystem.h"
 
 #include "EZSE/Engine/Components/Light.h"
-#include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Components/WorldMatrix.h"
 
 #include "EZSE/ECS/World.h"
 #include "EZSE/Math/Transform.h"
@@ -14,14 +14,6 @@
 namespace ezse {
 
 namespace {
-
-// A light shines along its own -Z, turned by the rotation of its Transform (roll does not change
-// the direction).
-Vec3 LightDirection(const Transform& transform) {
-    return TransformDirection(
-        Rotation(transform.rotation),
-        Vec3{0.0f, 0.0f, -1.0f});
-}
 
 // The view and projection of the directional light: a cube with half size extent around the
 // origin, seen from the side the light comes from.
@@ -50,14 +42,14 @@ void LightSystem::Update(World& world, float) {
     std::vector<SpotLight> spotLights;
 
     for (const auto& entity : GetEntities()) {
-        const Transform& transform = world.GetComponent<Transform>(entity);
+        const WorldMatrix& worldMatrix = world.GetComponent<WorldMatrix>(entity);
         const Light& light = world.GetComponent<Light>(entity);
         switch (light.type) {
         case LightType::Directional:
             if (directionalFound) {
                 break;
             }
-            directionalDirection = LightDirection(transform);
+            directionalDirection = Forward(worldMatrix);
             directionalColor = light.color * light.intensity;
             directionalFound = true;
             break;
@@ -71,7 +63,7 @@ void LightSystem::Update(World& world, float) {
         case LightType::Point:
             pointLights.push_back(
                 PointLight{
-                    transform.position,
+                    Position(worldMatrix),
                     light.color * light.intensity,
                     light.range
                 });
@@ -79,8 +71,8 @@ void LightSystem::Update(World& world, float) {
         case LightType::Spot:
             spotLights.push_back(
                 SpotLight{
-                    .position = transform.position,
-                    .direction = LightDirection(transform),
+                    .position = Position(worldMatrix),
+                    .direction = Forward(worldMatrix),
                     .color = light.color * light.intensity,
                     .range = light.range,
                     .innerAngle = light.innerAngle,
