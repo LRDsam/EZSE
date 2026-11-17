@@ -3,6 +3,7 @@
 #include "EZSE/Engine/Components/MeshRenderer.h"
 #include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
+#include "EZSE/Engine/Components/WorldMatrix.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Debug/DebugWidgets.h"
@@ -328,7 +329,7 @@ int main() {
     // The sun casts shadows in a cube of 20 meters around the origin; the room is 12 by 12.
     world.AddSystem<ezse::LightSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::Light>(),
                                        renderer, 10.0f);
-    world.AddSystem<ezse::RenderSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::Transform, ezse::MeshRenderer>(),
+    world.AddSystem<ezse::RenderSystem>(ezse::SystemPhase::Presentation, ezse::MakeSignature<ezse::WorldMatrix, ezse::MeshRenderer>(),
                                         renderer, ezse::Vec3{0.010f, 0.033f, 0.073f});
 
     // Capturing mouse in window and running game

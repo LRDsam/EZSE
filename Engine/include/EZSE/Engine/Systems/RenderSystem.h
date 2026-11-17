@@ -6,7 +6,7 @@
 
 namespace ezse {
 
-// Clears the screen and draws every entity with a Transform and a MeshRenderer.
+// Clears the screen and draws every entity with a WorldMatrix and a MeshRenderer.
 class RenderSystem : public System {
 public:
     RenderSystem(Renderer& renderer, Vec3 clearColor);
