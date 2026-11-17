@@ -460,6 +460,51 @@ const ezse::Vec3 c_axisX{ 1.0f, 0.0f, 0.0f };
 const ezse::Vec3 c_axisY{ 0.0f, 1.0f, 0.0f };
 const ezse::Vec3 c_axisZ{ 0.0f, 0.0f, 1.0f };
 
+void TestMat4Inverse() {
+    const ezse::Mat4 identity;
+    Check(NearlyEqual(ezse::Inverse(identity), identity), "Inverse of the identity is the identity");
+
+    const ezse::Vec3 offset{ 1.0f, -2.0f, 3.0f };
+    Check(NearlyEqual(ezse::Inverse(ezse::Translation(offset)), ezse::Translation(-offset)),
+        "Inverse of Translation(v) is Translation(-v)");
+
+    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{ 2.0f, 4.0f, 0.5f })),
+                      ezse::Scale(ezse::Vec3{ 0.5f, 0.25f, 2.0f })),
+        "Inverse of Scale(s) is Scale(1 / s)");
+
+    const ezse::Quat rotation = ezse::AxisAngle(ezse::Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.7f);
+    Check(NearlyEqual(ezse::Inverse(ezse::Rotation(rotation)), ezse::Rotation(ezse::Conjugate(rotation))),
+        "Inverse of a rotation is the rotation of the conjugate");
+
+    // A model matrix as the Engine builds it: translation * rotation * scale.
+    const ezse::Vec3 scale{ 2.0f, 0.5f, 3.0f };
+    const ezse::Mat4 model = ezse::Translation(offset) * ezse::Rotation(rotation) * ezse::Scale(scale);
+    const ezse::Mat4 inverse = ezse::Inverse(model);
+    Check(NearlyEqual(model * inverse, identity), "M * Inverse(M) is the identity for a model matrix");
+    Check(NearlyEqual(inverse * model, identity), "Inverse(M) * M is the identity for a model matrix");
+    Check(NearlyEqual(inverse,
+                      ezse::Scale(ezse::Vec3{ 0.5f, 2.0f, 1.0f / 3.0f }) *
+                          ezse::Rotation(ezse::Conjugate(rotation)) * ezse::Translation(-offset)),
+        "Inverse of T * R * S is S^-1 * R^-1 * T^-1: the order turns around");
+    Check(NearlyEqual(ezse::Inverse(inverse), model), "Inverse(Inverse(M)) is M");
+
+    const ezse::Mat4 projection =
+        ezse::Perspective(std::numbers::pi_v<float> / 3.0f, 2.0f, 0.5f, 10.0f);
+    Check(NearlyEqual(projection * ezse::Inverse(projection), identity),
+        "P * Inverse(P) is the identity for a perspective projection");
+
+    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{ 1.0f, 0.0f, 1.0f })), identity),
+        "Inverse of a matrix with a scale of 0 returns the identity");
+    const ezse::Mat4 dependentRows{{
+        { 1.0f,  2.0f,  3.0f,  4.0f},
+        { 5.0f,  6.0f,  7.0f,  8.0f},
+        { 9.0f, 10.0f, 11.0f, 12.0f},
+        {13.0f, 14.0f, 15.0f, 16.0f},
+    }};
+    Check(NearlyEqual(ezse::Inverse(dependentRows), identity),
+        "Inverse of a matrix with dependent columns (determinant 0) returns the identity");
+}
+
 void TestVec3Lerp() {
     const ezse::Vec3 a{ 1.0f, 2.0f, 3.0f };
     const ezse::Vec3 b{ 3.0f, -2.0f, 7.0f };
@@ -632,6 +677,7 @@ int main() {
     TestLookAt();
     TestOrthographic();
     TestPerspective();
+    TestMat4Inverse();
     TestVec3Lerp();
     TestQuatDefault();
     TestQuatAxisAngle();
