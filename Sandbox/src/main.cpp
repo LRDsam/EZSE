@@ -9,10 +9,6 @@
 #include "EZSE/Engine/Debug/DebugWidgets.h"
 #include "EZSE/Engine/Debug/ComponentEditors.h"
 
-#include "EZSE/Engine/Systems/CameraSystem.h"
-#include "EZSE/Engine/Systems/LightSystem.h"
-#include "EZSE/Engine/Systems/RenderSystem.h"
-
 #include "EZSE/ECS/SystemPhase.h"
 
 #include "EZSE/Core/Log.h"
@@ -183,8 +179,7 @@ int main() {
         return 1;
     }
 
-    // Setting references for renderer and resources
-    ezse::Renderer& renderer = engine->GetRenderer();
+    // Setting a reference for resources
     ezse::ResourceManager& resources = engine->GetResources();
 
     // Loading shader
@@ -327,20 +322,7 @@ int main() {
     world.AddSystem<CameraControlSystem>(ezse::PresentationGroup::Update,
                                          ezse::MakeSignature<ezse::Transform, CameraController>(),
                                          engine->GetWindow(), *engine);
-    // The engine systems in Render: camera, then lights, then drawing. They move into the
-    // Engine in step 32c-4e-2.
-    world.AddSystem<ezse::CameraSystem>(ezse::PresentationGroup::Render,
-                                        ezse::MakeSignature<ezse::Transform, ezse::Camera>(),
-                                        engine->GetWindow(),
-                                        renderer);
-    // The sun casts shadows in a cube of 20 meters around the origin; the room is 12 by 12.
-    world.AddSystem<ezse::LightSystem>(ezse::PresentationGroup::Render,
-                                       ezse::MakeSignature<ezse::Transform, ezse::Light>(),
-                                       renderer, 10.0f);
-    world.AddSystem<ezse::RenderSystem>(ezse::PresentationGroup::Render,
-                                        ezse::MakeSignature<ezse::WorldMatrix, ezse::MeshRenderer>(),
-                                        renderer,
-                                        ezse::Vec3{0.010f, 0.033f, 0.073f});
+    // The camera, the lights and drawing are added by the Engine itself (PresentationGroup::Render).
 
     // Capturing mouse in window and running game
     engine->GetWindow().SetCursorCaptured(true);

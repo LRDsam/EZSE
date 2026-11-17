@@ -6,6 +6,9 @@
 #include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
+#include "EZSE/Engine/Systems/CameraSystem.h"
+#include "EZSE/Engine/Systems/LightSystem.h"
+#include "EZSE/Engine/Systems/RenderSystem.h"
 #include "EZSE/Engine/Systems/TransformHistorySystem.h"
 #include "EZSE/Engine/Systems/WorldMatrixSystem.h"
 
@@ -51,19 +54,19 @@ std::unique_ptr<Engine> Engine::Create(const EngineDesc& desc) {
         return nullptr;
     }
 
-    const std::chrono::steady_clock::duration tickDuration =
-        std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::seconds{1}) / desc.ticksPerSecond;
-
-    return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer), tickDuration));
+    return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer), desc));
 }
 
 Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer,
-               std::chrono::steady_clock::duration tickDuration)
+               const EngineDesc& desc)
     : m_window(std::move(window)),
       m_renderer(std::move(renderer)),
       m_resources(*m_renderer, GetExecutableDirectory() / "assets"),
-      m_tickDuration(tickDuration),
-      m_simulationTime{.tickSeconds = std::chrono::duration<float>(tickDuration).count()} {
+      // Create has checked that ticksPerSecond is higher than 0.
+      m_tickDuration(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                         std::chrono::seconds{1}) / desc.ticksPerSecond),
+      // m_tickDuration is declared before m_simulationTime, so it is already set here.
+      m_simulationTime{.tickSeconds = std::chrono::duration<float>(m_tickDuration).count()} {
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
@@ -78,6 +81,21 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_world.AddSystem<WorldMatrixSystem>(PresentationGroup::PostUpdate,
                                          MakeSignature<Transform>(),
                                          m_simulationTime);
+    // Render, in the order of adding: the camera and the lights first, because the RenderSystem
+    // draws with what they hand to the Renderer in the same frame (the view, the lights and the
+    // shadow matrix).
+    m_world.AddSystem<CameraSystem>(PresentationGroup::Render,
+                                    MakeSignature<Transform, Camera>(),
+                                    *m_window,
+                                    *m_renderer);
+    m_world.AddSystem<LightSystem>(PresentationGroup::Render,
+                                   MakeSignature<Transform, Light>(),
+                                   *m_renderer,
+                                   desc.shadowExtent);
+    m_world.AddSystem<RenderSystem>(PresentationGroup::Render,
+                                    MakeSignature<WorldMatrix, MeshRenderer>(),
+                                    *m_renderer,
+                                    desc.clearColor);
 
     ImGui::CreateContext();
     // No imgui.ini with window positions in the working folder.
