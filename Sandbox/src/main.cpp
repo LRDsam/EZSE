@@ -228,8 +228,7 @@ ezse::Entity CreateSimulation(ezse::World& world) {
 
 // What is only there to be seen: resources, meshes, the cubes and the room, lights, the camera,
 // the debug panels and the systems for keyboard and mouse. Only with a window.
-// Returns false when loading fails.
-bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
+void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     // Setting a reference for resources
     ezse::ResourceManager& resources = engine.GetResources();
     ezse::World& world = engine.GetWorld();
@@ -241,18 +240,12 @@ bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     const ezse::ShaderHandle shader = resources.LoadShader(
         "engine/shaders/lit.vert",
         "engine/shaders/lit.frag");
-    if (shader.id == 0) {
-        return false;
-    }
 
-    // Loading Textures and meshes
+    // Loading Textures and meshes. A missing one gives a fallback (magenta) instead of stopping.
     const ezse::TextureHandle checkerTexture = resources.LoadTexture("sandbox/textures/checker.png");
     const ezse::MeshHandle cubeMesh = resources.LoadMesh("engine/models/cube.obj");
     const ezse::MeshHandle monkeyMesh = resources.LoadMesh("sandbox/models/monkey.obj");
     const ezse::MeshHandle roomMesh = resources.LoadMesh("sandbox/models/room.obj");
-    if (cubeMesh.id == 0 || monkeyMesh.id == 0 || roomMesh.id == 0 || checkerTexture.id == 0) {
-        return false;
-    }
 
     // Checks the counter of the resource manager: loading the same path again gives the same
     // handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
@@ -368,7 +361,6 @@ bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
 
     // Capturing mouse in window and running game
     engine.GetWindow().SetCursorCaptured(true);
-    return true;
 }
 
 } // namespace
@@ -404,9 +396,7 @@ int main(int argc, char* argv[]) {
 
     const ezse::Entity monkey = CreateSimulation(engine->GetWorld());
     if (!headless) {
-        if (!CreatePresentation(*engine, monkey)) {
-            return 1;
-        }
+        CreatePresentation(*engine, monkey);
     } else {
         ezse::World& world = engine->GetWorld();
         world.AddSystem<TickLogSystem>(ezse::SimulationGroup::Update,
