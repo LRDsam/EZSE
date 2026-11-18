@@ -12,6 +12,7 @@
 #include "EZSE/Engine/Systems/TransformHistorySystem.h"
 #include "EZSE/Engine/Systems/WorldMatrixSystem.h"
 
+#include "EZSE/Platform/FileSystem.h"
 #include "EZSE/Platform/Time.h"
 #include "EZSE/Platform/WindowEvent.h"
 
@@ -81,7 +82,16 @@ std::unique_ptr<Engine> Engine::Create(const EngineDesc& desc) {
         LogInfo("Running headless");
     }
 
-    return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer), desc));
+    std::unique_ptr<Engine> engine(new Engine(std::move(window), std::move(renderer), desc));
+
+    // Here and not in the constructor, which cannot fail. Also headless: the tree is the same with
+    // and without a window. ezse_copy_engine_assets in CMake puts the folder there.
+    if (!engine->m_fileSystem.MountDirectory(GetExecutableDirectory() / "assets" / "engine",
+                                             "engine")) {
+        LogError("Failed to mount the engine assets");
+        return nullptr;
+    }
+    return engine;
 }
 
 Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> renderer,

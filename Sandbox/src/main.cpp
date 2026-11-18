@@ -239,15 +239,15 @@ bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
 
     // Loading shader
     const ezse::ShaderHandle shader = resources.LoadShader(
-        "shaders/lit.vert",
-        "shaders/lit.frag");
+        "engine/shaders/lit.vert",
+        "engine/shaders/lit.frag");
     if (shader.id == 0) {
         return false;
     }
 
     // Loading Textures and meshes
     const ezse::TextureHandle checkerTexture = resources.LoadTexture("sandbox/textures/checker.png");
-    const ezse::MeshHandle cubeMesh = resources.LoadMesh("sandbox/models/cube.obj");
+    const ezse::MeshHandle cubeMesh = resources.LoadMesh("engine/models/cube.obj");
     const ezse::MeshHandle monkeyMesh = resources.LoadMesh("sandbox/models/monkey.obj");
     const ezse::MeshHandle roomMesh = resources.LoadMesh("sandbox/models/room.obj");
     if (cubeMesh.id == 0 || monkeyMesh.id == 0 || roomMesh.id == 0 || checkerTexture.id == 0) {
@@ -256,7 +256,7 @@ bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
 
     // Checks the counter of the resource manager: loading the same path again gives the same
     // handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
-    const ezse::MeshHandle cubeMeshAgain = resources.LoadMesh("sandbox/models/cube.obj");
+    const ezse::MeshHandle cubeMeshAgain = resources.LoadMesh("engine/models/cube.obj");
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
@@ -395,10 +395,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Our assets are copied next to the exe; also mounted when headless, the simulation may read
-    // data too.
-    if (!engine->GetFileSystem().MountDirectory(ezse::GetExecutableDirectory() / "assets",
-                                                "sandbox")) {
+    // Our own assets, copied next to the exe by ezse_copy_assets (the Engine mounts "engine"
+    // itself). Also when headless: the simulation may read data too.
+    if (!engine->GetFileSystem().MountDirectory(
+            ezse::GetExecutableDirectory() / "assets" / "sandbox", "sandbox")) {
         return 1;
     }
 
