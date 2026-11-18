@@ -24,11 +24,15 @@
 #include <algorithm>
 #include <cstdint>
 #include <numbers>
+#include <string_view>
 #include <variant>
 
 #include <imgui.h>
 
 namespace {
+
+// Low on purpose, so the interpolation between ticks is easy to see.
+constexpr int c_ticksPerSecond = 5;
 
 // Components
 // Turns an entity at a fixed speed
@@ -155,6 +159,39 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
     }
 }
 
+// Logs once per second, for every spinning entity, the tick and how far it has turned around Y.
+// Only used headless: with a window you see the monkey turn.
+class TickLogSystem : public ezse::System {
+public:
+    TickLogSystem(ezse::Engine& engine, int ticksPerSecond);
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+
+private:
+    ezse::Engine& m_engine;
+    int m_ticksPerSecond;
+};
+
+TickLogSystem::TickLogSystem(ezse::Engine& engine, int ticksPerSecond) :
+    m_engine(engine), m_ticksPerSecond(ticksPerSecond) {}
+
+void TickLogSystem::Update(ezse::World& world, float) {
+    const std::uint64_t tick = m_engine.GetSimulationTime().tick;
+    if (tick % m_ticksPerSecond != 0) {
+        return;
+    }
+    const float radiansToDegrees = 180.0f / std::numbers::pi_v<float>;
+    for (const ezse::Entity entity : GetEntities()) {
+        const ezse::Transform& transform = world.GetComponent<ezse::Transform>(entity);
+        // ToEuler gives the yaw between -180 and 180 degrees.
+        ezse::LogInfo("Tick {}: entity {} turned to {:.1f} degrees",
+                      tick,
+                      entity.id,
+                      ezse::ToEuler(transform.rotation).y * radiansToDegrees);
+    }
+}
+
 // Draws the Transform (not for ambient light, which has no place or direction) and the Light of
 // one entity in the debug UI, under a heading.
 void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
@@ -168,26 +205,43 @@ void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
     ImGui::PopID();
 }
 
-} // namespace
+// What changes per tick: the spinning monkey and the SpinSystem. Runs with and without a window.
+// Returns the monkey, so the presentation can give it a mesh.
+ezse::Entity CreateSimulation(ezse::World& world) {
+    world.RegisterComponent<Spin>();
 
-int main() {
-    // Creating engine
-    auto engine = ezse::Engine::Create(
-        {.window = ezse::WindowDesc{.title = "EZSE Sandbox"},
-        .ticksPerSecond = 5});
-    if (!engine) {
-        return 1;
-    }
+    // Suzanne from Blender, left of the cubes: half size. Interpolated, so she turns smoothly
+    // between the ticks; headless nobody reads it, but the simulation stays the same.
+    const ezse::Entity monkey = world.CreateEntity();
+    world.AddComponent(monkey, ezse::Transform{
+        .position = {-1.75f, -2.0f, 0.0f},
+        .scale = {0.5f, 0.5f, 0.5f}});
+    world.AddComponent(monkey, Spin{.speed = {0.0f, 2.5f, 0.0f}});
+    ezse::EnableInterpolation(world, monkey);
 
+    // Turns the monkey at a constant speed, per tick.
+    world.AddSystem<SpinSystem>(ezse::SimulationGroup::Update,
+                                ezse::MakeSignature<ezse::Transform, Spin>());
+    return monkey;
+}
+
+// What is only there to be seen: resources, meshes, the cubes and the room, lights, the camera,
+// the debug panels and the systems for keyboard and mouse. Only with a window.
+// Returns false when loading fails.
+bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     // Setting a reference for resources
-    ezse::ResourceManager& resources = engine->GetResources();
+    ezse::ResourceManager& resources = engine.GetResources();
+    ezse::World& world = engine.GetWorld();
+
+    // Registering Components
+    world.RegisterComponent<CameraController>();
 
     // Loading shader
     const ezse::ShaderHandle shader = resources.LoadShader(
         "shaders/lit.vert",
         "shaders/lit.frag");
     if (shader.id == 0) {
-        return 1;
+        return false;
     }
 
     // Loading Textures and meshes
@@ -196,24 +250,23 @@ int main() {
     const ezse::MeshHandle monkeyMesh = resources.LoadMesh("models/monkey.obj");
     const ezse::MeshHandle roomMesh = resources.LoadMesh("models/room.obj");
     if (cubeMesh.id == 0 || monkeyMesh.id == 0 || roomMesh.id == 0 || checkerTexture.id == 0) {
-        return 1;
+        return false;
     }
+
     // Checks the counter of the resource manager: the same file through another path gives the
     // same handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
     const ezse::MeshHandle cubeMeshAgain = resources.LoadMesh("./models/cube.obj");
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
-    ezse::World& world = engine->GetWorld();
-
-    // Registering components
-    world.RegisterComponent<Spin>();
-    world.RegisterComponent<CameraController>();
-
     // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
     world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, {.shader = shader, .texture = checkerTexture}});
+
+    // The monkey from the simulation gets its mesh, with the checkerboard to show her uvs.
+    world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh,
+                                                  {.shader = shader, .texture = checkerTexture}});
 
     //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
     // All colors in this file are linear: they go to the shader unchanged, and the window converts
@@ -226,15 +279,6 @@ int main() {
         .tint = {1.0f, 0.214f, 0.010f},
         .shininess = 16.0f,
         .specularStrength = 1.0f}});
-
-    // Suzanne from Blender, left of the cubes: half size, with the checkerboard to show her uvs.
-    const ezse::Entity monkey = world.CreateEntity();
-    world.AddComponent(monkey, ezse::Transform{
-        .position = {-1.75f, -2.0f, 0.0f},
-        .scale = {0.5f, 0.5f, 0.5f}});
-    world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh, {.shader = shader, .texture = checkerTexture}});
-    world.AddComponent(monkey, Spin{.speed = {0.0f, 2.5f, 0.0f}});
-    ezse::EnableInterpolation(world, monkey);
 
     // A room around everything: a floor under the cubes and four walls, open at the top. Grey
     // checkerboard with little shine, so it does not look like the cubes.
@@ -289,7 +333,7 @@ int main() {
         .outerAngle = 0.45f});
 
     // Debug panel for all lights in the Sandbox.
-    engine->GetDebugUI().AddPanel("Light", [sun, ambient, lamp, blueLamp, spot](ezse::World& world) {
+    engine.GetDebugUI().AddPanel("Light", [sun, ambient, lamp, blueLamp, spot](ezse::World& world) {
         DebugLight("Sun", sun, world);
         DebugLight("Ambient", ambient, world);
         DebugLight("Lamp", lamp, world);
@@ -303,7 +347,7 @@ int main() {
     world.AddComponent(camera, ezse::Camera{});
     world.AddComponent(camera, CameraController{});
     // Making the debug panel for the Camera
-    engine->GetDebugUI().AddPanel("Camera", [camera](ezse::World& world) {
+    engine.GetDebugUI().AddPanel("Camera", [camera](ezse::World& world) {
         ezse::Vec3& cameraPos = world.GetComponent<ezse::Transform>(camera).position;
         ezse::DragVec3("Position", cameraPos, 0.05f);
     });
@@ -313,21 +357,56 @@ int main() {
     // frame; in the simulation a key press would be missed in frames without a tick.
     world.AddSystem<GameControlSystem>(ezse::PresentationGroup::Update,
                                        ezse::MakeSignature<>(),
-                                       engine->GetWindow(),
-                                       *engine);
-    // Turns the monkey at a constant speed, per tick.
-    world.AddSystem<SpinSystem>(ezse::SimulationGroup::Update,
-                                ezse::MakeSignature<ezse::Transform, Spin>());
+                                       engine.GetWindow(),
+                                       engine);
     // The fly camera is a debug tool, not a player: per frame, so looking around stays smooth.
     world.AddSystem<CameraControlSystem>(ezse::PresentationGroup::Update,
                                          ezse::MakeSignature<ezse::Transform, CameraController>(),
-                                         engine->GetWindow(), *engine);
+                                         engine.GetWindow(), engine);
     // The camera, the lights and drawing are added by the Engine itself (PresentationGroup::Render).
 
     // Capturing mouse in window and running game
-    engine->GetWindow().SetCursorCaptured(true);
-    engine->Run();
+    engine.GetWindow().SetCursorCaptured(true);
+    return true;
+}
 
+} // namespace
+
+int main(int argc, char* argv[]) {
+    bool headless = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument = argv[i];
+        if (argument == "--headless") {
+            headless = true;
+        }
+    }
+
+    // Creating engine
+    ezse::EngineDesc desc{};
+    if (headless) {
+        desc.window = std::nullopt;
+    } else {
+        desc.window = ezse::WindowDesc{.title = "EZSE Sandbox"};
+    }
+    desc.ticksPerSecond = c_ticksPerSecond;
+    auto engine = ezse::Engine::Create(desc);
+    if (!engine) {
+        return 1;
+    }
+    const ezse::Entity monkey = CreateSimulation(engine->GetWorld());
+    if (!headless) {
+        if (!CreatePresentation(*engine, monkey)) {
+            return 1;
+        }
+    } else {
+        ezse::World& world = engine->GetWorld();
+        world.AddSystem<TickLogSystem>(ezse::SimulationGroup::Update,
+                                       ezse::MakeSignature<ezse::Transform, Spin>(),
+                                       *engine,
+                                       c_ticksPerSecond);
+    }
+
+    engine->Run();
     ezse::LogInfo("Sandbox closed");
     return 0;
 }
