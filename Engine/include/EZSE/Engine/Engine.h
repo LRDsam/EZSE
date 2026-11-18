@@ -66,6 +66,10 @@ private:
 
     // The part that needs a window: the WorldMatrix, camera, lights, drawing and the debug UI.
     void InitPresentation(const EngineDesc& desc);
+    // The loop with a window: the screen sets the pace, each frame runs the ticks that are due.
+    void RunWithWindow();
+    // The loop without a window: the ticks set the pace, sleeping until the next one is due.
+    void RunHeadless();
 
     // Destroyed in reverse order:
     // the world (and its systems) first, then the resources, the window last.

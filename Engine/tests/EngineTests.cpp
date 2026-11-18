@@ -20,6 +20,7 @@
 #include "EZSE/Math/Vec3.h"
 #include "EZSE/Math/Vec4.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -547,6 +548,44 @@ void TestEngineStep() {
           "Engine Step: the previous state follows tick by tick");
 }
 
+// Calls Quit on the Engine once it has run the given number of ticks.
+class QuitAfterSystem : public ezse::System {
+public:
+    QuitAfterSystem(ezse::Engine& engine, int ticks) : engine(engine), ticksLeft(ticks) {}
+
+protected:
+    void Update(ezse::World&, float) override {
+        if (--ticksLeft == 0) {
+            engine.Quit();
+        }
+    }
+
+private:
+    ezse::Engine& engine;
+    int ticksLeft;
+};
+
+void TestHeadlessRun() {
+    std::unique_ptr<ezse::Engine> engine =
+        ezse::Engine::Create({.window = std::nullopt, .ticksPerSecond = 30});
+    if (!engine) {
+        Check(false, "Headless Run: a headless Engine is created");
+        return;
+    }
+    engine->GetWorld().AddSystem<QuitAfterSystem>(ezse::SimulationGroup::Update,
+                                                  ezse::MakeSignature<>(), *engine, 3);
+
+    const auto start = std::chrono::steady_clock::now();
+    engine->Run();
+    const std::chrono::duration<float, std::milli> elapsed = std::chrono::steady_clock::now() - start;
+
+    Check(engine->GetSimulationTime().tick == 3, "Headless Run: Run returns after Quit, at tick 3");
+    // Three ticks are two waits of about 33 ms: not at once (it sleeps) and not seconds (it does
+    // not wait a tick after Quit). Wide margins, so a busy machine does not fail the test.
+    Check(elapsed.count() > 40.0f && elapsed.count() < 1000.0f,
+          "Headless Run: follows real time, about two tick lengths for three ticks");
+}
+
 } // namespace
 
 int main() {
@@ -562,6 +601,7 @@ int main() {
     TestWorldMatrixSystem();
     TestHeadlessEngine();
     TestEngineStep();
+    TestHeadlessRun();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

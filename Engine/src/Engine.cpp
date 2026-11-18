@@ -13,6 +13,7 @@
 #include "EZSE/Engine/Systems/WorldMatrixSystem.h"
 
 #include "EZSE/Platform/FileSystem.h"
+#include "EZSE/Platform/Time.h"
 #include "EZSE/Platform/WindowEvent.h"
 
 #include "EZSE/Core/Log.h"
@@ -31,6 +32,26 @@ namespace {
 // on hundreds of ticks at once. The simulation then runs behind real time for a moment.
 // The same type as the frame time, so std::min can compare them.
 constexpr std::chrono::steady_clock::duration c_maxFrameTime = std::chrono::milliseconds{250};
+
+// What the headless loop measures; logged and cleared once per second.
+struct TickStats {
+    int ticks = 0;
+    // The longest Step: the room the simulation has left within one tick.
+    std::chrono::steady_clock::duration slowestTick{0};
+    // How much later than asked SleepUntil returned: how precise sleeping is.
+    std::chrono::steady_clock::duration latestWake{0};
+    // Ticks that took longer than a tick may take.
+    int overBudget = 0;
+};
+
+void LogTickStats(const TickStats& stats) {
+    using Milliseconds = std::chrono::duration<float, std::milli>;
+    LogInfo("Ticks {} | slowest tick {:.2f} ms | latest wake {:.2f} ms | over budget {}",
+            stats.ticks,
+            Milliseconds(stats.slowestTick).count(),
+            Milliseconds(stats.latestWake).count(),
+            stats.overBudget);
+}
 
 } // namespace
 
@@ -102,54 +123,10 @@ Engine::~Engine() {
 }
 
 void Engine::Run() {
-    // The loop without a window comes in step 33c. A log line, not only an assert: in Release the
-    // loop below would use the missing window.
     if (IsHeadless()) {
-        LogError("Run without a window is not supported yet");
-        return;
-    }
-
-    auto framebufferSize = m_window->GetFramebufferSize();
-    m_renderer->SetViewport(framebufferSize.width, framebufferSize.height);
-    auto lastFrame = std::chrono::steady_clock::now();
-    // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
-    std::chrono::steady_clock::duration accumulator{0};
-
-    while (!m_quitRequested && !m_window->ShouldClose()) {
-        m_window->PollEvents();
-        m_window->BeginDebugUIFrame();
-        m_renderer->BeginDebugUIFrame();
-        ImGui::NewFrame();
-        for (const WindowEvent& event : m_window->GetEvents()) {
-            if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
-                if (resized->width == 0 || resized->height == 0) {
-                    continue;
-                }
-                m_renderer->SetViewport(resized->width, resized->height);
-            }
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
-        lastFrame = now;
-
-        // Systems may call ImGui:: functions during the update.
-        // The simulation runs zero or more fixed ticks, depending on the time that has passed.
-        accumulator += frameTime;
-        while (accumulator >= m_tickDuration) {
-            accumulator -= m_tickDuration;
-            Step();
-        }
-        // What is left in the accumulator is always less than one tick, so alpha stays below 1.
-        m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
-                                 std::chrono::duration<float>(m_tickDuration);
-
-        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
-
-        m_debugUI.Draw(m_world);
-        ImGui::Render();
-        m_renderer->DrawDebugUI();
-        m_window->SwapBuffers();
+        RunHeadless();
+    } else {
+        RunWithWindow();
     }
 }
 
@@ -249,6 +226,97 @@ void Engine::InitPresentation(const EngineDesc& desc) {
     m_debugUI.AddPanel("Shadow map", [&renderer = *m_renderer](World&) {
         renderer.DrawShadowMapDebugUI();
     });
+}
+
+void Engine::RunWithWindow() {
+    auto framebufferSize = m_window->GetFramebufferSize();
+    m_renderer->SetViewport(framebufferSize.width, framebufferSize.height);
+    auto lastFrame = std::chrono::steady_clock::now();
+    // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
+    std::chrono::steady_clock::duration accumulator{0};
+
+    while (!m_quitRequested && !m_window->ShouldClose()) {
+        m_window->PollEvents();
+        m_window->BeginDebugUIFrame();
+        m_renderer->BeginDebugUIFrame();
+        ImGui::NewFrame();
+        for (const WindowEvent& event : m_window->GetEvents()) {
+            if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
+                if (resized->width == 0 || resized->height == 0) {
+                    continue;
+                }
+                m_renderer->SetViewport(resized->width, resized->height);
+            }
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
+        lastFrame = now;
+
+        // Systems may call ImGui:: functions during the update.
+        // The simulation runs zero or more fixed ticks, depending on the time that has passed.
+        accumulator += frameTime;
+        while (accumulator >= m_tickDuration) {
+            accumulator -= m_tickDuration;
+            Step();
+        }
+        // What is left in the accumulator is always less than one tick, so alpha stays below 1.
+        m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
+                                 std::chrono::duration<float>(m_tickDuration);
+
+        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
+
+        m_debugUI.Draw(m_world);
+        ImGui::Render();
+        m_renderer->DrawDebugUI();
+        m_window->SwapBuffers();
+    }
+}
+
+void Engine::RunHeadless() {
+    using Clock = std::chrono::steady_clock;
+    // The moment the next tick is due. It moves by exactly one tick each time, so rounding in
+    // sleeping does not add up over time.
+    Clock::time_point nextTick = Clock::now();
+    TickStats stats;
+    Clock::time_point statsStart = nextTick;
+
+    while (!m_quitRequested) {
+        const Clock::time_point tickStart = Clock::now();
+        Step();
+        const Clock::duration tickTime = Clock::now() - tickStart;
+        ++stats.ticks;
+        stats.slowestTick = std::max(stats.slowestTick, tickTime);
+        if (tickTime > m_tickDuration) {
+            ++stats.overBudget;
+        }
+        // A system may have called Quit during the tick: stop without waiting for the next one.
+        if (m_quitRequested) {
+            break;
+        }
+
+        nextTick += m_tickDuration;
+        const Clock::time_point now = Clock::now();
+        if (now - nextTick > c_maxFrameTime) {
+            // Too far behind (a breakpoint, a stalled disk): give up catching up, as the loop
+            // with a window does. The simulation then runs behind real time.
+            LogWarn("Simulation fell {} ms behind, skipping ahead",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(now - nextTick).count());
+            nextTick = now;
+        }
+        // Only measured when there is something to wait for: a tick that is already due runs at
+        // once (catching up), and its delay says nothing about how precise sleeping is.
+        if (now < nextTick) {
+            SleepUntil(nextTick);
+            stats.latestWake = std::max(stats.latestWake, Clock::now() - nextTick);
+        }
+
+        if (Clock::now() - statsStart >= std::chrono::seconds{1}) {
+            LogTickStats(stats);
+            stats = TickStats{};
+            statsStart = Clock::now();
+        }
+    }
 }
 
 } // namespace ezse

@@ -1,9 +1,11 @@
 add_library(EZSEPlatform STATIC
     include/EZSE/Platform/FileSystem.h
     include/EZSE/Platform/Key.h
+    include/EZSE/Platform/Time.h
     include/EZSE/Platform/Window.h
     include/EZSE/Platform/WindowEvent.h
     src/FileSystem.cpp
+    src/Time.cpp
     src/Window.cpp
 )
 add_library(EZSE::Platform ALIAS EZSEPlatform)
