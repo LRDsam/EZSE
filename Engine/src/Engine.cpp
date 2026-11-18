@@ -42,16 +42,23 @@ std::unique_ptr<Engine> Engine::Create(const EngineDesc& desc) {
         return nullptr;
     }
 
-    auto window = Window::Create(desc.window);
-    if (!window) {
-        LogError("Failed to create window");
-        return nullptr;
-    }
+    // Headless, both stay empty.
+    std::unique_ptr<Window> window;
+    std::unique_ptr<Renderer> renderer;
+    if (desc.window.has_value()) {
+        window = Window::Create(*desc.window);
+        if (!window) {
+            LogError("Failed to create window");
+            return nullptr;
+        }
 
-    auto renderer = Renderer::Create(window->GetGLLoadFunction());
-    if (!renderer) {
-        LogError("Failed to create renderer");
-        return nullptr;
+        renderer = Renderer::Create(window->GetGLLoadFunction());
+        if (!renderer) {
+            LogError("Failed to create renderer");
+            return nullptr;
+        }
+    } else {
+        LogInfo("Running headless");
     }
 
     return std::unique_ptr<Engine>(new Engine(std::move(window), std::move(renderer), desc));
@@ -61,12 +68,14 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
                const EngineDesc& desc)
     : m_window(std::move(window)),
       m_renderer(std::move(renderer)),
-      m_resources(*m_renderer, GetExecutableDirectory() / "assets"),
       // Create has checked that ticksPerSecond is higher than 0.
       m_tickDuration(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                          std::chrono::seconds{1}) / desc.ticksPerSecond),
       // m_tickDuration is declared before m_simulationTime, so it is already set here.
       m_simulationTime{.tickSeconds = std::chrono::duration<float>(m_tickDuration).count()} {
+    if (!IsHeadless()) {
+        m_resources.emplace(*m_renderer, GetExecutableDirectory() / "assets");
+    }
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
     m_world.RegisterComponent<Camera>();
@@ -77,6 +86,112 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     // PreUpdate keeps the previous Transform before the game changes it in this tick.
     m_world.AddSystem<TransformHistorySystem>(SimulationGroup::PreUpdate,
                                               MakeSignature<Transform, PreviousTransform>());
+    if (!IsHeadless()) {
+        InitPresentation(desc);
+    }
+}
+
+Engine::~Engine() {
+    // The body runs before the members are destroyed, so the Renderer and the window still exist.
+    // Headless, there is no debug UI to shut down.
+    if (!IsHeadless()) {
+        m_renderer->ShutdownDebugUI();
+        m_window->ShutdownDebugUI();
+        ImGui::DestroyContext();
+    }
+}
+
+void Engine::Run() {
+    // The loop without a window comes in step 33c. A log line, not only an assert: in Release the
+    // loop below would use the missing window.
+    if (IsHeadless()) {
+        LogError("Run without a window is not supported yet");
+        return;
+    }
+
+    auto framebufferSize = m_window->GetFramebufferSize();
+    m_renderer->SetViewport(framebufferSize.width, framebufferSize.height);
+    auto lastFrame = std::chrono::steady_clock::now();
+    // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
+    std::chrono::steady_clock::duration accumulator{0};
+
+    while (!m_quitRequested && !m_window->ShouldClose()) {
+        m_window->PollEvents();
+        m_window->BeginDebugUIFrame();
+        m_renderer->BeginDebugUIFrame();
+        ImGui::NewFrame();
+        for (const WindowEvent& event : m_window->GetEvents()) {
+            if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
+                if (resized->width == 0 || resized->height == 0) {
+                    continue;
+                }
+                m_renderer->SetViewport(resized->width, resized->height);
+            }
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
+        lastFrame = now;
+
+        // Systems may call ImGui:: functions during the update.
+        // The simulation runs zero or more fixed ticks, depending on the time that has passed.
+        accumulator += frameTime;
+        while (accumulator >= m_tickDuration) {
+            m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
+            accumulator -= m_tickDuration;
+            ++m_simulationTime.tick;
+        }
+        // What is left in the accumulator is always less than one tick, so alpha stays below 1.
+        m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
+                                 std::chrono::duration<float>(m_tickDuration);
+
+        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
+
+        m_debugUI.Draw(m_world);
+        ImGui::Render();
+        m_renderer->DrawDebugUI();
+        m_window->SwapBuffers();
+    }
+}
+
+void Engine::Quit() {
+    m_quitRequested = true;
+}
+
+bool Engine::IsHeadless() const {
+    // Create makes the window and the Renderer together, or neither.
+    return m_window == nullptr;
+}
+
+const SimulationTime& Engine::GetSimulationTime() const {
+    return m_simulationTime;
+}
+
+World& Engine::GetWorld() {
+    return m_world;
+}
+
+Window& Engine::GetWindow() {
+    EZSE_ASSERT(!IsHeadless(), "There is no window when running headless");
+    return *m_window;
+}
+
+Renderer& Engine::GetRenderer() {
+    EZSE_ASSERT(!IsHeadless(), "There is no Renderer when running headless");
+    return *m_renderer;
+}
+
+ResourceManager& Engine::GetResources() {
+    EZSE_ASSERT(!IsHeadless(), "There are no resources when running headless");
+    return *m_resources;
+}
+
+DebugUI& Engine::GetDebugUI() {
+    EZSE_ASSERT(!IsHeadless(), "There is no debug UI when running headless");
+    return m_debugUI;
+}
+
+void Engine::InitPresentation(const EngineDesc& desc) {
     // PostUpdate computes the WorldMatrix after the game changed this frame, before drawing.
     m_world.AddSystem<WorldMatrixSystem>(PresentationGroup::PostUpdate,
                                          MakeSignature<Transform>(),
@@ -130,87 +245,6 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
     m_debugUI.AddPanel("Shadow map", [&renderer = *m_renderer](World&) {
         renderer.DrawShadowMapDebugUI();
     });
-}
-
-Engine::~Engine() {
-    // The body runs before the members are destroyed, so the Renderer and the window still exist.
-    m_renderer->ShutdownDebugUI();
-    m_window->ShutdownDebugUI();
-    ImGui::DestroyContext();
-}
-
-void Engine::Run() {
-    auto framebufferSize = m_window->GetFramebufferSize();
-    m_renderer->SetViewport(framebufferSize.width, framebufferSize.height);
-    auto lastFrame = std::chrono::steady_clock::now();
-    // Time not yet simulated; whole ticks are taken out, the rest stays for the next frame.
-    std::chrono::steady_clock::duration accumulator{0};
-
-    while (!m_quitRequested && !m_window->ShouldClose()) {
-        m_window->PollEvents();
-        m_window->BeginDebugUIFrame();
-        m_renderer->BeginDebugUIFrame();
-        ImGui::NewFrame();
-        for (const WindowEvent& event : m_window->GetEvents()) {
-            if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
-                if (resized->width == 0 || resized->height == 0) {
-                    continue;
-                }
-                m_renderer->SetViewport(resized->width, resized->height);
-            }
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
-        lastFrame = now;
-
-        // Systems may call ImGui:: functions during the update.
-        // The simulation runs zero or more fixed ticks, depending on the time that has passed.
-        accumulator += frameTime;
-        while (accumulator >= m_tickDuration) {
-            m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
-            accumulator -= m_tickDuration;
-            ++m_simulationTime.tick;
-        }
-        // What is left in the accumulator is always less than one tick, so alpha stays below 1.
-        m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
-                                 std::chrono::duration<float>(m_tickDuration);
-
-        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
-
-        m_debugUI.Draw(m_world);
-        ImGui::Render();
-        m_renderer->DrawDebugUI();
-        m_window->SwapBuffers();
-    }
-}
-
-void Engine::Quit() {
-    m_quitRequested = true;
-}
-
-const SimulationTime& Engine::GetSimulationTime() const {
-    return m_simulationTime;
-}
-
-World& Engine::GetWorld() {
-    return m_world;
-}
-
-Window& Engine::GetWindow() {
-    return *m_window;
-}
-
-Renderer& Engine::GetRenderer() {
-    return *m_renderer;
-}
-
-ResourceManager& Engine::GetResources() {
-    return m_resources;
-}
-
-DebugUI& Engine::GetDebugUI() {
-    return m_debugUI;
 }
 
 } // namespace ezse

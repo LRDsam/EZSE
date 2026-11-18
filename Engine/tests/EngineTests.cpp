@@ -4,6 +4,7 @@
 #include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
+#include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 #include "EZSE/Engine/Resources/ResourceCache.h"
@@ -22,7 +23,9 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -452,6 +455,28 @@ void TestWorldMatrixSystem() {
           "WorldMatrixSystem: does not run in Simulation");
 }
 
+void TestHeadlessEngine() {
+    // The first Engine in the tests: without a window it needs no GPU.
+    std::unique_ptr<ezse::Engine> engine = ezse::Engine::Create({.window = std::nullopt});
+    Check(engine != nullptr, "Headless Engine: Create succeeds without a window");
+    if (!engine) {
+        return;
+    }
+    Check(engine->IsHeadless(), "Headless Engine: IsHeadless is true");
+    Check(engine->GetSimulationTime().tick == 0, "Headless Engine: starts at tick 0");
+
+    // The built-in components are registered, also without a window.
+    ezse::World& world = engine->GetWorld();
+    const ezse::Entity entity = world.CreateEntity();
+    world.AddComponent(entity, ezse::Transform{});
+    world.AddComponent(entity, ezse::WorldMatrix{});
+    Check(world.HasComponent<ezse::Transform>(entity) && world.HasComponent<ezse::WorldMatrix>(entity),
+          "Headless Engine: the built-in components are registered");
+
+    Check(ezse::Engine::Create({.window = std::nullopt, .ticksPerSecond = 0}) == nullptr,
+          "Headless Engine: ticksPerSecond 0 is still refused");
+}
+
 } // namespace
 
 int main() {
@@ -465,6 +490,7 @@ int main() {
     TestInterpolationHistory();
     TestInterpolate();
     TestWorldMatrixSystem();
+    TestHeadlessEngine();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;
