@@ -54,6 +54,10 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
     return true;
 }
 
+bool NearlyEqual(float a, float b) {
+    return std::abs(a - b) <= 0.0001f;
+}
+
 bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
     return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f &&
            std::abs(a.z - b.z) <= 0.0001f;
@@ -477,6 +481,72 @@ void TestHeadlessEngine() {
           "Headless Engine: ticksPerSecond 0 is still refused");
 }
 
+// Moves every entity one unit along X per tick and records the delta time it got.
+class MoveSystem : public ezse::System {
+public:
+    explicit MoveSystem(std::vector<float>& deltaTimes) : deltaTimes(deltaTimes) {}
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override {
+        deltaTimes.push_back(deltaTime);
+        for (const ezse::Entity entity : GetEntities()) {
+            world.GetComponent<ezse::Transform>(entity).position.x += 1.0f;
+        }
+    }
+
+private:
+    std::vector<float>& deltaTimes;
+};
+
+// Counts how often it runs.
+class CountSystem : public ezse::System {
+public:
+    explicit CountSystem(int& count) : count(count) {}
+
+protected:
+    void Update(ezse::World&, float) override { ++count; }
+
+private:
+    int& count;
+};
+
+void TestEngineStep() {
+    std::unique_ptr<ezse::Engine> engine =
+        ezse::Engine::Create({.window = std::nullopt, .ticksPerSecond = 30});
+    if (!engine) {
+        Check(false, "Engine Step: a headless Engine is created");
+        return;
+    }
+    ezse::World& world = engine->GetWorld();
+    std::vector<float> deltaTimes;
+    int presentationRuns = 0;
+    world.AddSystem<MoveSystem>(ezse::SimulationGroup::Update,
+                                ezse::MakeSignature<ezse::Transform>(), deltaTimes);
+    world.AddSystem<CountSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(),
+                                 presentationRuns);
+
+    const ezse::Entity entity = world.CreateEntity();
+    world.AddComponent(entity, ezse::Transform{});
+    ezse::EnableInterpolation(world, entity);
+
+    engine->Step();
+    Check(engine->GetSimulationTime().tick == 1, "Engine Step: counts exactly one tick");
+    Check(deltaTimes.size() == 1, "Engine Step: a simulation system runs once per step");
+    Check(!deltaTimes.empty() && NearlyEqual(deltaTimes.front(), 1.0f / 30.0f),
+          "Engine Step: the system gets the length of a tick as delta time");
+    Check(presentationRuns == 0, "Engine Step: the presentation does not run");
+    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x, 0.0f) &&
+              NearlyEqual(world.GetComponent<ezse::Transform>(entity).position.x, 1.0f),
+          "Engine Step: the Engine keeps the Transform from before the tick (PreUpdate)");
+
+    engine->Step();
+    engine->Step();
+    Check(engine->GetSimulationTime().tick == 3 && deltaTimes.size() == 3,
+          "Engine Step: three steps are three ticks, without real time passing");
+    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x, 2.0f),
+          "Engine Step: the previous state follows tick by tick");
+}
+
 } // namespace
 
 int main() {
@@ -491,6 +561,7 @@ int main() {
     TestInterpolate();
     TestWorldMatrixSystem();
     TestHeadlessEngine();
+    TestEngineStep();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

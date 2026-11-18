@@ -43,6 +43,10 @@ public:
 
     void Run();
     void Quit();
+    // Runs exactly one tick of SystemPhase::Simulation and counts it, without looking at real time.
+    // Run calls it for every tick; tests (and later bots and a server inside the client) call it
+    // directly. Not from inside a system: the tick would run within itself.
+    void Step();
 
     // Whether the Engine runs without a window (EngineDesc::window was empty).
     bool IsHeadless() const;

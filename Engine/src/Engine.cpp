@@ -137,9 +137,8 @@ void Engine::Run() {
         // The simulation runs zero or more fixed ticks, depending on the time that has passed.
         accumulator += frameTime;
         while (accumulator >= m_tickDuration) {
-            m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
             accumulator -= m_tickDuration;
-            ++m_simulationTime.tick;
+            Step();
         }
         // What is left in the accumulator is always less than one tick, so alpha stays below 1.
         m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
@@ -156,6 +155,11 @@ void Engine::Run() {
 
 void Engine::Quit() {
     m_quitRequested = true;
+}
+
+void Engine::Step() {
+    m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
+    ++m_simulationTime.tick;
 }
 
 bool Engine::IsHeadless() const {
