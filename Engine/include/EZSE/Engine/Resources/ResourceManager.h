@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EZSE/Core/VirtualFileSystem.h"
+
 #include "EZSE/Engine/Resources/ResourceCache.h"
 
 #include "EZSE/Renderer/Mesh.h"
@@ -7,32 +9,31 @@
 #include "EZSE/Renderer/Shader.h"
 #include "EZSE/Renderer/Texture.h"
 
-#include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace ezse {
 
 class ResourceManager {
 public:
-    ResourceManager(Renderer& renderer, std::filesystem::path root);
+    ResourceManager(Renderer& renderer, const VirtualFileSystem& fileSystem);
     ~ResourceManager();
 
     ResourceManager(const ResourceManager&) = delete;
     ResourceManager& operator=(const ResourceManager&) = delete;
 
-    MeshHandle LoadMesh(const std::filesystem::path& path);
+    MeshHandle LoadMesh(std::string_view path);
     void UnloadMesh(MeshHandle mesh);
 
-    TextureHandle LoadTexture(const std::filesystem::path& path);
+    TextureHandle LoadTexture(std::string_view path);
     void UnloadTexture(TextureHandle texture);
 
-    ShaderHandle LoadShader(const std::filesystem::path& vertexPath,
-                            const std::filesystem::path& fragmentPath);
+    ShaderHandle LoadShader(std::string_view vertexPath, std::string_view fragmentPath);
     void UnloadShader(ShaderHandle shader);
 
 private:
     Renderer& m_renderer;
-    std::filesystem::path m_root;
+    const VirtualFileSystem& m_fileSystem;
 
     ResourceCache<MeshHandle> m_meshes;
     ResourceCache<TextureHandle> m_textures;

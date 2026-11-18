@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
 #include <optional>
 #include <span>
 #include <vector>
@@ -19,8 +18,5 @@ struct Image {
 // Decodes a PNG, JPG, BMP or TGA file that is already in memory.
 // Returns nothing (and logs why) if the bytes are not an image stb_image can read.
 std::optional<Image> DecodeImage(std::span<const std::uint8_t> fileBytes);
-
-// Reads and decodes an image file. Returns nothing (and logs why) if that fails.
-std::optional<Image> ReadImageFile(const std::filesystem::path& path);
 
 } // namespace ezse

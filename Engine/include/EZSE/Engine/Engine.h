@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EZSE/Core/VirtualFileSystem.h"
+
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Resources/ResourceManager.h"
 #include "EZSE/Engine/SimulationTime.h"
@@ -54,6 +56,9 @@ public:
     const SimulationTime& GetSimulationTime() const;
 
     World& GetWorld();
+    // The tree of virtual paths: mount at startup, before loading. Also there when running
+    // headless, because the server reads data too.
+    VirtualFileSystem& GetFileSystem();
     // Only with a window: these assert when running headless.
     Window& GetWindow();
     Renderer& GetRenderer();
@@ -72,9 +77,11 @@ private:
     void RunHeadless();
 
     // Destroyed in reverse order:
-    // the world (and its systems) first, then the resources, the window last.
+    // the world (and its systems) first, then the resources, then the file system they read
+    // from, the window last.
     std::unique_ptr<Window> m_window;
     std::unique_ptr<Renderer> m_renderer;
+    VirtualFileSystem m_fileSystem;
     // Empty when running headless: it uploads to the GPU through the Renderer.
     std::optional<ResourceManager> m_resources;
     DebugUI m_debugUI;

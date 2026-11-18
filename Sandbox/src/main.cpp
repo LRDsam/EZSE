@@ -15,8 +15,9 @@
 
 #include "EZSE/Renderer/Mesh.h"
 
-#include "EZSE/Platform/Window.h"
+#include "EZSE/Platform/FileSystem.h"
 #include "EZSE/Platform/Key.h"
+#include "EZSE/Platform/Window.h"
 #include "EZSE/Platform/WindowEvent.h"
 
 #include "EZSE/Math/Transform.h"
@@ -245,17 +246,17 @@ bool CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     }
 
     // Loading Textures and meshes
-    const ezse::TextureHandle checkerTexture = resources.LoadTexture("textures/checker.png");
-    const ezse::MeshHandle cubeMesh = resources.LoadMesh("models/cube.obj");
-    const ezse::MeshHandle monkeyMesh = resources.LoadMesh("models/monkey.obj");
-    const ezse::MeshHandle roomMesh = resources.LoadMesh("models/room.obj");
+    const ezse::TextureHandle checkerTexture = resources.LoadTexture("sandbox/textures/checker.png");
+    const ezse::MeshHandle cubeMesh = resources.LoadMesh("sandbox/models/cube.obj");
+    const ezse::MeshHandle monkeyMesh = resources.LoadMesh("sandbox/models/monkey.obj");
+    const ezse::MeshHandle roomMesh = resources.LoadMesh("sandbox/models/room.obj");
     if (cubeMesh.id == 0 || monkeyMesh.id == 0 || roomMesh.id == 0 || checkerTexture.id == 0) {
         return false;
     }
 
-    // Checks the counter of the resource manager: the same file through another path gives the
-    // same handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
-    const ezse::MeshHandle cubeMeshAgain = resources.LoadMesh("./models/cube.obj");
+    // Checks the counter of the resource manager: loading the same path again gives the same
+    // handle without loading it again, and one Unload does not destroy it yet (2 -> 1).
+    const ezse::MeshHandle cubeMeshAgain = resources.LoadMesh("sandbox/models/cube.obj");
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
@@ -393,6 +394,14 @@ int main(int argc, char* argv[]) {
     if (!engine) {
         return 1;
     }
+
+    // Our assets are copied next to the exe; also mounted when headless, the simulation may read
+    // data too.
+    if (!engine->GetFileSystem().MountDirectory(ezse::GetExecutableDirectory() / "assets",
+                                                "sandbox")) {
+        return 1;
+    }
+
     const ezse::Entity monkey = CreateSimulation(engine->GetWorld());
     if (!headless) {
         if (!CreatePresentation(*engine, monkey)) {

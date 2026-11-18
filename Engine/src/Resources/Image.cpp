@@ -1,6 +1,5 @@
 #include "EZSE/Engine/Resources/Image.h"
 
-#include "EZSE/Core/File.h"
 #include "EZSE/Core/Log.h"
 
 // We decode from memory only; our own code reads the files (no fopen, and paths with any
@@ -34,19 +33,6 @@ std::optional<Image> DecodeImage(std::span<const std::uint8_t> fileBytes) {
         static_cast<std::size_t>(image.height);
     image.pixels = std::vector<std::uint8_t>(imageData, imageDataEnd);
     stbi_image_free(imageData);
-    return image;
-}
-
-std::optional<Image> ReadImageFile(const std::filesystem::path& path) {
-    std::optional<std::vector<std::uint8_t>> binaryData = ReadBinaryFile(path);
-    if (!binaryData.has_value()) {
-        return std::nullopt;
-    }
-    std::optional<Image> image = DecodeImage(binaryData.value());
-    if (!image.has_value()) {
-        LogError("Failed to decode image '{}'", path.string());
-        return std::nullopt;
-    }
     return image;
 }
 

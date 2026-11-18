@@ -12,7 +12,6 @@
 #include "EZSE/Engine/Systems/TransformHistorySystem.h"
 #include "EZSE/Engine/Systems/WorldMatrixSystem.h"
 
-#include "EZSE/Platform/FileSystem.h"
 #include "EZSE/Platform/Time.h"
 #include "EZSE/Platform/WindowEvent.h"
 
@@ -95,7 +94,7 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
       // m_tickDuration is declared before m_simulationTime, so it is already set here.
       m_simulationTime{.tickSeconds = std::chrono::duration<float>(m_tickDuration).count()} {
     if (!IsHeadless()) {
-        m_resources.emplace(*m_renderer, GetExecutableDirectory() / "assets");
+        m_resources.emplace(*m_renderer, m_fileSystem);
     }
     m_world.RegisterComponent<Transform>();
     m_world.RegisterComponent<MeshRenderer>();
@@ -150,6 +149,10 @@ const SimulationTime& Engine::GetSimulationTime() const {
 
 World& Engine::GetWorld() {
     return m_world;
+}
+
+VirtualFileSystem& Engine::GetFileSystem() {
+    return m_fileSystem;
 }
 
 Window& Engine::GetWindow() {

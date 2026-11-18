@@ -3,24 +3,17 @@
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 
-#include "EZSE/Core/File.h"
 #include "EZSE/Core/Log.h"
 
+#include <cstdint>
 #include <optional>
-#include <utility>
+#include <string>
+#include <vector>
 
 namespace ezse {
 
-namespace {
-
-std::string MakeKey(const std::filesystem::path& path) {
-    return path.lexically_normal().generic_string();
-}
-
-} // namespace
-
-ResourceManager::ResourceManager(Renderer& renderer, std::filesystem::path root) :
-    m_renderer(renderer), m_root(std::move(root)) {}
+ResourceManager::ResourceManager(Renderer& renderer, const VirtualFileSystem& fileSystem) :
+    m_renderer(renderer), m_fileSystem(fileSystem) {}
 
 ResourceManager::~ResourceManager() {
     for (MeshHandle mesh : m_meshes.GetHandles()) {
@@ -34,14 +27,21 @@ ResourceManager::~ResourceManager() {
     }
 }
 
-MeshHandle ResourceManager::LoadMesh(const std::filesystem::path& path) {
-    const std::string key = MakeKey(path);
+MeshHandle ResourceManager::LoadMesh(std::string_view path) {
+    // The virtual path is the key: the path rules already make it unambiguous.
+    const std::string key(path);
     MeshHandle mesh = m_meshes.Acquire(key);
     if (mesh.id != 0) {
         return mesh;
     }
-    std::optional<MeshData> meshData = ReadObjFile(m_root / path);
+    std::optional<std::string> text = m_fileSystem.ReadText(path);
+    if (!text.has_value()) {
+        return MeshHandle{};
+    }
+    // ReadText logs why reading failed; ParseObj logs the line, but not which file it was.
+    std::optional<MeshData> meshData = ParseObj(text.value());
     if (!meshData.has_value()) {
+        LogError("Failed to load mesh '{}'", key);
         return MeshHandle{};
     }
     mesh = m_renderer.CreateMesh(meshData->vertices, meshData->indices);
@@ -58,14 +58,20 @@ void ResourceManager::UnloadMesh(MeshHandle mesh) {
     }
 }
 
-TextureHandle ResourceManager::LoadTexture(const std::filesystem::path& path) {
-    const std::string key = MakeKey(path);
+TextureHandle ResourceManager::LoadTexture(std::string_view path) {
+    const std::string key(path);
     TextureHandle texture = m_textures.Acquire(key);
     if (texture.id != 0) {
         return texture;
     }
-    const std::optional<Image> image = ReadImageFile(m_root / path);
+    std::optional<std::vector<std::uint8_t>> bytes = m_fileSystem.ReadBinary(path);
+    if (!bytes.has_value()) {
+        return TextureHandle{};
+    }
+    // DecodeImage logs the reason, but not which file it was.
+    std::optional<Image> image = DecodeImage(bytes.value());
     if (!image.has_value()) {
+        LogError("Failed to load texture '{}'", key);
         return TextureHandle{};
     }
     texture = m_renderer.CreateTexture(image->width, image->height, image->pixels);
@@ -82,15 +88,16 @@ void ResourceManager::UnloadTexture(TextureHandle texture) {
     }
 }
 
-ShaderHandle ResourceManager::LoadShader(const std::filesystem::path& vertexPath,
-                                         const std::filesystem::path& fragmentPath) {
-    const std::string key = MakeKey(vertexPath) + '|' + MakeKey(fragmentPath);
+ShaderHandle ResourceManager::LoadShader(std::string_view vertexPath,
+                                         std::string_view fragmentPath) {
+    // '|' is not allowed in a virtual path, so two different pairs never give the same key.
+    const std::string key = std::string(vertexPath) + '|' + std::string(fragmentPath);
     ShaderHandle shader = m_shaders.Acquire(key);
     if (shader.id != 0) {
         return shader;
     }
-    const std::optional<std::string> vertexSource = ReadTextFile(m_root / vertexPath);
-    const std::optional<std::string> fragmentSource = ReadTextFile(m_root / fragmentPath);
+    const std::optional<std::string> vertexSource = m_fileSystem.ReadText(vertexPath);
+    const std::optional<std::string> fragmentSource = m_fileSystem.ReadText(fragmentPath);
     if (!vertexSource.has_value() || !fragmentSource.has_value()) {
         return ShaderHandle{};
     }
