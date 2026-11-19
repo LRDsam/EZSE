@@ -21,7 +21,10 @@ public:
     template <typename T, typename... Args>
     T& Add(SystemPhase systemPhase, std::size_t group, Signature signature, Args&&... args);
 
+    // Puts the entity in every system whose signature it matches, and takes it out of the others.
     void EntitySignatureChanged(Entity entity, Signature signature);
+    // The same for one system only: for a system that was just added.
+    static void EntitySignatureChanged(System& system, Entity entity, Signature signature);
     void EntityDestroyed(Entity entity);
 
     void Update(World& world, SystemPhase systemPhase, float deltaTime);

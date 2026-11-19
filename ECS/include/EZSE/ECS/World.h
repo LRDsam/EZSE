@@ -51,9 +51,8 @@ public:
     void Update(SystemPhase systemPhase, float deltaTime);
 
 private:
-    // Puts every living entity in the systems whose signature it matches; for a system that was
-    // just added.
-    void AddExistingEntitiesToSystems();
+    // Gives a system that was just added every living entity that matches its signature.
+    void AddExistingEntities(System& system);
 
     EntityManager m_entities;
     ComponentManager m_components;
@@ -96,7 +95,7 @@ T& World::AddSystem(SimulationGroup group, Signature signature, Args&&... args) 
                                  static_cast<std::size_t>(group),
                                  signature,
                                  std::forward<Args>(args)...);
-    AddExistingEntitiesToSystems();
+    AddExistingEntities(system);
     return system;
 }
 
@@ -106,7 +105,7 @@ T& World::AddSystem(PresentationGroup group, Signature signature, Args&&... args
                                  static_cast<std::size_t>(group),
                                  signature,
                                  std::forward<Args>(args)...);
-    AddExistingEntitiesToSystems();
+    AddExistingEntities(system);
     return system;
 }
 

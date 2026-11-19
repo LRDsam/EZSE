@@ -38,8 +38,8 @@ void LightSystem::Update(World& world, float) {
     Vec3 directionalDirection = {0.0f, -1.0f, 0.0f};
     Vec3 directionalColor;
     Vec3 ambientColor;
-    std::vector<PointLight> pointLights;
-    std::vector<SpotLight> spotLights;
+    m_pointLights.clear();
+    m_spotLights.clear();
 
     for (const Entity entity : GetEntities()) {
         const WorldMatrix& worldMatrix = world.GetComponent<WorldMatrix>(entity);
@@ -61,7 +61,7 @@ void LightSystem::Update(World& world, float) {
                 ambientFound = true;
                 break;
             case LightType::Point:
-                pointLights.push_back(
+                m_pointLights.push_back(
                     PointLight{
                         Position(worldMatrix),
                         light.color * light.intensity,
@@ -69,7 +69,7 @@ void LightSystem::Update(World& world, float) {
                     });
                 break;
             case LightType::Spot:
-                spotLights.push_back(
+                m_spotLights.push_back(
                     SpotLight{
                         .position = Position(worldMatrix),
                         .direction = Forward(worldMatrix),
@@ -84,8 +84,8 @@ void LightSystem::Update(World& world, float) {
     m_renderer.SetDirectionalLight(directionalDirection, directionalColor);
     m_renderer.SetDirectionalShadow(DirectionalShadowMatrix(directionalDirection, m_shadowExtent));
     m_renderer.SetAmbientLight(ambientColor);
-    m_renderer.SetPointLights(pointLights);
-    m_renderer.SetSpotLights(spotLights);
+    m_renderer.SetPointLights(m_pointLights);
+    m_renderer.SetSpotLights(m_spotLights);
 }
 
 } // namespace ezse

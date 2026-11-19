@@ -21,11 +21,12 @@ void World::Update(SystemPhase systemPhase, float deltaTime) {
     m_systems.Update(*this, systemPhase, deltaTime);
 }
 
-void World::AddExistingEntitiesToSystems() {
+void World::AddExistingEntities(System& system) {
     for (std::uint32_t id = 1; id <= m_entities.GetCreatedCount(); ++id) {
         const Entity entity = Entity{id};
         if (m_entities.IsAlive(entity)) {
-            m_systems.EntitySignatureChanged(entity, m_components.GetSignature(entity));
+            SystemManager::EntitySignatureChanged(system, entity,
+                                                  m_components.GetSignature(entity));
         }
     }
 }
