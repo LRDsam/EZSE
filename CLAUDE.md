@@ -478,6 +478,7 @@ Regels die de Renderer herbruikbaar houden:
 | 309 | Stijl gelijkgetrokken (R3) | de opmaak die de meeste code al had, staat nu bij Conventies: regels van hoogstens 100 tekens (vervolgregel onder het eerste argument, anders 4 verder in), `{` aan het eind van de regel en `} else {` (`Mat4.cpp` en `Obj.cpp` weken af), `case` één stap in (`LightSystem` week af), `Vec3{1.0f, 2.0f}` zonder spaties binnen de accolades (vooral `MathTests` en `Vec3.cpp` weken af), de volgorde van includes (eigen header, EZSE, derden, standaard; `ComponentEditors.cpp` en Sandbox weken af), assert-berichten als gewone zin. In `.editorconfig`: `trim_trailing_whitespace` en `max_line_length = 100` (die laatste toont Visual Studio niet als lijn; hij legt de afspraak vast). Lange regels in de tests zijn met een script afgebroken (beschrijvingen van `Check` onder het eerste argument), de rest met de hand; het aantal checks is gelijk gebleven (Core 39, Math 145, ECS 118, Engine 85). Niet aangeraakt: `Renderer.cpp` en twee lange regels in `Renderer.h` (de render-kant, besluit 306) en de spatie in `ComponentManager.cpp` (een lokale wijziging van de gebruiker) |
 | 310 | Commentaar in de headers (R4) | elke publieke class, struct en functie zonder uitleg kreeg een comment over wat hij doet, wat hij verwacht (asserts) en wat hij teruggeeft; de nadruk op wat een gebruiker kan verrassen. Core: `EZSE_ASSERT` (alleen voor programmeerfouten; in Release draait de voorwaarde niet, dus geen bijwerkingen), `ReadTextFile`/`ReadBinaryFile` (echte paden, assets gaan via het bestandssysteem), de log-niveaus. Math: `Mat4` is `m[column][row]` en `a * b` doet eerst `b`; de draairichting van `RotationX/Y/Z`; `Perspective` kijkt langs -Z met diepte -1 tot 1; wanneer w 1 of 0 is. ECS: `World` per functie; een reference uit `GetComponent` is geldig tot de volgende `AddComponent` of `RemoveComponent` van hetzelfde type; `GetEntities` van een system is ongeldig zodra components van zijn signature veranderen; `deltaTime` per fase; nummers van `ComponentType` niet over het netwerk of in een bestand. Platform: `Window`, `FramebufferSize` (0 bij minimaliseren). Renderer (alleen commentaar, besluit 306): de volgorde van aanroepen per frame, `Vertex`, de velden van `Material`, de lichten. Engine: `Camera`, `MeshRenderer`, `LightType`, `Transform`, `MeshData`, wat `ParseObj` wel en niet leest, `ResourceCache`, `Run` en `Quit`. `EntityManager.h` include nu zelf `<cstdint>` |
 | 311 | Simpele optimalisaties (R5) | (1) `ReadTextFile` en `ReadBinaryFile` lezen een bestand in één keer: openen aan het eind (`std::ios::ate`), de grootte met `tellg`, één `read` in een container van die grootte, via een template `ReadWholeFile<Container>` in de `.cpp` (vervangt `istreambuf_iterator`, dat teken voor teken leest); een bestand van 0 bytes geeft een lege container. Niet gemeten; het scheelt vooral bij textures van een paar MB. (2) `World::AddSystem` controleert alleen het nieuwe system tegen alle entities (`AddExistingEntities(System&)` met een nieuwe `static SystemManager::EntitySignatureChanged(System&, Entity, Signature)`, die ook de lus over alle systems gebruikt), in plaats van elk system opnieuw. (3) `LightSystem` bewaart zijn lijsten van punt- en spotlichten als members en maakt ze elk frame leeg met `clear()`, zodat er geen geheugen per frame aangevraagd wordt. De punten voor de Renderer (de buffers loggen met `LogTrace`, de shadow map één keer per pass binden) gaan naar de render-kant (besluit 306) |
+| 312 | README, Sandbox en punten voor later (R6) | de `README.md` noemt nu ook de vaste tick met interpolatie, headless draaien, het bestandssysteem met fallbacks, `Quat`, spotlichten en schaduwen, de debug-UI (F1), `CoreTests`, CTest en Dear ImGui. Sandbox: uitgecommentarieerde code weg, commentaar dat alleen herhaalde wat de code zegt ("Creating engine", "Registing the systems") weg of vervangen door het waarom, `Transform{0.0f, -2.0f, 0.0f}` wordt `Transform{.position = {...}}` (de oude vorm werkte alleen doordat C++ binnenste accolades mag weglaten). `Camera::fovY` is `std::numbers::pi_v<float> / 4.0f`, zoals de hoeken in `Light`. Bij Bekende beperkingen staan nu de punten waar de game later tegenaan loopt: entity-ids worden niet hergebruikt (de sparse arrays groeien met het hoogste id; generaties en vrije plekken in fase 3 of 6), `ComponentType`-nummers verschillen per programma (fase 4), `__debugbreak` en `GetExecutableDirectory` alleen op Windows (fase 4), loggen via `std::cout` met een buffer en zonder threads (fase 4 en 6), `Engine.h` haalt `Window` en `Renderer` binnen (server-build, fase 4), `stbi_set_flip_vertically_on_load` is globaal (fase 8). Ze staan ook bij hun fase in de roadmap van de game. De punten voor `Renderer.cpp` staan bovenaan Daarna |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -647,6 +648,15 @@ kubus met alleen engine-assets (door de gebruiker gezien). Besluiten 298 tot en 
 `CoreTests`, `MathTests`, `ECSTests` en `EngineTests` geven allemaal `[PASS]` in Debug en Release.
 Daarmee is het engine-werk van fase 1 van de game af.
 
+Review na fase 1 (op branch `review-phase-1`, nog niet in `main` gemerged, besluiten 306 tot en met
+312): twee fouten verholpen (`ComponentArray::Remove` van het laatste element, de muispositie via
+`float`), eigen code met `/W4 /permissive-` (0 warnings) en CTest, de stijl gelijkgetrokken en
+vastgelegd bij Conventies, commentaar in alle publieke headers, drie simpele optimalisaties
+(bestanden in één keer lezen, een nieuw system alleen zichzelf laten controleren, de lijsten van
+`LightSystem` hergebruiken), de README bijgewerkt en de punten voor later bij Bekende beperkingen.
+Controles: `CoreTests` 39, `MathTests` 145, `ECSTests` 118, `EngineTests` 85, allemaal `[PASS]` in
+Debug en Release. Sandbox en de `Client` zijn na de review nog niet door de gebruiker gestart.
+
 Publieke interface van `Renderer`:
 
 ```cpp
@@ -684,6 +694,22 @@ void                         SetCursorCaptured(bool captured);
 ```
 
 Bekende beperkingen, bewust zo gelaten:
+
+- Entity-ids worden niet hergebruikt (besluit 312): elke sparse array (per component en per system)
+  groeit mee met het hoogste id dat ooit is uitgedeeld. Een server die urenlang zombies maakt en
+  opruimt, blijft zo geheugen gebruiken, en het netwerk heeft vaste ids nodig. Oplossing later:
+  ids met een generatie en een lijst met vrije plekken (fase 3 of 6 van de game).
+- De nummers van `ComponentType` volgen de volgorde van het eerste gebruik en kunnen per programma
+  verschillen (client en server); niet over het netwerk sturen of opslaan (fase 4 van de game).
+- Alleen Windows: `EZSE_DEBUG_BREAK` (`__debugbreak`) en `GetExecutableDirectory` (`#error` op
+  andere systemen); de Linux-server (fase 4) vraagt een eigen versie.
+- Loggen gaat naar `std::cout`, met een buffer en niet veilig voor threads: bij een crash kan de
+  laatste regel ontbreken. Logs naar een bestand komen met de server (fase 4), threads met het job
+  system (fase 6).
+- `Engine.h` haalt de headers van `Window` en `Renderer` binnen: een server-build zonder OpenGL en
+  GLFW (fase 4) vraagt daar een splitsing.
+- `DecodeImage` zet `stbi_set_flip_vertically_on_load`, een globale instelling van stb_image: laden
+  op een achtergrond-thread (fase 8) vraagt de versie per thread.
 
 - Tijdens het slepen aan de rand van het venster staat het beeld stil: op Windows blokkeert
   `glfwPollEvents` zolang de muisknop is ingedrukt. Daarna staan alle tussenliggende groottes
@@ -859,6 +885,10 @@ fase 1 van de game af. Het volgende engine-werk komt uit fase 2 van de game (phy
 debug-draw, botsingen, raycasts, character controller, glTF); eerst bespreken, dan een branch
 `step-35-...` vanaf `main`.
 
+Eerst: de review na fase 1 (branch `review-phase-1`, besluiten 306 tot en met 312, zes commits R1
+tot en met R6) na akkoord in `main` mergen en pushen; de gebruiker start dan Sandbox en de
+`Client` nog één keer om te zien dat alles er hetzelfde uitziet.
+
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
 
@@ -918,6 +948,13 @@ vakje en de shader leest eruit met `binding = 0`. `std140` legt de indeling in h
 vast; een `Mat4` van ons past daar precies op een `mat4`.
 
 ## Daarna
+
+Uit de review na fase 1 (besluit 306), voor de render-kant: in `Renderer.cpp` de regels langer
+dan 100 tekens en de stijl van besluit 309 (`for(`, `MeshHandle{ ... }`, lege regels voor `}`),
+het aanmaken van elke buffer, vertex array en texture loggen met `LogTrace` in plaats van
+`LogInfo` (drie regels per mesh), de shadow map en zijn sampler één keer per pass binden in plaats
+van bij elke `DrawMesh`, en in `CompileShader` de soort shader als woord loggen in plaats van als
+getal.
 
 Op de lijst, zonder vaste volgorde: het vrije vertex-formaat (besluit 153), standaard-assets van de
 engine in een eigen assetmap (standaardshader, standaardtextures), waarna de shader van de

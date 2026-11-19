@@ -230,19 +230,15 @@ ezse::Entity CreateSimulation(ezse::World& world) {
 // What is only there to be seen: resources, meshes, the cubes and the room, lights, the camera,
 // the debug panels and the systems for keyboard and mouse. Only with a window.
 void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
-    // Setting a reference for resources
     ezse::ResourceManager& resources = engine.GetResources();
     ezse::World& world = engine.GetWorld();
-
-    // Registering Components
     world.RegisterComponent<CameraController>();
 
-    // Loading shader
     const ezse::ShaderHandle shader = resources.LoadShader(
         "engine/shaders/lit.vert",
         "engine/shaders/lit.frag");
 
-    // Loading Textures and meshes. A missing one gives a fallback (magenta) instead of stopping.
+    // A missing texture or mesh gives a fallback (magenta) instead of stopping.
     const ezse::TextureHandle checkerTexture =
         resources.LoadTexture("sandbox/textures/checker.png");
     const ezse::MeshHandle cubeMesh = resources.LoadMesh("engine/models/cube.obj");
@@ -255,9 +251,9 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     ezse::LogInfo("Cube loaded twice: id {} and id {}", cubeMesh.id, cubeMeshAgain.id);
     resources.UnloadMesh(cubeMeshAgain);
 
-    // Creating the entities
+    // The textured cube in the middle.
     const ezse::Entity cube = world.CreateEntity();
-    world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
+    world.AddComponent(cube, ezse::Transform{.position = {0.0f, -2.0f, 0.0f}});
     world.AddComponent(cube, ezse::MeshRenderer{cubeMesh,
                                                 {.shader = shader, .texture = checkerTexture}});
 
@@ -265,12 +261,11 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh,
                                                   {.shader = shader, .texture = checkerTexture}});
 
-    //world.AddComponent(cube, Spin{ .speed{0.175f, 0.25f, 0.0f} });
     // All colors in this file are linear: they go to the shader unchanged, and the window converts
     // the result to sRGB. An sRGB color c becomes roughly c^2.2 (0.5 becomes 0.214).
     // A second cube with the same mesh: no texture (white), an orange tint and a different shine.
     const ezse::Entity orangeCube = world.CreateEntity();
-    world.AddComponent(orangeCube, ezse::Transform{1.5f, -2.0f, 0.0f});
+    world.AddComponent(orangeCube, ezse::Transform{.position = {1.5f, -2.0f, 0.0f}});
     world.AddComponent(orangeCube, ezse::MeshRenderer{cubeMesh, {
         .shader = shader,
         .tint = {1.0f, 0.214f, 0.010f},
@@ -343,13 +338,12 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     world.AddComponent(camera, ezse::Transform{.position = {0.0f, 0.0f, 3.0f}});
     world.AddComponent(camera, ezse::Camera{});
     world.AddComponent(camera, CameraController{});
-    // Making the debug panel for the Camera
+    // A debug panel to place the camera by hand.
     engine.GetDebugUI().AddPanel("Camera", [camera](ezse::World& world) {
         ezse::Vec3& cameraPos = world.GetComponent<ezse::Transform>(camera).position;
         ezse::DragVec3("Position", cameraPos, 0.05f);
     });
 
-    // Registing the systems
     // Program controls (quit, debug UI, cursor) read the events of this frame, so they run once per
     // frame; in the simulation a key press would be missed in frames without a tick.
     world.AddSystem<GameControlSystem>(ezse::PresentationGroup::Update,
@@ -363,7 +357,7 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     // The camera, the lights and drawing are added by the Engine itself
     // (PresentationGroup::Render).
 
-    // Capturing mouse in window and running game
+    // The mouse turns the camera; F1 frees the cursor again.
     engine.GetWindow().SetCursorCaptured(true);
 }
 
@@ -378,7 +372,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Creating engine
     ezse::EngineDesc desc{};
     if (headless) {
         desc.window = std::nullopt;
