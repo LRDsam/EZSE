@@ -14,15 +14,20 @@
 
 namespace ezse {
 
+// One ComponentArray per registered type, and the signature of every entity. Used by World; a
+// game uses World. Add, Remove, Get and Has need the type to be registered (asserts).
 class ComponentManager {
 public:
+    // Once per type, before the first Add.
     template <typename T> void Register();
     template <typename T> void Add(Entity entity, T component);
     template <typename T> void Remove(Entity entity);
     template <typename T> T& Get(Entity entity);
     template <typename T> bool Has(Entity entity) const;
 
+    // Removes all components of the entity and clears its signature.
     void EntityDestroyed(Entity entity);
+    // Empty for an entity without components.
     Signature GetSignature(Entity entity) const;
 
 private:

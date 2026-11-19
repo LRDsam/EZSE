@@ -6,6 +6,9 @@
 
 namespace ezse {
 
+// Directional: shines one way everywhere, like the sun (one is used, and it casts the shadows).
+// Point: from one point in all directions. Spot: from one point in a cone. Ambient: reaches every
+// surface from all sides, so nothing is fully black (one is used; it has no place or direction).
 enum class LightType { Directional, Point, Spot, Ambient };
 
 // A light; where it is and where it points come from the Transform of the same entity

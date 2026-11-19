@@ -6,6 +6,7 @@
 
 namespace ezse {
 
+// A light at one point that shines in a cone and fades out towards range (meters).
 struct SpotLight {
     Vec3  position = Vec3{};
     Vec3  direction = {0.0f, 0.0f, -1.0f};   // which way the cone points; need not be normalized

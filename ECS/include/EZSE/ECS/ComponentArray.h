@@ -10,25 +10,35 @@
 
 namespace ezse {
 
+// The part of every ComponentArray that does not depend on T, so ComponentManager can keep them
+// all in one list and tell each one that an entity was destroyed.
 class IComponentArray {
 public:
     virtual ~IComponentArray() = default;
     virtual void EntityDestroyed(Entity entity) = 0;
 };
 
+// All components of one type, as a sparse set: the components lie packed in one vector (fast to go
+// through), and a second vector finds the place of an entity in O(1). Remove moves the last
+// component into the hole, so the order is not fixed.
 template <typename T>
 class ComponentArray : public IComponentArray {
 public:
+    // The entity must not have this component yet (asserts).
     void Add(Entity entity, T component);
+    // The entity must have this component (asserts).
     void Remove(Entity entity);
     bool Has(Entity entity) const;
+    // The entity must have this component (asserts). The reference is valid until the next Add or
+    // Remove in this array: an Add can move all components to new memory.
     T& Get(Entity entity);
+    // Removes the component if the entity has one.
     void EntityDestroyed(Entity entity) override;
 
 private:
     std::vector<T> m_components;
-    std::vector<Entity> m_entities;
-    std::vector<std::uint32_t> m_sparse;
+    std::vector<Entity> m_entities;       // the entity of each component, at the same place
+    std::vector<std::uint32_t> m_sparse;  // index: id - 1, value: place plus one, 0 = none
 };
 
 template <typename T>

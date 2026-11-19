@@ -9,14 +9,20 @@
 
 namespace ezse {
 
+// The bookkeeping of the ResourceManager for one kind of handle: which key (path) has which handle,
+// and how many times it was loaded. It does not create or destroy anything itself.
 template <typename Handle>
 class ResourceCache {
 public:
+    // The handle of key with its count raised by one, or id 0 if the key is not there yet.
     Handle Acquire(const std::string& key);
+    // A new key with its handle, counted once. Neither may be there yet (asserts).
     void Add(const std::string& key, Handle handle);
+    // Lowers the count by one; true when it reaches 0 and the entry is gone (then destroy it).
     bool Release(Handle handle);
 
     const std::string& GetKey(Handle handle) const;
+    // Every handle still in the cache, for cleaning up at the end.
     std::vector<Handle> GetHandles() const;
 
 private:

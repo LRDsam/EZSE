@@ -20,11 +20,19 @@ namespace ezse {
 using GLProc = void (*)();
 using GLLoadFunction = GLProc (*)(const char* name);
 
+// Everything that talks to OpenGL. It knows no files, entities or windows: it gets data and gives
+// handles back (rules 1 to 4 under Architectuur in CLAUDE.md). The Engine drives it each frame:
+// SetCamera and the lights, BeginShadowPass, DrawShadowCaster per mesh, EndShadowPass, Clear,
+// DrawMesh per mesh, then the debug UI.
 class Renderer {
 public:
+    // Loads OpenGL with the function of the window. Returns nothing (and logs why) if that fails.
     static std::unique_ptr<Renderer> Create(GLLoadFunction loadFunction);
+    // The size of the window in pixels; a size of 0 (a minimized window) is ignored.
     void SetViewport(int width, int height);
 
+    // Uploads the mesh to the GPU. indices: three per triangle, counterclockwise seen from the
+    // front (the back is not drawn).
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
     // Draws the mesh with the shader, texture and settings of the material. The texture is bound
     // to texture unit 0; texture id 0 binds a 1x1 white texture, so only the tint shows.
@@ -37,6 +45,7 @@ public:
     TextureHandle CreateTexture(int width, int height, std::span<const std::uint8_t> pixels);
     void DestroyTexture(TextureHandle texture);
 
+    // Compiles and links GLSL source. Returns id 0 (and logs the error) if that fails.
     ShaderHandle CreateShader(std::string_view vertexSource, std::string_view fragmentSource);
     void DestroyShader(ShaderHandle shader);
 
@@ -69,6 +78,7 @@ public:
     Renderer& operator=(const Renderer&) = delete;
     ~Renderer();
 
+    // Clears color and depth of the window; the color is linear.
     void Clear(float red, float green, float blue);
 
     // The shadow pass of the directional light, drawn before the normal image each frame:

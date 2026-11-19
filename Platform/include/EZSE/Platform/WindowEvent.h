@@ -17,6 +17,7 @@ struct KeyPressed {
     Key key = Key::Unknown;
 };
 
+// A key went up.
 struct KeyReleased {
     Key key = Key::Unknown;
 };

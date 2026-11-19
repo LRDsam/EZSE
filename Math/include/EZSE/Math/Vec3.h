@@ -2,12 +2,15 @@
 
 namespace ezse {
 
+// A point, a direction or a color (red, green and blue in x, y and z). In the world, +Y is up and
+// a camera or light looks along its own -Z (right-handed, as in OpenGL).
 struct Vec3 {
     float x = 0.0f;
     float y = 0.0f;
     float z = 0.0f;
 };
 
+// Part by part; a vector times a number scales its length.
 Vec3 operator+(const Vec3& a, const Vec3& b);
 Vec3 operator-(const Vec3& a, const Vec3& b);
 Vec3 operator-(const Vec3& a);

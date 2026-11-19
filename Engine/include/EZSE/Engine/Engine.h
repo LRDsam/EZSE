@@ -43,7 +43,10 @@ public:
 
     ~Engine();
 
+    // Runs the game loop until Quit, or until the window is closed: with a window the screen sets
+    // the pace, headless the ticks do.
     void Run();
+    // Stops Run after the current tick or frame. Can be called from a system.
     void Quit();
     // Runs exactly one tick of SystemPhase::Simulation and counts it, without looking at real time.
     // Run calls it for every tick; tests (and later bots and a server inside the client) call it
@@ -53,6 +56,7 @@ public:
     // Whether the Engine runs without a window (EngineDesc::window was empty).
     bool IsHeadless() const;
 
+    // The tick number, the length of a tick and the blend between ticks.
     const SimulationTime& GetSimulationTime() const;
 
     World& GetWorld();

@@ -14,12 +14,15 @@ struct GLFWwindow;
 
 namespace ezse {
 
+// How the window opens: its title and its size in screen pixels.
 struct WindowDesc {
     std::string title = "EZSE";
     int width = 1280;
     int height = 720;
 };
 
+// The size of the area that is drawn to, in pixels. Can differ from the window size (a screen
+// with scaling), and is 0 by 0 while the window is minimized.
 struct FramebufferSize {
     int width = 0;
     int height = 0;
@@ -32,20 +35,28 @@ struct MouseDelta {
     float y = 0.0f;
 };
 
+// The window of the program with an OpenGL 4.6 context, keyboard and mouse. GLFW stays hidden
+// behind it. There can be one Window at a time.
 class Window {
 public:
+    // Opens the window and makes its OpenGL context current; vsync is on. Returns nothing (and
+    // logs why) if GLFW or the window cannot be made.
     static std::unique_ptr<Window> Create(const WindowDesc& desc);
     ~Window();
 
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
 
+    // The function the Renderer loads OpenGL with. Declared here and in the Renderer, so the two
+    // modules do not know each other.
     using GLProc = void (*)();
     using GLLoadFunction = GLProc (*)(const char* name);
 
     // Collects what happened since the previous call; read it with GetEvents.
     void PollEvents();
+    // Shows the image that was drawn; waits for the screen (vsync).
     void SwapBuffers();
+    // True after the close button of the window was clicked.
     bool ShouldClose() const;
 
     // The events of the last PollEvents. Valid until the next PollEvents.
