@@ -648,8 +648,7 @@ kubus met alleen engine-assets (door de gebruiker gezien). Besluiten 298 tot en 
 `CoreTests`, `MathTests`, `ECSTests` en `EngineTests` geven allemaal `[PASS]` in Debug en Release.
 Daarmee is het engine-werk van fase 1 van de game af.
 
-Review na fase 1 (op branch `review-phase-1`, nog niet in `main` gemerged, besluiten 306 tot en met
-312): twee fouten verholpen (`ComponentArray::Remove` van het laatste element, de muispositie via
+Review na fase 1 (besluiten 306 tot en met 312, op 19 november 2026 in `main` gemerged): twee fouten verholpen (`ComponentArray::Remove` van het laatste element, de muispositie via
 `float`), eigen code met `/W4 /permissive-` (0 warnings) en CTest, de stijl gelijkgetrokken en
 vastgelegd bij Conventies, commentaar in alle publieke headers, drie simpele optimalisaties
 (bestanden in één keer lezen, een nieuw system alleen zichzelf laten controleren, de lijsten van
@@ -885,9 +884,11 @@ fase 1 van de game af. Het volgende engine-werk komt uit fase 2 van de game (phy
 debug-draw, botsingen, raycasts, character controller, glTF); eerst bespreken, dan een branch
 `step-35-...` vanaf `main`.
 
-Eerst: de review na fase 1 (branch `review-phase-1`, besluiten 306 tot en met 312, zes commits R1
-tot en met R6) na akkoord in `main` mergen en pushen; de gebruiker start dan Sandbox en de
-`Client` nog één keer om te zien dat alles er hetzelfde uitziet.
+De review na fase 1 (besluiten 306 tot en met 312, zes commits R1 tot en met R6) is op 19 november
+2026 in `main` gemerged (fast-forward). Nog te doen: de gebruiker start Sandbox en de `Client` nog
+één keer om te zien dat alles er hetzelfde uitziet. Opruimen na akkoord: de branches
+`step-34-assets-vfs` en `review-phase-1` (lokaal en op GitHub) en de lokale `step-32-fixed-tick`
+en `step-33-headless`.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
