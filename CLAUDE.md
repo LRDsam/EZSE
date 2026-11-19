@@ -618,10 +618,16 @@ vaste tijdstip van de volgende tick met `Platform::SleepUntil` (op Windows minde
 en logt elke seconde een meting. Sandbox draait met `--headless` dezelfde simulatie zonder venster.
 Besluiten 291 tot en met 297.
 
-Stap 34 (standaard-assets en een virtueel bestandssysteem, op branch `step-34-assets-vfs`) is
-begonnen. 34a is af: `VirtualFileSystem` in Core met mount points, een inhoudsopgave en strikte
-padregels, en een nieuw testprogramma `CoreTests` (39 controles). Besluiten 298 tot en met 302.
+Stap 34 (standaard-assets en een virtueel bestandssysteem) is af en op 19 november 2026 in `main`
+gemerged. `VirtualFileSystem` in Core met mount points, een inhoudsopgave en strikte padregels
+(namespace als eerste deel: `engine/...`, `sandbox/...`), met een eigen testprogramma `CoreTests`.
+De `Engine` bezit het, ook headless, en mount bij `Create` de engine-assets als `engine`; die staan
+in `Engine/assets/` (de shaders `lit`, `basic`, `normals`, `uv` en `cube.obj`) en komen met
+`ezse_copy_engine_assets` naast elke exe. De `ResourceManager` leest via het bestandssysteem, en een
+`Load` die mislukt geeft een magenta fallback met een `LogWarn`. De `Client` van de game tekent een
+kubus met alleen engine-assets (door de gebruiker gezien). Besluiten 298 tot en met 305.
 `CoreTests`, `MathTests`, `ECSTests` en `EngineTests` geven allemaal `[PASS]` in Debug en Release.
+Daarmee is het engine-werk van fase 1 van de game af.
 
 Publieke interface van `Renderer`:
 
@@ -823,13 +829,17 @@ besluit 292), 33b `Step()` en `Run` gebruikt hem (af, besluit 295), 33c de headl
 `Platform::SleepUntil` en een meting per seconde (af, besluit 296), 33d Sandbox met `--headless` (af,
 besluit 297). Daarmee is stap 33 af; op 18 november 2026 in `main` gemerged (fast-forward).
 
-Stap 34 (op branch `step-34-assets-vfs`): standaard-assets en een virtueel bestandssysteem
+Stap 34: standaard-assets en een virtueel bestandssysteem
 (onderzoek en aanpak in besluiten 298 tot en met 300). In delen: 34a `VirtualFileSystem` in Core
 (af, besluiten 301 en 302), 34b de `Engine` bezit het (ook headless), de `ResourceManager` leest
 erdoor, Sandbox mount zijn assets als `sandbox` (af, besluit 303); 34c de engine-assets in
 `Engine/assets/`, gekopieerd naar `<exe>/assets/engine/` met `ezse_copy_engine_assets`, door
 `Engine::Create` gemount als `engine` (af, besluit 304); 34d de fallbacks in de `ResourceManager`
-(af, besluit 305); **34e** de `Client` van de game tekent met alleen engine-assets.
+(af, besluit 305); 34e de `Client` van de game tekent met alleen engine-assets (af, in de game,
+game-besluit 8). Stap 34 is op 19 november 2026 in `main` gemerged (fast-forward). Daarmee is
+fase 1 van de game af. Het volgende engine-werk komt uit fase 2 van de game (physics en de wereld:
+debug-draw, botsingen, raycasts, character controller, glTF); eerst bespreken, dan een branch
+`step-35-...` vanaf `main`.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
