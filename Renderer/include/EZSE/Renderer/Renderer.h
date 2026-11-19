@@ -26,7 +26,8 @@ public:
     void SetViewport(int width, int height);
 
     MeshHandle CreateMesh(std::span<const Vertex> vertices, std::span<const std::uint32_t> indices);
-    // texture: bound to texture unit 0 for this draw; id 0 binds a 1x1 white texture.
+    // Draws the mesh with the shader, texture and settings of the material. The texture is bound
+    // to texture unit 0; texture id 0 binds a 1x1 white texture, so only the tint shows.
     void DrawMesh(MeshHandle mesh, const Material& material, const Mat4& model);
     void DestroyMesh(MeshHandle mesh);
 

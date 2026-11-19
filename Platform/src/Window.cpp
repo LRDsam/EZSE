@@ -112,8 +112,10 @@ void Window::PollEvents() {
     glfwGetCursorPos(m_handle, &cursorX, &cursorY);
     m_mouseDelta.x = static_cast<float>(cursorX - m_lastCursorX);
     m_mouseDelta.y = static_cast<float>(cursorY - m_lastCursorY);
-    m_lastCursorX = static_cast<float>(cursorX);
-    m_lastCursorY = static_cast<float>(cursorY);
+    // Kept as double: with a captured cursor GLFW keeps adding to the position, and a float
+    // would lose the small steps after a long time.
+    m_lastCursorX = cursorX;
+    m_lastCursorY = cursorY;
 }
 
 void Window::SwapBuffers() {

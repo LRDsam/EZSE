@@ -49,11 +49,15 @@ template <typename T>
 void ComponentArray<T>::Remove(Entity entity) {
     EZSE_ASSERT(Has(entity), "Entity does not have component");
 
+    // The last component fills the hole, so the array stays packed. Not when the removed one is
+    // the last itself: moving an object onto itself can empty it (a std::string, for example).
     const std::uint32_t position = m_sparse[entity.id - 1] - 1;
-    m_components[position] = std::move(m_components.back());
-    m_entities[position] = m_entities.back();
-
-    m_sparse[m_entities.back().id - 1] = m_sparse[entity.id - 1];
+    const std::uint32_t last = static_cast<std::uint32_t>(m_components.size() - 1);
+    if (position != last) {
+        m_components[position] = std::move(m_components.back());
+        m_entities[position] = m_entities.back();
+        m_sparse[m_entities[position].id - 1] = position + 1;
+    }
     m_sparse[entity.id - 1] = 0;
 
     m_components.pop_back();

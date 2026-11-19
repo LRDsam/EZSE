@@ -9,6 +9,7 @@
 #include "EZSE/ECS/World.h"
 
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace {
@@ -31,6 +32,11 @@ struct Unregistered {};
 // Registered after Unregistered got its number, so its slot lies beyond the empty one.
 struct Armor {
     int value = 0;
+};
+
+// A component that owns memory, as an inventory will later: moving it must not lose its content.
+struct Name {
+    std::string text;
 };
 
 void Check(bool condition, const char* description) {
@@ -142,6 +148,27 @@ void TestComponentRemoveLast() {
     components.Remove(ezse::Entity{2});
     components.Remove(ezse::Entity{4});
     Check(!components.Has(ezse::Entity{4}), "ComponentArray Remove last: the only component can be removed");
+}
+
+void TestComponentRemoveOwningMemory() {
+    ezse::ComponentArray<Name> names;
+    names.Add(ezse::Entity{1}, Name{"first, longer than the small string buffer"});
+    names.Add(ezse::Entity{2}, Name{"second, longer than the small string buffer"});
+    names.Add(ezse::Entity{3}, Name{"third, longer than the small string buffer"});
+
+    names.Remove(ezse::Entity{3});
+    Check(names.Get(ezse::Entity{1}).text == "first, longer than the small string buffer" &&
+              names.Get(ezse::Entity{2}).text == "second, longer than the small string buffer",
+          "ComponentArray Remove last: components that own memory keep their content");
+
+    names.Remove(ezse::Entity{1});
+    Check(names.Get(ezse::Entity{2}).text == "second, longer than the small string buffer",
+          "ComponentArray Remove: the moved component keeps its content");
+
+    names.Remove(ezse::Entity{2});
+    names.Add(ezse::Entity{2}, Name{"again"});
+    Check(names.Has(ezse::Entity{2}) && names.Get(ezse::Entity{2}).text == "again",
+          "ComponentArray Remove the only one: it can be added again");
 }
 
 void TestComponentAddAfterRemove() {
@@ -652,6 +679,7 @@ int main() {
     TestComponentGetReference();
     TestComponentRemove();
     TestComponentRemoveLast();
+    TestComponentRemoveOwningMemory();
     TestComponentAddAfterRemove();
     TestComponentType();
     TestComponentEntityDestroyed();

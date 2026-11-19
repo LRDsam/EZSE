@@ -22,10 +22,13 @@ void EntitySet::Remove(Entity entity) {
         return;
     }
 
+    // The last entity fills the hole, so the list stays packed (as in ComponentArray::Remove).
     const std::uint32_t position = m_sparse[entity.id - 1] - 1;
-    m_entities[position] = m_entities.back();
-
-    m_sparse[m_entities.back().id - 1] = m_sparse[entity.id - 1];
+    const std::uint32_t last = static_cast<std::uint32_t>(m_entities.size() - 1);
+    if (position != last) {
+        m_entities[position] = m_entities.back();
+        m_sparse[m_entities[position].id - 1] = position + 1;
+    }
     m_sparse[entity.id - 1] = 0;
 
     m_entities.pop_back();
