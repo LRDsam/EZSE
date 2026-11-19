@@ -654,7 +654,8 @@ vastgelegd bij Conventies, commentaar in alle publieke headers, drie simpele opt
 (bestanden in één keer lezen, een nieuw system alleen zichzelf laten controleren, de lijsten van
 `LightSystem` hergebruiken), de README bijgewerkt en de punten voor later bij Bekende beperkingen.
 Controles: `CoreTests` 39, `MathTests` 145, `ECSTests` 118, `EngineTests` 85, allemaal `[PASS]` in
-Debug en Release. Sandbox en de `Client` zijn na de review nog niet door de gebruiker gestart.
+Debug en Release. Sandbox en de `Client` zien er na de review hetzelfde uit (door de gebruiker
+gezien).
 
 Publieke interface van `Renderer`:
 
@@ -885,10 +886,9 @@ debug-draw, botsingen, raycasts, character controller, glTF); eerst bespreken, d
 `step-35-...` vanaf `main`.
 
 De review na fase 1 (besluiten 306 tot en met 312, zes commits R1 tot en met R6) is op 19 november
-2026 in `main` gemerged (fast-forward). Nog te doen: de gebruiker start Sandbox en de `Client` nog
-één keer om te zien dat alles er hetzelfde uitziet. Opruimen na akkoord: de branches
-`step-34-assets-vfs` en `review-phase-1` (lokaal en op GitHub) en de lokale `step-32-fixed-tick`
-en `step-33-headless`.
+2026 in `main` gemerged (fast-forward); Sandbox en de `Client` zien er daarna hetzelfde uit. De
+branches van stap 32 tot en met 34 en van de review zijn opgeruimd, lokaal en op GitHub; alleen
+`main` is er nog.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
