@@ -76,6 +76,7 @@ add_library(EZSEEngine STATIC
 add_library(EZSE::Engine ALIAS EZSEEngine)
 
 target_include_directories(EZSEEngine PUBLIC include)
+ezse_set_warnings(EZSEEngine)
 target_link_libraries(EZSEEngine
     PUBLIC EZSE::Platform EZSE::Renderer EZSE::ECS EZSE::Core imgui
     PRIVATE stb
@@ -84,5 +85,7 @@ target_link_libraries(EZSEEngine
 if(EZSE_BUILD_TESTS)
     add_executable(EngineTests tests/EngineTests.cpp)
     target_link_libraries(EngineTests PRIVATE EZSE::Engine)
+    ezse_set_warnings(EngineTests)
     ezse_copy_engine_assets(EngineTests)
+    add_test(NAME EngineTests COMMAND EngineTests)
 endif()

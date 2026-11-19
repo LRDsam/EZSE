@@ -19,9 +19,12 @@ add_library(EZSEECS STATIC
 add_library(EZSE::ECS ALIAS EZSEECS)
 
 target_include_directories(EZSEECS PUBLIC include)
+ezse_set_warnings(EZSEECS)
 target_link_libraries(EZSEECS PUBLIC EZSE::Core)
 
 if(EZSE_BUILD_TESTS)
     add_executable(ECSTests tests/ECSTests.cpp)
     target_link_libraries(ECSTests PRIVATE EZSE::ECS)
+    ezse_set_warnings(ECSTests)
+    add_test(NAME ECSTests COMMAND ECSTests)
 endif()

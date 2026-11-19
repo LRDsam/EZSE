@@ -12,8 +12,11 @@ add_library(EZSEMath STATIC
 add_library(EZSE::Math ALIAS EZSEMath)
 
 target_include_directories(EZSEMath PUBLIC include)
+ezse_set_warnings(EZSEMath)
 
 if(EZSE_BUILD_TESTS)
     add_executable(MathTests tests/MathTests.cpp)
     target_link_libraries(MathTests PRIVATE EZSE::Math)
+    ezse_set_warnings(MathTests)
+    add_test(NAME MathTests COMMAND MathTests)
 endif()

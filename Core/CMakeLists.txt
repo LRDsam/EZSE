@@ -10,6 +10,7 @@ add_library(EZSECore STATIC
 add_library(EZSE::Core ALIAS EZSECore)
 
 target_include_directories(EZSECore PUBLIC include)
+ezse_set_warnings(EZSECore)
 target_compile_definitions(EZSECore PUBLIC
     $<$<CONFIG:Debug>:EZSE_DEBUG>
     $<$<CONFIG:Debug>:EZSE_ENABLE_ASSERTS>
@@ -18,4 +19,6 @@ target_compile_definitions(EZSECore PUBLIC
 if(EZSE_BUILD_TESTS)
     add_executable(CoreTests tests/CoreTests.cpp)
     target_link_libraries(CoreTests PRIVATE EZSE::Core)
+    ezse_set_warnings(CoreTests)
+    add_test(NAME CoreTests COMMAND CoreTests)
 endif()

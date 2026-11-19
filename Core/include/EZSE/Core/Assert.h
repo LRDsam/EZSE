@@ -14,5 +14,7 @@
             }                                                                  \
         } while (false)
 #else
-    #define EZSE_ASSERT(condition, message) ((void)0)
+    // sizeof does not run the condition, but it still counts as used: a loop that only asserts
+    // gives no "variable not used" warning in Release.
+    #define EZSE_ASSERT(condition, message) ((void)sizeof(condition))
 #endif

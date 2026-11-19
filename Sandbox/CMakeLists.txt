@@ -1,6 +1,7 @@
 add_executable(Sandbox src/main.cpp)
 
 target_link_libraries(Sandbox PRIVATE EZSE::Engine)
+ezse_set_warnings(Sandbox)
 
 # The shaders and the cube come from the engine; the rest of Sandbox/assets is its own, as
 # namespace "sandbox".

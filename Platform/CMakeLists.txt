@@ -11,4 +11,5 @@ add_library(EZSEPlatform STATIC
 add_library(EZSE::Platform ALIAS EZSEPlatform)
 
 target_include_directories(EZSEPlatform PUBLIC include)
+ezse_set_warnings(EZSEPlatform)
 target_link_libraries(EZSEPlatform PRIVATE EZSE::Core glfw imgui_glfw)

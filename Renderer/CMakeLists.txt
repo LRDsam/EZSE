@@ -11,6 +11,7 @@ add_library(EZSERenderer STATIC
 add_library(EZSE::Renderer ALIAS EZSERenderer)
 
 target_include_directories(EZSERenderer PUBLIC include)
+ezse_set_warnings(EZSERenderer)
 target_link_libraries(EZSERenderer
     PUBLIC EZSE::Math
     PRIVATE EZSE::Core glad imgui_opengl3
