@@ -108,8 +108,8 @@ Quat FromEuler(const Vec3& angles) {
 }
 
 Vec3 ToEuler(const Quat& q) {
-    // The angles are read from elements of the rotation matrix of q, written per row as R[row][col],
-    // for R = RotationY(yaw) * RotationX(pitch) * RotationZ(roll):
+    // The angles are read from elements of the rotation matrix of q, written per row as
+    // R[row][col], for R = RotationY(yaw) * RotationX(pitch) * RotationZ(roll):
     //   R[1][2] = -sin(pitch)
     //   R[0][2] = sin(yaw) cos(pitch),   R[2][2] = cos(yaw) cos(pitch)
     //   R[1][0] = cos(pitch) sin(roll),  R[1][1] = cos(pitch) cos(roll)

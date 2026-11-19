@@ -11,7 +11,7 @@ struct Transform {
     // The orientation, of length 1; the default does not turn. Make one from angles with
     // FromEuler (pitch, yaw, roll in radians).
     Quat rotation;
-    Vec3 scale = { 1.0f, 1.0f, 1.0f };
+    Vec3 scale = {1.0f, 1.0f, 1.0f};
 };
 
 Mat4 ModelMatrix(const Transform& transform);

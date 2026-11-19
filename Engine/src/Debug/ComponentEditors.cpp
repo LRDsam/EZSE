@@ -5,6 +5,7 @@
 #include "EZSE/Math/Quat.h"
 
 #include <imgui.h>
+
 #include <algorithm>
 
 namespace ezse {

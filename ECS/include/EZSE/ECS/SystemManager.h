@@ -36,7 +36,8 @@ private:
 };
 
 template <typename T, typename... Args>
-T& SystemManager::Add(SystemPhase systemPhase, std::size_t group, Signature signature, Args&&... args) {
+T& SystemManager::Add(SystemPhase systemPhase, std::size_t group, Signature signature,
+                      Args&&... args) {
     EZSE_ASSERT(group < c_maxSystemGroupCount, "System group out of range");
     std::unique_ptr<T> system = std::make_unique<T>(std::forward<Args>(args)...);
     system->m_signature = signature;

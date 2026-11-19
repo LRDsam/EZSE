@@ -18,7 +18,7 @@ class World {
 public:
     Entity CreateEntity();
     void DestroyEntity(Entity entity);
-    bool  IsAlive(Entity entity) const;
+    bool IsAlive(Entity entity) const;
 
     template <typename T> void RegisterComponent();
     template <typename T> void AddComponent(Entity entity, T component);

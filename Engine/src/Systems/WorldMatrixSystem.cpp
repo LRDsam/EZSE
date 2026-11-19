@@ -18,7 +18,8 @@ void WorldMatrixSystem::Update(World& world, float) {
             world.AddComponent<WorldMatrix>(entity, WorldMatrix{});
         }
         if (world.HasComponent<PreviousTransform>(entity)) {
-            const Transform& prevTransform = world.GetComponent<PreviousTransform>(entity).transform;
+            const Transform& prevTransform =
+                world.GetComponent<PreviousTransform>(entity).transform;
             world.GetComponent<WorldMatrix>(entity).matrix =
                 ModelMatrix(Interpolate(prevTransform, transform, m_simulationTime.alpha));
             continue;

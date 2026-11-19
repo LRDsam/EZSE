@@ -22,13 +22,13 @@
 
 #include "EZSE/Math/Transform.h"
 
+#include <imgui.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <numbers>
 #include <string_view>
 #include <variant>
-
-#include <imgui.h>
 
 namespace {
 
@@ -150,7 +150,8 @@ void CameraControlSystem::Update(ezse::World& world, float deltaTime) {
         cameraController.yaw -= mouseDelta.x * cameraController.lookSensitivity;
         cameraController.pitch -= mouseDelta.y * cameraController.lookSensitivity;
         cameraController.pitch = std::clamp(cameraController.pitch, -maxPitch, maxPitch);
-        transform.rotation = ezse::FromEuler(ezse::Vec3{cameraController.pitch, cameraController.yaw, 0.0f});
+        transform.rotation =
+            ezse::FromEuler(ezse::Vec3{cameraController.pitch, cameraController.yaw, 0.0f});
         // Walking follows only the yaw, so looking up or down does not slow it.
         const ezse::Vec3 moveEntity = ezse::TransformDirection(
             ezse::RotationY(cameraController.yaw),
@@ -242,7 +243,8 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
         "engine/shaders/lit.frag");
 
     // Loading Textures and meshes. A missing one gives a fallback (magenta) instead of stopping.
-    const ezse::TextureHandle checkerTexture = resources.LoadTexture("sandbox/textures/checker.png");
+    const ezse::TextureHandle checkerTexture =
+        resources.LoadTexture("sandbox/textures/checker.png");
     const ezse::MeshHandle cubeMesh = resources.LoadMesh("engine/models/cube.obj");
     const ezse::MeshHandle monkeyMesh = resources.LoadMesh("sandbox/models/monkey.obj");
     const ezse::MeshHandle roomMesh = resources.LoadMesh("sandbox/models/room.obj");
@@ -256,7 +258,8 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     // Creating the entities
     const ezse::Entity cube = world.CreateEntity();
     world.AddComponent(cube, ezse::Transform{0.0f, -2.0f, 0.0f});
-    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh, {.shader = shader, .texture = checkerTexture}});
+    world.AddComponent(cube, ezse::MeshRenderer{cubeMesh,
+                                                {.shader = shader, .texture = checkerTexture}});
 
     // The monkey from the simulation gets its mesh, with the checkerboard to show her uvs.
     world.AddComponent(monkey, ezse::MeshRenderer{monkeyMesh,
@@ -357,7 +360,8 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     world.AddSystem<CameraControlSystem>(ezse::PresentationGroup::Update,
                                          ezse::MakeSignature<ezse::Transform, CameraController>(),
                                          engine.GetWindow(), engine);
-    // The camera, the lights and drawing are added by the Engine itself (PresentationGroup::Render).
+    // The camera, the lights and drawing are added by the Engine itself
+    // (PresentationGroup::Render).
 
     // Capturing mouse in window and running game
     engine.GetWindow().SetCursorCaptured(true);

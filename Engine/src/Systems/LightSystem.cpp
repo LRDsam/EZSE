@@ -35,50 +35,50 @@ LightSystem::LightSystem(Renderer& renderer, float shadowExtent)
 void LightSystem::Update(World& world, float) {
     bool directionalFound = false;
     bool ambientFound = false;
-    Vec3 directionalDirection = { 0.0f, -1.0f, 0.0f };
+    Vec3 directionalDirection = {0.0f, -1.0f, 0.0f};
     Vec3 directionalColor;
     Vec3 ambientColor;
     std::vector<PointLight> pointLights;
     std::vector<SpotLight> spotLights;
 
-    for (const auto& entity : GetEntities()) {
+    for (const Entity entity : GetEntities()) {
         const WorldMatrix& worldMatrix = world.GetComponent<WorldMatrix>(entity);
         const Light& light = world.GetComponent<Light>(entity);
         switch (light.type) {
-        case LightType::Directional:
-            if (directionalFound) {
+            case LightType::Directional:
+                if (directionalFound) {
+                    break;
+                }
+                directionalDirection = Forward(worldMatrix);
+                directionalColor = light.color * light.intensity;
+                directionalFound = true;
                 break;
-            }
-            directionalDirection = Forward(worldMatrix);
-            directionalColor = light.color * light.intensity;
-            directionalFound = true;
-            break;
-        case LightType::Ambient:
-            if (ambientFound) {
+            case LightType::Ambient:
+                if (ambientFound) {
+                    break;
+                }
+                ambientColor = light.color * light.intensity;
+                ambientFound = true;
                 break;
-            }
-            ambientColor = light.color * light.intensity;
-            ambientFound = true;
-            break;
-        case LightType::Point:
-            pointLights.push_back(
-                PointLight{
-                    Position(worldMatrix),
-                    light.color * light.intensity,
-                    light.range
-                });
-            break;
-        case LightType::Spot:
-            spotLights.push_back(
-                SpotLight{
-                    .position = Position(worldMatrix),
-                    .direction = Forward(worldMatrix),
-                    .color = light.color * light.intensity,
-                    .range = light.range,
-                    .innerAngle = light.innerAngle,
-                    .outerAngle = light.outerAngle
-                });
-            break;
+            case LightType::Point:
+                pointLights.push_back(
+                    PointLight{
+                        Position(worldMatrix),
+                        light.color * light.intensity,
+                        light.range
+                    });
+                break;
+            case LightType::Spot:
+                spotLights.push_back(
+                    SpotLight{
+                        .position = Position(worldMatrix),
+                        .direction = Forward(worldMatrix),
+                        .color = light.color * light.intensity,
+                        .range = light.range,
+                        .innerAngle = light.innerAngle,
+                        .outerAngle = light.outerAngle
+                    });
+                break;
         }
     }
     m_renderer.SetDirectionalLight(directionalDirection, directionalColor);

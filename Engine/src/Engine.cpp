@@ -263,7 +263,8 @@ void Engine::RunWithWindow() {
         }
 
         const auto now = std::chrono::steady_clock::now();
-        const std::chrono::steady_clock::duration frameTime = std::min(now - lastFrame, c_maxFrameTime);
+        const std::chrono::steady_clock::duration frameTime =
+            std::min(now - lastFrame, c_maxFrameTime);
         lastFrame = now;
 
         // Systems may call ImGui:: functions during the update.

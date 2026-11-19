@@ -34,7 +34,7 @@ private:
 template <typename T>
 void ComponentArray<T>::Add(Entity entity, T component) {
     EZSE_ASSERT(entity.id != 0, "Cannot add a component to entity 0");
-    EZSE_ASSERT(!Has(entity), "Entity already has component");
+    EZSE_ASSERT(!Has(entity), "Entity already has this component");
 
     m_components.push_back(std::move(component));
     m_entities.push_back(entity);
@@ -47,7 +47,7 @@ void ComponentArray<T>::Add(Entity entity, T component) {
 
 template <typename T>
 void ComponentArray<T>::Remove(Entity entity) {
-    EZSE_ASSERT(Has(entity), "Entity does not have component");
+    EZSE_ASSERT(Has(entity), "Entity does not have this component");
 
     // The last component fills the hole, so the array stays packed. Not when the removed one is
     // the last itself: moving an object onto itself can empty it (a std::string, for example).
@@ -73,7 +73,7 @@ bool ComponentArray<T>::Has(Entity entity) const {
 
 template <typename T>
 T& ComponentArray<T>::Get(Entity entity) {
-    EZSE_ASSERT(Has(entity), "Entity does not have component");
+    EZSE_ASSERT(Has(entity), "Entity does not have this component");
     return m_components[m_sparse[entity.id - 1] - 1];
 }
 

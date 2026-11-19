@@ -6,7 +6,7 @@ namespace ezse {
 
 void EnableInterpolation(World& world, Entity entity) {
     world.AddComponent<PreviousTransform>(
-        entity, 
+        entity,
         PreviousTransform{world.GetComponent<Transform>(entity)});
 }
 

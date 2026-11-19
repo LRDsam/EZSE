@@ -18,7 +18,8 @@ void OnGlfwError(int code, const char* description) {
 // so those ranges are translated with an offset instead of a case per key.
 // The checks below fail to compile when a range in Key gets a gap or a different length.
 static_assert(static_cast<int>(Key::Z) - static_cast<int>(Key::A) == GLFW_KEY_Z - GLFW_KEY_A);
-static_assert(static_cast<int>(Key::Digit9) - static_cast<int>(Key::Digit0) == GLFW_KEY_9 - GLFW_KEY_0);
+static_assert(static_cast<int>(Key::Digit9) - static_cast<int>(Key::Digit0) ==
+              GLFW_KEY_9 - GLFW_KEY_0);
 static_assert(static_cast<int>(Key::F12) - static_cast<int>(Key::F1) == GLFW_KEY_F12 - GLFW_KEY_F1);
 
 Key ToKey(int glfwKey) {

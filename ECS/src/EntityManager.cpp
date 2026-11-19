@@ -12,7 +12,7 @@ Entity EntityManager::CreateEntity() {
 }
 
 void EntityManager::DestroyEntity(Entity entity) {
-    EZSE_ASSERT(IsAlive(entity), "Entity is not alive!");
+    EZSE_ASSERT(IsAlive(entity), "Entity is not alive");
     m_alive[entity.id - 1] = false;
 }
 

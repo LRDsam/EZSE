@@ -5,19 +5,19 @@
 namespace ezse {
 
 Vec3 operator+(const Vec3& a, const Vec3& b) {
-    return Vec3{ a.x + b.x, a.y + b.y, a.z + b.z };
+    return Vec3{a.x + b.x, a.y + b.y, a.z + b.z};
 }
 
 Vec3 operator-(const Vec3& a, const Vec3& b) {
-    return Vec3{ a.x - b.x, a.y - b.y, a.z - b.z };
+    return Vec3{a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
 Vec3 operator-(const Vec3& a) {
-    return Vec3{ -a.x, -a.y, -a.z };
+    return Vec3{-a.x, -a.y, -a.z};
 }
 
 Vec3 operator*(const Vec3& vec, float scalar) {
-    return Vec3{ vec.x * scalar, vec.y * scalar, vec.z * scalar };
+    return Vec3{vec.x * scalar, vec.y * scalar, vec.z * scalar};
 }
 
 Vec3 Cross(const Vec3& a, const Vec3& b) {
@@ -42,7 +42,7 @@ Vec3 Normalize(const Vec3& vec) {
     if (length < margin) {
         return Vec3{};
     }
-    return Vec3{ vec.x / length, vec.y / length, vec.z / length };
+    return Vec3{vec.x / length, vec.y / length, vec.z / length};
 }
 
 Vec3 Lerp(const Vec3& a, const Vec3& b, float t) {

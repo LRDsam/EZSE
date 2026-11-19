@@ -37,8 +37,7 @@ std::string_view NextLine(std::string_view& text) {
     }
     if (position == std::string_view::npos) {
         text = {};
-    }
-    else {
+    } else {
         text.remove_prefix(position + 1);
     }
     return line;
@@ -54,8 +53,7 @@ std::string_view NextToken(std::string_view& line) {
     const std::string_view token = line.substr(begin, end - begin);
     if (end == std::string_view::npos) {
         line = {};
-    }
-    else {
+    } else {
         line.remove_prefix(end);
     }
     return token;
@@ -133,30 +131,28 @@ std::optional<MeshData> ParseObj(std::string_view text) {
                 return std::nullopt;
             }
             positions.push_back(position);
-        }
-        else if (keyword == "vn") {
+        } else if (keyword == "vn") {
             std::array<float, 3> normal{};
             if (!ParseFloats(line, normal)) {
                 LogError("Failed to parse OBJ line {}: '{}'", lineNumber, fullLine);
                 return std::nullopt;
             }
             normals.push_back(normal);
-        }
-        else if (keyword == "vt") {
+        } else if (keyword == "vt") {
             std::array<float, 2> uv{};
             if (!ParseFloats(line, uv)) {
                 LogError("Failed to parse OBJ line {}: '{}'", lineNumber, fullLine);
                 return std::nullopt;
             }
             uvs.push_back(uv);
-        }
-        else if (keyword == "f") {
+        } else if (keyword == "f") {
             // The face becomes a fan of triangles: from the third corner on, every corner adds
             // the triangle (first, previous, current).
             std::uint32_t first = 0;
             std::uint32_t previous = 0;
             int cornerCount = 0;
-            for (std::string_view token = NextToken(line); !token.empty(); token = NextToken(line)) {
+            for (std::string_view token = NextToken(line); !token.empty();
+                 token = NextToken(line)) {
                 ObjCorner corner;
                 if (!ParseCorner(token, corner)) {
                     LogError("Failed to parse OBJ line {}: invalid corner '{}'", lineNumber, token);
@@ -176,8 +172,7 @@ std::optional<MeshData> ParseObj(std::string_view text) {
                 const auto found = vertexIndices.find(corner);
                 if (found != vertexIndices.end()) {
                     current = found->second;
-                }
-                else {
+                } else {
                     Vertex vertex{};
                     const std::array<float, 3>& position = positions[corner.position - 1];
                     const std::array<float, 3>& normal = normals[corner.normal - 1];

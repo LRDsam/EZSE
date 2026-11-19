@@ -36,12 +36,11 @@ private:
 template <typename T>
 void ComponentManager::Register() {
     const std::uint32_t type = ComponentType<T>();
-    EZSE_ASSERT(type < c_maxComponentTypes,
-        "Maximum number of components Registered");
+    EZSE_ASSERT(type < c_maxComponentTypes, "Too many component types registered");
     if (type >= m_arrays.size()) {
         m_arrays.resize(type + 1);
     }
-    EZSE_ASSERT(m_arrays[type] == nullptr, "Component already Registered");
+    EZSE_ASSERT(m_arrays[type] == nullptr, "Component already registered");
     m_arrays[type] = std::make_unique<ComponentArray<T>>();
 }
 
@@ -73,9 +72,8 @@ bool ComponentManager::Has(Entity entity) const {
 template <typename T>
 ComponentArray<T>& ComponentManager::GetArray() {
     const std::uint32_t type = ComponentType<T>();
-    EZSE_ASSERT(
-        type < m_arrays.size() &&
-        m_arrays[type] != nullptr, "Component not Registered");
+    EZSE_ASSERT(type < m_arrays.size() && m_arrays[type] != nullptr,
+                "Component not registered");
 
     IComponentArray* pointer = m_arrays[type].get();
     return *static_cast<ComponentArray<T>*>(pointer);
@@ -84,9 +82,8 @@ ComponentArray<T>& ComponentManager::GetArray() {
 template <typename T>
 const ComponentArray<T>& ComponentManager::GetArray() const {
     const std::uint32_t type = ComponentType<T>();
-    EZSE_ASSERT(
-        type < m_arrays.size() &&
-        m_arrays[type] != nullptr, "Component not Registered");
+    EZSE_ASSERT(type < m_arrays.size() && m_arrays[type] != nullptr,
+                "Component not registered");
 
     const IComponentArray* pointer = m_arrays[type].get();
     return *static_cast<const ComponentArray<T>*>(pointer);

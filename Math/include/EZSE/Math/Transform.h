@@ -21,7 +21,8 @@ Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up);
 
 // A projection without perspective: the box from left to right, bottom to top and nearPlane to
 // farPlane in front of the camera (along -Z) becomes the cube from -1 to 1.
-Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane);
+Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane,
+                  float farPlane);
 
 Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane);
 

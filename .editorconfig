@@ -3,6 +3,10 @@ root = true
 [*]
 indent_style = space
 indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{h,cpp,txt,cmake,vert,frag}]
+max_line_length = 100
 
 [*.{h,cpp}]
 cpp_indent_namespace_contents = false

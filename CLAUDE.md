@@ -159,6 +159,18 @@ Regels die de Renderer herbruikbaar houden:
 - Handles: een struct per soort met een `std::uint32_t id`, `0` is ongeldig. Opslag in een
   `std::vector`, id is de index plus één. Verwijderde plekken blijven leeg en worden niet
   hergebruikt.
+- Opmaak (vastgelegd in de review na fase 1, besluit 309): regels van hoogstens 100 tekens; een
+  vervolgregel staat onder het eerste argument, of 4 spaties verder in als dat niet past. `{` aan
+  het eind van de regel, `} else {` op één regel, `case` één stap in onder `switch`. Accolades
+  van een waarde zonder spaties erbinnen: `Vec3{1.0f, 2.0f, 3.0f}`. Geen spaties aan het eind
+  van een regel.
+- Volgorde van includes, met een lege regel tussen de groepen: in een `.cpp` eerst zijn eigen
+  header, dan andere headers van EZSE (de eigen module eerst), dan libraries van derden
+  (`<imgui.h>`, `<glad/gl.h>`), dan de standaardbibliotheek.
+- Berichten van asserts en logs: een gewone zin, een hoofdletter alleen aan het begin, geen
+  uitroepteken.
+- Eigen targets krijgen `ezse_set_warnings` (`/W4 /permissive-`, besluit 308); nieuwe code geeft
+  geen warnings.
 
 ## Genomen besluiten
 
@@ -463,6 +475,7 @@ Regels die de Renderer herbruikbaar houden:
 | 306 | Review na fase 1 (19 november 2026) | op branch `review-phase-1`: alle code van EZSE en de game gelezen op opruimen, structuur, commentaar, verder bouwen, optimalisaties en afspraken. Een proefbuild met `/W4 /permissive-` gaf 0 warnings in de eigen code. In zes delen, elk een eigen commit: R1 fouten, R2 warnings en CTest, R3 stijl, R4 commentaar in headers, R5 simpele optimalisaties, R6 README, Sandbox en bekende punten voor later. De Renderer krijgt alleen commentaar (de punten in `Renderer.cpp` gaan naar de render-kant, tegen merge-conflicten); geen `.clang-format` (zou alles in één keer opnieuw opmaken; eerst de regels vastleggen). Claude schrijft alle delen, de gebruiker reviewt |
 | 307 | Fouten uit de review (R1) | `ComponentArray::Remove` verplaatste het laatste component ook naar zichzelf als het weggehaalde het laatste was; een type dat geheugen bezit (`std::string`, later een inventory) mag dat niet aannemen. Nu alleen verplaatsen als `position != last`, en de sparse-plek van het verplaatste element wordt `position + 1`; `EntitySet::Remove` in dezelfde vorm. Nieuwe test `TestComponentRemoveOwningMemory` in `ECSTests` met een component `Name` (een `std::string` langer dan de small string buffer; 3 checks). Eerlijk: MSVC beschermt zijn eigen `std::string` tegen verplaatsen naar zichzelf, dus de oude code faalde deze test niet; hij bewaakt de vorm. `Window::PollEvents` zette de muispositie via `float` in een `double` (precisieverlies bij een gevangen cursor die steeds verder telt). Het commentaar van `SleepUntil` (`Time.h`) en `DrawMesh` (`Renderer.h`) klopte niet meer |
 | 308 | Warnings en CTest (R2) | `ezse_set_warnings(<target>)` in de `CMakeLists.txt` in de root: `/W4 /permissive-` met MSVC (anders `-Wall -Wextra -Wpedantic`), alleen `PRIVATE` op de eigen targets (alle modules, de vier testprogramma's, Sandbox), niet op GLFW, glad, stb en Dear ImGui. Reden: sinds CMake 3.15 zet CMake zelf geen `/W3` meer, dus MSVC waarschuwde op zijn laagste niveau. De game roept hem aan voor de `Client`. In Release gaven twee lussen die alleen een assert bevatten C4189 (variabele niet gebruikt); `EZSE_ASSERT` is in Release daarom `((void)sizeof(condition))`: de voorwaarde draait niet, maar telt wel als gebruikt. Nog geen `/WX` (warnings als fouten): pas als de code een tijd schoon blijft. CTest: `enable_testing()` in de root (alleen met `EZSE_BUILD_TESTS`) en `add_test` per testprogramma; `ctest --test-dir build -C Debug` draait ze alle vier |
+| 309 | Stijl gelijkgetrokken (R3) | de opmaak die de meeste code al had, staat nu bij Conventies: regels van hoogstens 100 tekens (vervolgregel onder het eerste argument, anders 4 verder in), `{` aan het eind van de regel en `} else {` (`Mat4.cpp` en `Obj.cpp` weken af), `case` één stap in (`LightSystem` week af), `Vec3{1.0f, 2.0f}` zonder spaties binnen de accolades (vooral `MathTests` en `Vec3.cpp` weken af), de volgorde van includes (eigen header, EZSE, derden, standaard; `ComponentEditors.cpp` en Sandbox weken af), assert-berichten als gewone zin. In `.editorconfig`: `trim_trailing_whitespace` en `max_line_length = 100` (die laatste toont Visual Studio niet als lijn; hij legt de afspraak vast). Lange regels in de tests zijn met een script afgebroken (beschrijvingen van `Check` onder het eerste argument), de rest met de hand; het aantal checks is gelijk gebleven (Core 39, Math 145, ECS 118, Engine 85). Niet aangeraakt: `Renderer.cpp` en twee lange regels in `Renderer.h` (de render-kant, besluit 306) en de spatie in `ComponentManager.cpp` (een lokale wijziging van de gebruiker) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand

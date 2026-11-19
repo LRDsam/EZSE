@@ -36,7 +36,7 @@ Handle ResourceCache<Handle>::Acquire(const std::string& key) {
         return Handle{};
     }
     auto entry = m_entries.find(it->second.id);
-    EZSE_ASSERT(entry != m_entries.end(), "Handle Not found");
+    EZSE_ASSERT(entry != m_entries.end(), "Handle not found");
     entry->second.count++;
     return it->second;
 }
@@ -44,7 +44,7 @@ Handle ResourceCache<Handle>::Acquire(const std::string& key) {
 template <typename Handle>
 void ResourceCache<Handle>::Add(const std::string& key, Handle handle) {
     EZSE_ASSERT(m_handlesByKey.find(key) == m_handlesByKey.end(), "Key already exists");
-    EZSE_ASSERT(handle.id != 0, "Handle has id of 0");
+    EZSE_ASSERT(handle.id != 0, "Handle has id 0");
     m_handlesByKey.emplace(key, handle);
     m_entries.emplace(handle.id, Entry{key, 1});
 }
@@ -52,7 +52,7 @@ void ResourceCache<Handle>::Add(const std::string& key, Handle handle) {
 template <typename Handle>
 bool ResourceCache<Handle>::Release(Handle handle) {
     auto it = m_entries.find(handle.id);
-    EZSE_ASSERT(it != m_entries.end(), "handle does not exist in entries");
+    EZSE_ASSERT(it != m_entries.end(), "Handle not found");
     if (--it->second.count == 0) {
         m_handlesByKey.erase(it->second.key);
         m_entries.erase(it);
@@ -64,7 +64,7 @@ bool ResourceCache<Handle>::Release(Handle handle) {
 template <typename Handle>
 const std::string& ResourceCache<Handle>::GetKey(Handle handle) const {
     auto it = m_entries.find(handle.id);
-    EZSE_ASSERT(it != m_entries.end(), "Handle does not exist");
+    EZSE_ASSERT(it != m_entries.end(), "Handle not found");
     return it->second.key;
 }
 

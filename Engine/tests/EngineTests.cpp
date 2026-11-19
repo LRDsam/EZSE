@@ -124,7 +124,8 @@ void TestCameraView() {
     Check(NearlyEqual(view * ezse::ModelMatrix(camera), ezse::Mat4{}),
           "Camera view: the inverse undoes ModelMatrix of the same Transform");
 
-    Check(NearlyEqual(view * ezse::Vec4{2.0f, 1.0f, 3.0f, 1.0f}, ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
+    Check(NearlyEqual(view * ezse::Vec4{2.0f, 1.0f, 3.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
           "Camera view: the camera position ends up in the origin");
 
     // A camera at (0, 0, 3) turned a quarter to the left looks along -X.
@@ -132,7 +133,8 @@ void TestCameraView() {
     ezse::Transform turnedLeft;
     turnedLeft.position = ezse::Vec3{0.0f, 0.0f, 3.0f};
     turnedLeft.rotation = ezse::FromEuler(ezse::Vec3{0.0f, quarterTurn, 0.0f});
-    Check(NearlyEqual(ezse::Inverse(ezse::ModelMatrix(turnedLeft)) * ezse::Vec4{-2.0f, 0.0f, 3.0f, 1.0f},
+    const ezse::Mat4 turnedView = ezse::Inverse(ezse::ModelMatrix(turnedLeft));
+    Check(NearlyEqual(turnedView * ezse::Vec4{-2.0f, 0.0f, 3.0f, 1.0f},
                       ezse::Vec4{0.0f, 0.0f, -2.0f, 1.0f}),
           "Camera view: a point in front of a turned camera lies on -Z");
 }
@@ -203,8 +205,9 @@ const std::uint8_t c_testPng[] = {
 // The 4 bytes of the pixel at (column, row) of an Image; row 0 is the first row in memory.
 bool PixelIs(const ezse::Image& image, int column, int row,
              std::uint8_t red, std::uint8_t green, std::uint8_t blue, std::uint8_t alpha) {
-    const std::size_t index = (static_cast<std::size_t>(row) * static_cast<std::size_t>(image.width) +
-                               static_cast<std::size_t>(column)) * 4;
+    const std::size_t index =
+        (static_cast<std::size_t>(row) * static_cast<std::size_t>(image.width) +
+         static_cast<std::size_t>(column)) * 4;
     return image.pixels[index] == red && image.pixels[index + 1] == green &&
            image.pixels[index + 2] == blue && image.pixels[index + 3] == alpha;
 }
@@ -225,7 +228,8 @@ void TestDecodeImage() {
           "DecodeImage: the second row in memory is the top row of the file (red, green)");
 
     const std::uint8_t notAnImage[] = {1, 2, 3, 4, 5, 6, 7, 8};
-    Check(!ezse::DecodeImage(notAnImage).has_value(), "DecodeImage: bytes that are not an image give nothing");
+    Check(!ezse::DecodeImage(notAnImage).has_value(),
+          "DecodeImage: bytes that are not an image give nothing");
 }
 
 // The positions, uvs and normal of a square in the XY plane, facing +Z. A test adds the faces.
@@ -256,8 +260,9 @@ void TestParseObj() {
               "ParseObj: shared corners are merged (4 vertices, 6 indices)");
         Check(IndicesAre(*square, {0, 1, 2, 0, 2, 3}), "ParseObj: the indices follow the faces");
         const ezse::Vertex& corner = square->vertices[2];
-        Check(corner.position[0] == 0.5f && corner.position[1] == 0.5f && corner.position[2] == 0.0f &&
-                  corner.normal[2] == 1.0f && corner.uv[0] == 1.0f && corner.uv[1] == 1.0f,
+        Check(corner.position[0] == 0.5f && corner.position[1] == 0.5f &&
+                  corner.position[2] == 0.0f && corner.normal[2] == 1.0f &&
+                  corner.uv[0] == 1.0f && corner.uv[1] == 1.0f,
               "ParseObj: a vertex gets its position, normal and uv");
     }
 
@@ -292,7 +297,8 @@ void TestResourceCache() {
 
     const ezse::MeshHandle cube{7};
     cache.Add("models/cube.obj", cube);
-    Check(cache.GetKey(cube) == "models/cube.obj", "ResourceCache: GetKey gives the key of a handle");
+    Check(cache.GetKey(cube) == "models/cube.obj",
+          "ResourceCache: GetKey gives the key of a handle");
     Check(cache.Acquire("models/cube.obj").id == 7, "ResourceCache: a known key gives its handle");
 
     const ezse::MeshHandle monkey{9};
@@ -301,19 +307,23 @@ void TestResourceCache() {
 
     // The cube is at count 2 now (Add, then one Acquire).
     Check(!cache.Release(cube), "ResourceCache: the first Release of two is not the last");
-    Check(cache.Acquire("models/cube.obj").id == 7, "ResourceCache: after one Release the key is still known");
+    Check(cache.Acquire("models/cube.obj").id == 7,
+          "ResourceCache: after one Release the key is still known");
     Check(!cache.Release(cube), "ResourceCache: Release counts down an Acquire");
     Check(cache.Release(cube), "ResourceCache: the last Release returns true");
-    Check(cache.Acquire("models/cube.obj").id == 0, "ResourceCache: after the last Release the key is unknown");
+    Check(cache.Acquire("models/cube.obj").id == 0,
+          "ResourceCache: after the last Release the key is unknown");
 
     const std::vector<ezse::MeshHandle> left = cache.GetHandles();
     Check(left.size() == 1 && left[0].id == 9, "ResourceCache: other keys keep their own count");
     Check(cache.Release(monkey), "ResourceCache: a single Add needs a single Release");
-    Check(cache.GetHandles().empty(), "ResourceCache: the cache is empty after everything is released");
+    Check(cache.GetHandles().empty(),
+          "ResourceCache: the cache is empty after everything is released");
 
     // A key can be added again after its last Release, with a new handle.
     cache.Add("models/cube.obj", ezse::MeshHandle{12});
-    Check(cache.Acquire("models/cube.obj").id == 12, "ResourceCache: a released key can be added again");
+    Check(cache.Acquire("models/cube.obj").id == 12,
+          "ResourceCache: a released key can be added again");
 }
 
 // Exact comparison: the system and ResetInterpolation copy, they do not compute.
@@ -441,7 +451,8 @@ void TestWorldMatrixSystem() {
           "WorldMatrixSystem: an entity without a Transform gets no WorldMatrix");
     Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(plain).matrix,
                       MakeTranslation(1.0f, 2.0f, 3.0f)),
-          "WorldMatrixSystem: without interpolation the matrix is the ModelMatrix of the Transform");
+          "WorldMatrixSystem: without interpolation the matrix is the ModelMatrix of the "
+          "Transform");
     Check(NearlyEqual(world.GetComponent<ezse::WorldMatrix>(interpolated).matrix,
                       MakeTranslation(0.5f, 0.0f, 0.0f)),
           "WorldMatrixSystem: with interpolation the matrix is blended by alpha");
@@ -475,7 +486,8 @@ void TestHeadlessEngine() {
     const ezse::Entity entity = world.CreateEntity();
     world.AddComponent(entity, ezse::Transform{});
     world.AddComponent(entity, ezse::WorldMatrix{});
-    Check(world.HasComponent<ezse::Transform>(entity) && world.HasComponent<ezse::WorldMatrix>(entity),
+    Check(world.HasComponent<ezse::Transform>(entity) && world.HasComponent<ezse::WorldMatrix>(
+        entity),
           "Headless Engine: the built-in components are registered");
 
     Check(ezse::Engine::Create({.window = std::nullopt, .ticksPerSecond = 0}) == nullptr,
@@ -536,7 +548,8 @@ void TestEngineStep() {
     Check(!deltaTimes.empty() && NearlyEqual(deltaTimes.front(), 1.0f / 30.0f),
           "Engine Step: the system gets the length of a tick as delta time");
     Check(presentationRuns == 0, "Engine Step: the presentation does not run");
-    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x, 0.0f) &&
+    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x,
+                      0.0f) &&
               NearlyEqual(world.GetComponent<ezse::Transform>(entity).position.x, 1.0f),
           "Engine Step: the Engine keeps the Transform from before the tick (PreUpdate)");
 
@@ -544,7 +557,8 @@ void TestEngineStep() {
     engine->Step();
     Check(engine->GetSimulationTime().tick == 3 && deltaTimes.size() == 3,
           "Engine Step: three steps are three ticks, without real time passing");
-    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x, 2.0f),
+    Check(NearlyEqual(world.GetComponent<ezse::PreviousTransform>(entity).transform.position.x,
+                      2.0f),
           "Engine Step: the previous state follows tick by tick");
 }
 
@@ -577,7 +591,8 @@ void TestHeadlessRun() {
 
     const auto start = std::chrono::steady_clock::now();
     engine->Run();
-    const std::chrono::duration<float, std::milli> elapsed = std::chrono::steady_clock::now() - start;
+    const std::chrono::duration<float, std::milli> elapsed =
+        std::chrono::steady_clock::now() - start;
 
     Check(engine->GetSimulationTime().tick == 3, "Headless Run: Run returns after Quit, at tick 3");
     // Three ticks are two waits of about 33 ms: not at once (it sleeps) and not seconds (it does

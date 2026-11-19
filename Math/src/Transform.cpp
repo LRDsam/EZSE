@@ -102,7 +102,8 @@ Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up) {
     return view;
 }
 
-Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane, float farPlane) {
+Mat4 Orthographic(float left, float right, float bottom, float top, float nearPlane,
+                  float farPlane) {
     // Each axis is scaled and shifted on its own, so the box maps onto the cube from -1 to 1.
     Mat4 projection;
     projection.m[0][0] = 2.0f / (right - left);
@@ -129,8 +130,8 @@ Mat4 Perspective(float fovY, float aspect, float nearPlane, float farPlane) {
 }
 
 Vec3 TransformDirection(const Mat4& mat, const Vec3& direction) {
-    const Vec4 result = mat * Vec4{ direction.x, direction.y, direction.z, 0.0f };
-    return Vec3{ result.x, result.y, result.z };
+    const Vec4 result = mat * Vec4{direction.x, direction.y, direction.z, 0.0f};
+    return Vec3{result.x, result.y, result.z};
 }
 
 } // namespace ezse

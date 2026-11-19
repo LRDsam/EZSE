@@ -85,7 +85,8 @@ void TestInvalidEntity() {
 
     entities.CreateEntity();
     Check(!entities.IsAlive(ezse::Entity{0}), "IsAlive: id 0 is not alive");
-    Check(!entities.IsAlive(ezse::Entity{2}), "IsAlive: an id that was never handed out is not alive");
+    Check(!entities.IsAlive(ezse::Entity{2}),
+          "IsAlive: an id that was never handed out is not alive");
 }
 
 // Entities 4, 2 and 5 get a component, in that order; 1 and 3 do not.
@@ -102,9 +103,12 @@ void TestComponentAdd() {
     Check(components.Has(ezse::Entity{4}), "ComponentArray Add: entity 4 has the component");
     Check(components.Has(ezse::Entity{2}), "ComponentArray Add: entity 2 has the component");
     Check(components.Has(ezse::Entity{5}), "ComponentArray Add: entity 5 has the component");
-    Check(components.Get(ezse::Entity{4}).value == 40, "ComponentArray Add: entity 4 gets its own value");
-    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Add: entity 2 gets its own value");
-    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Add: entity 5 gets its own value");
+    Check(components.Get(ezse::Entity{4}).value == 40,
+          "ComponentArray Add: entity 4 gets its own value");
+    Check(components.Get(ezse::Entity{2}).value == 20,
+          "ComponentArray Add: entity 2 gets its own value");
+    Check(components.Get(ezse::Entity{5}).value == 50,
+          "ComponentArray Add: entity 5 gets its own value");
 }
 
 void TestComponentHas() {
@@ -113,8 +117,10 @@ void TestComponentHas() {
 
     FillComponents(components);
     Check(!components.Has(ezse::Entity{1}), "ComponentArray Has: entity 1 has no component");
-    Check(!components.Has(ezse::Entity{3}), "ComponentArray Has: entity 3, between two others, has no component");
-    Check(!components.Has(ezse::Entity{7}), "ComponentArray Has: an id beyond the sparse array has no component");
+    Check(!components.Has(ezse::Entity{3}),
+          "ComponentArray Has: entity 3, between two others, has no component");
+    Check(!components.Has(ezse::Entity{7}),
+          "ComponentArray Has: an id beyond the sparse array has no component");
     Check(!components.Has(ezse::Entity{}), "ComponentArray Has: entity 0 has no component");
 }
 
@@ -123,7 +129,8 @@ void TestComponentGetReference() {
     FillComponents(components);
     components.Get(ezse::Entity{2}).value = 25;
 
-    Check(components.Get(ezse::Entity{2}).value == 25, "ComponentArray Get: a change through the reference is kept");
+    Check(components.Get(ezse::Entity{2}).value == 25,
+          "ComponentArray Get: a change through the reference is kept");
 }
 
 void TestComponentRemove() {
@@ -131,9 +138,12 @@ void TestComponentRemove() {
     FillComponents(components);
     components.Remove(ezse::Entity{4});
 
-    Check(!components.Has(ezse::Entity{4}), "ComponentArray Remove: entity 4 no longer has the component");
-    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Remove: the moved entity 5 keeps its value");
-    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Remove: entity 2 keeps its value");
+    Check(!components.Has(ezse::Entity{4}),
+          "ComponentArray Remove: entity 4 no longer has the component");
+    Check(components.Get(ezse::Entity{5}).value == 50,
+          "ComponentArray Remove: the moved entity 5 keeps its value");
+    Check(components.Get(ezse::Entity{2}).value == 20,
+          "ComponentArray Remove: entity 2 keeps its value");
 }
 
 void TestComponentRemoveLast() {
@@ -141,13 +151,17 @@ void TestComponentRemoveLast() {
     FillComponents(components);
     components.Remove(ezse::Entity{5});
 
-    Check(!components.Has(ezse::Entity{5}), "ComponentArray Remove last: entity 5 no longer has the component");
-    Check(components.Get(ezse::Entity{4}).value == 40, "ComponentArray Remove last: entity 4 keeps its value");
-    Check(components.Get(ezse::Entity{2}).value == 20, "ComponentArray Remove last: entity 2 keeps its value");
+    Check(!components.Has(ezse::Entity{5}),
+          "ComponentArray Remove last: entity 5 no longer has the component");
+    Check(components.Get(ezse::Entity{4}).value == 40,
+          "ComponentArray Remove last: entity 4 keeps its value");
+    Check(components.Get(ezse::Entity{2}).value == 20,
+          "ComponentArray Remove last: entity 2 keeps its value");
 
     components.Remove(ezse::Entity{2});
     components.Remove(ezse::Entity{4});
-    Check(!components.Has(ezse::Entity{4}), "ComponentArray Remove last: the only component can be removed");
+    Check(!components.Has(ezse::Entity{4}),
+          "ComponentArray Remove last: the only component can be removed");
 }
 
 void TestComponentRemoveOwningMemory() {
@@ -177,8 +191,10 @@ void TestComponentAddAfterRemove() {
     components.Remove(ezse::Entity{4});
     components.Add(ezse::Entity{4}, Health{44});
 
-    Check(components.Get(ezse::Entity{4}).value == 44, "ComponentArray Add after Remove: entity 4 gets its new value");
-    Check(components.Get(ezse::Entity{5}).value == 50, "ComponentArray Add after Remove: entity 5 keeps its value");
+    Check(components.Get(ezse::Entity{4}).value == 44,
+          "ComponentArray Add after Remove: entity 4 gets its new value");
+    Check(components.Get(ezse::Entity{5}).value == 50,
+          "ComponentArray Add after Remove: entity 5 keeps its value");
 }
 
 void TestComponentType() {
@@ -194,8 +210,10 @@ void TestComponentEntityDestroyed() {
     ezse::IComponentArray& base = components;
 
     base.EntityDestroyed(ezse::Entity{4});
-    Check(!components.Has(ezse::Entity{4}), "EntityDestroyed: the component of entity 4 is removed");
-    Check(components.Get(ezse::Entity{5}).value == 50, "EntityDestroyed: the moved entity 5 keeps its value");
+    Check(!components.Has(ezse::Entity{4}),
+          "EntityDestroyed: the component of entity 4 is removed");
+    Check(components.Get(ezse::Entity{5}).value == 50,
+          "EntityDestroyed: the moved entity 5 keeps its value");
 
     base.EntityDestroyed(ezse::Entity{1});
     Check(components.Has(ezse::Entity{2}) && components.Has(ezse::Entity{5}),
@@ -216,12 +234,16 @@ void TestComponentManager() {
     Check(constComponents.Has<Health>(ezse::Entity{1}), "ComponentManager: entity 1 has Health");
     Check(constComponents.Has<Speed>(ezse::Entity{1}), "ComponentManager: entity 1 has Speed");
     Check(!constComponents.Has<Speed>(ezse::Entity{2}), "ComponentManager: entity 2 has no Speed");
-    Check(components.Get<Health>(ezse::Entity{2}).value == 20, "ComponentManager: Get finds the Health of entity 2");
-    Check(components.Get<Speed>(ezse::Entity{1}).value == 2.5f, "ComponentManager: Get finds the Speed of entity 1");
+    Check(components.Get<Health>(ezse::Entity{2}).value == 20,
+          "ComponentManager: Get finds the Health of entity 2");
+    Check(components.Get<Speed>(ezse::Entity{1}).value == 2.5f,
+          "ComponentManager: Get finds the Speed of entity 1");
 
     components.Remove<Health>(ezse::Entity{1});
-    Check(!components.Has<Health>(ezse::Entity{1}), "ComponentManager: Remove takes away only Health");
-    Check(components.Has<Speed>(ezse::Entity{1}), "ComponentManager: Remove leaves Speed of the same entity");
+    Check(!components.Has<Health>(ezse::Entity{1}),
+          "ComponentManager: Remove takes away only Health");
+    Check(components.Has<Speed>(ezse::Entity{1}),
+          "ComponentManager: Remove leaves Speed of the same entity");
 }
 
 void TestComponentManagerEntityDestroyed() {
@@ -237,8 +259,10 @@ void TestComponentManagerEntityDestroyed() {
     components.Add(ezse::Entity{2}, Health{20});
     components.EntityDestroyed(ezse::Entity{1});
 
-    Check(!components.Has<Health>(ezse::Entity{1}), "ComponentManager EntityDestroyed: Health of entity 1 is removed");
-    Check(!components.Has<Armor>(ezse::Entity{1}), "ComponentManager EntityDestroyed: Armor of entity 1 is removed");
+    Check(!components.Has<Health>(ezse::Entity{1}),
+          "ComponentManager EntityDestroyed: Health of entity 1 is removed");
+    Check(!components.Has<Armor>(ezse::Entity{1}),
+          "ComponentManager EntityDestroyed: Armor of entity 1 is removed");
     Check(components.Get<Health>(ezse::Entity{2}).value == 20,
           "ComponentManager EntityDestroyed: entity 2 keeps its Health");
 }
@@ -250,8 +274,10 @@ void TestSignature() {
     const std::uint32_t health = ezse::ComponentType<Health>();
     const std::uint32_t speed = ezse::ComponentType<Speed>();
 
-    Check(components.GetSignature(ezse::Entity{}).none(), "Signature: entity 0 has an empty signature");
-    Check(components.GetSignature(ezse::Entity{1}).none(), "Signature: an entity without components has an empty signature");
+    Check(components.GetSignature(ezse::Entity{}).none(),
+          "Signature: entity 0 has an empty signature");
+    Check(components.GetSignature(ezse::Entity{1}).none(),
+          "Signature: an entity without components has an empty signature");
 
     components.Add(ezse::Entity{1}, Health{10});
     components.Add(ezse::Entity{1}, Speed{2.5f});
@@ -261,16 +287,21 @@ void TestSignature() {
     Check(first.test(health) && first.test(speed) && first.count() == 2,
           "Signature: Add sets the bits of Health and Speed for entity 1");
     const ezse::Signature second = components.GetSignature(ezse::Entity{2});
-    Check(second.test(health) && second.count() == 1, "Signature: Add sets only the Health bit for entity 2");
-    Check(components.GetSignature(ezse::Entity{99}).none(), "Signature: an id beyond all entities has an empty signature");
+    Check(second.test(health) && second.count() == 1,
+          "Signature: Add sets only the Health bit for entity 2");
+    Check(components.GetSignature(ezse::Entity{99}).none(),
+          "Signature: an id beyond all entities has an empty signature");
 
     components.Remove<Speed>(ezse::Entity{1});
     const ezse::Signature afterRemove = components.GetSignature(ezse::Entity{1});
-    Check(afterRemove.test(health) && !afterRemove.test(speed), "Signature: Remove clears only the Speed bit");
+    Check(afterRemove.test(health) && !afterRemove.test(speed),
+          "Signature: Remove clears only the Speed bit");
 
     components.EntityDestroyed(ezse::Entity{2});
-    Check(components.GetSignature(ezse::Entity{2}).none(), "Signature: EntityDestroyed clears the whole signature");
-    Check(components.GetSignature(ezse::Entity{1}).test(health), "Signature: EntityDestroyed leaves other entities alone");
+    Check(components.GetSignature(ezse::Entity{2}).none(),
+          "Signature: EntityDestroyed clears the whole signature");
+    Check(components.GetSignature(ezse::Entity{1}).test(health),
+          "Signature: EntityDestroyed leaves other entities alone");
 
     components.EntityDestroyed(ezse::Entity{50});
     Check(components.GetSignature(ezse::Entity{50}).none(),
@@ -286,10 +317,14 @@ void TestEntitySetInsert() {
     set.Insert(ezse::Entity{2});
     set.Insert(ezse::Entity{4});
 
-    Check(set.Contains(ezse::Entity{4}) && set.Contains(ezse::Entity{2}), "EntitySet Insert: both entities are in the set");
-    Check(!set.Contains(ezse::Entity{3}), "EntitySet Insert: an entity between them is not in the set");
-    Check(!set.Contains(ezse::Entity{9}), "EntitySet Insert: an id beyond the sparse array is not in the set");
-    Check(set.GetEntities().size() == 2, "EntitySet Insert: inserting an entity twice keeps it once");
+    Check(set.Contains(ezse::Entity{4}) && set.Contains(ezse::Entity{2}),
+          "EntitySet Insert: both entities are in the set");
+    Check(!set.Contains(ezse::Entity{3}),
+          "EntitySet Insert: an entity between them is not in the set");
+    Check(!set.Contains(ezse::Entity{9}),
+          "EntitySet Insert: an id beyond the sparse array is not in the set");
+    Check(set.GetEntities().size() == 2,
+          "EntitySet Insert: inserting an entity twice keeps it once");
 }
 
 void TestEntitySetRemove() {
@@ -305,11 +340,13 @@ void TestEntitySetRemove() {
 
     set.Remove(ezse::Entity{4});
     set.Remove(ezse::Entity{7});
-    Check(set.GetEntities().size() == 2, "EntitySet Remove: removing an absent entity changes nothing");
+    Check(set.GetEntities().size() == 2,
+          "EntitySet Remove: removing an absent entity changes nothing");
 
     set.Remove(ezse::Entity{2});
     set.Remove(ezse::Entity{5});
-    Check(set.GetEntities().empty(), "EntitySet Remove: the set can be emptied, also from the back");
+    Check(set.GetEntities().empty(),
+          "EntitySet Remove: the set can be emptied, also from the back");
 }
 
 void TestEntitySetGetEntities() {
@@ -384,7 +421,8 @@ protected:
 
 // The index of the Update group of each phase, for tests on the SystemManager directly.
 constexpr std::size_t c_simulationUpdate = static_cast<std::size_t>(ezse::SimulationGroup::Update);
-constexpr std::size_t c_presentationUpdate = static_cast<std::size_t>(ezse::PresentationGroup::Update);
+constexpr std::size_t c_presentationUpdate = static_cast<std::size_t>(
+    ezse::PresentationGroup::Update);
 
 bool SystemHas(const ezse::System& system, ezse::Entity entity) {
     for (ezse::Entity member : system.GetEntities()) {
@@ -398,22 +436,30 @@ bool SystemHas(const ezse::System& system, ezse::Entity entity) {
 void TestSystemManagerAdd() {
     ezse::SystemManager systems;
     int counter = 0;
-    CountingSystem& counting = systems.Add<CountingSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health>(), counter);
+    CountingSystem& counting = systems.Add<CountingSystem>(ezse::SystemPhase::Simulation,
+                                                           c_simulationUpdate,
+                                                           ezse::MakeSignature<Health>(), counter);
     counter = 7;
     Check(counting.counter == 7, "SystemManager Add: a reference argument stays a reference");
 
     for (int i = 0; i < 20; ++i) {
-        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Speed>());
+        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate,
+                                 ezse::MakeSignature<Speed>());
     }
     counter = 8;
-    Check(counting.counter == 8, "SystemManager Add: the returned reference stays valid as systems are added");
+    Check(counting.counter == 8,
+          "SystemManager Add: the returned reference stays valid as systems are added");
     Check(counting.GetEntities().empty(), "SystemManager Add: a new system has no entities");
 }
 
 void TestSystemManagerSignatureChanged() {
     ezse::SystemManager systems;
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health>());
-    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health, Speed>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<Health, Speed>());
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
@@ -437,15 +483,20 @@ void TestSystemManagerSignatureChanged() {
 
 void TestSystemManagerEntityDestroyed() {
     ezse::SystemManager systems;
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health>());
-    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health, Speed>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<Health>());
+    PlainSystem& movingSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health, Speed>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::MakeSignature<Health>());
 
     systems.EntityDestroyed(ezse::Entity{1});
     Check(!SystemHas(healthSystem, ezse::Entity{1}) && !SystemHas(movingSystem, ezse::Entity{1}),
           "SystemManager EntityDestroyed: the entity leaves every system");
-    Check(SystemHas(healthSystem, ezse::Entity{2}), "SystemManager EntityDestroyed: other entities stay");
+    Check(SystemHas(healthSystem, ezse::Entity{2}),
+          "SystemManager EntityDestroyed: other entities stay");
 }
 
 void TestWorldComponents() {
@@ -468,24 +519,29 @@ void TestWorldSystems() {
     ezse::World world;
     world.RegisterComponent<Health>();
     world.RegisterComponent<Speed>();
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update,
+                                                             ezse::MakeSignature<Health>());
 
     const ezse::Entity healthy = world.CreateEntity();
     const ezse::Entity fast = world.CreateEntity();
     world.AddComponent(healthy, Health{10});
     world.AddComponent(fast, Speed{2.0f});
 
-    Check(SystemHas(healthSystem, healthy), "World AddComponent: an entity enters a system it now matches");
-    Check(!SystemHas(healthSystem, fast), "World AddComponent: an entity stays out of a system it does not match");
+    Check(SystemHas(healthSystem, healthy),
+          "World AddComponent: an entity enters a system it now matches");
+    Check(!SystemHas(healthSystem, fast),
+          "World AddComponent: an entity stays out of a system it does not match");
 
     world.RemoveComponent<Health>(healthy);
-    Check(!SystemHas(healthSystem, healthy), "World RemoveComponent: an entity leaves a system it no longer matches");
+    Check(!SystemHas(healthSystem, healthy),
+          "World RemoveComponent: an entity leaves a system it no longer matches");
 }
 
 void TestWorldDestroyEntity() {
     ezse::World world;
     world.RegisterComponent<Health>();
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update,
+                                                             ezse::MakeSignature<Health>());
 
     const ezse::Entity first = world.CreateEntity();
     const ezse::Entity second = world.CreateEntity();
@@ -512,11 +568,14 @@ void TestWorldAddSystemLater() {
     world.AddComponent(destroyed, Health{30});
     world.DestroyEntity(destroyed);
 
-    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>());
+    PlainSystem& healthSystem = world.AddSystem<PlainSystem>(ezse::SimulationGroup::Update,
+                                                             ezse::MakeSignature<Health>());
     Check(SystemHas(healthSystem, first) && SystemHas(healthSystem, second),
           "World AddSystem: a later system gets the existing entities it matches");
-    Check(!SystemHas(healthSystem, destroyed), "World AddSystem: a later system skips destroyed entities");
-    Check(!SystemHas(healthSystem, bare), "World AddSystem: a later system skips entities it does not match");
+    Check(!SystemHas(healthSystem, destroyed),
+          "World AddSystem: a later system skips destroyed entities");
+    Check(!SystemHas(healthSystem, bare),
+          "World AddSystem: a later system skips entities it does not match");
 }
 
 void TestWorldUpdateOrder() {
@@ -524,12 +583,16 @@ void TestWorldUpdateOrder() {
     world.RegisterComponent<Health>();
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>(), 1, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>(), 2, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>(), 1,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<Health>(), 2,
+                                   numbers, deltaTimes);
 
     world.Update(ezse::SystemPhase::Simulation, 0.5f);
-    Check(numbers == std::vector<int>{1, 2}, "World Update: every system runs once, in the order they were added");
-    Check(deltaTimes == std::vector<float>{0.5f, 0.5f}, "World Update: every system gets the delta time");
+    Check(numbers == std::vector<int>{1, 2},
+          "World Update: every system runs once, in the order they were added");
+    Check(deltaTimes == std::vector<float>{0.5f, 0.5f},
+          "World Update: every system gets the delta time");
 }
 
 void TestWorldUpdateComponents() {
@@ -545,19 +608,26 @@ void TestWorldUpdateComponents() {
 
     world.Update(ezse::SystemPhase::Simulation, 0.016f);
     world.Update(ezse::SystemPhase::Simulation, 0.016f);
-    Check(world.GetComponent<Health>(healthy).value == 12, "World Update: a system changes the components of its entities");
-    Check(!world.HasComponent<Health>(fast), "World Update: an entity outside the system is left alone");
+    Check(world.GetComponent<Health>(healthy).value == 12,
+          "World Update: a system changes the components of its entities");
+    Check(!world.HasComponent<Health>(fast),
+          "World Update: an entity outside the system is left alone");
 }
 
 void TestEmptySignatureSystem() {
     ezse::SystemManager systems;
-    PlainSystem& globalSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<>());
-    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health>());
+    PlainSystem& globalSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<>());
+    PlainSystem& healthSystem = systems.Add<PlainSystem>(ezse::SystemPhase::Simulation,
+                                                         c_simulationUpdate,
+                                                         ezse::MakeSignature<Health>());
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
     systems.EntitySignatureChanged(ezse::Entity{2}, ezse::Signature{});
     Check(globalSystem.GetEntities().empty(), "Empty signature: the system gets no entities");
-    Check(SystemHas(healthSystem, ezse::Entity{1}), "Empty signature: other systems still get their entities");
+    Check(SystemHas(healthSystem, ezse::Entity{1}),
+          "Empty signature: other systems still get their entities");
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::Signature{});
     Check(!SystemHas(healthSystem, ezse::Entity{1}),
@@ -573,19 +643,24 @@ void TestWorldEmptySignatureSystem() {
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
     LoggingSystem& logging =
-        world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 7, numbers, deltaTimes);
-    Check(logging.GetEntities().empty(), "World AddSystem: a later system with an empty signature gets no entities");
+        world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 7,
+                                       numbers, deltaTimes);
+    Check(logging.GetEntities().empty(),
+          "World AddSystem: a later system with an empty signature gets no entities");
 
     world.Update(ezse::SystemPhase::Simulation, 0.1f);
-    Check(numbers == std::vector<int>{7}, "World Update: a system with an empty signature still runs");
+    Check(numbers == std::vector<int>{7},
+          "World Update: a system with an empty signature still runs");
 }
 
 void TestSystemManagerPhasesEntities() {
     ezse::SystemManager systems;
     PlainSystem& simulation =
-        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate, ezse::MakeSignature<Health>());
+        systems.Add<PlainSystem>(ezse::SystemPhase::Simulation, c_simulationUpdate,
+                                 ezse::MakeSignature<Health>());
     PlainSystem& presentation =
-        systems.Add<PlainSystem>(ezse::SystemPhase::Presentation, c_presentationUpdate, ezse::MakeSignature<Health>());
+        systems.Add<PlainSystem>(ezse::SystemPhase::Presentation, c_presentationUpdate,
+                                 ezse::MakeSignature<Health>());
 
     systems.EntitySignatureChanged(ezse::Entity{1}, ezse::MakeSignature<Health>());
     Check(SystemHas(simulation, ezse::Entity{1}) && SystemHas(presentation, ezse::Entity{1}),
@@ -601,20 +676,27 @@ void TestWorldUpdatePhases() {
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
     // Added mixed on purpose: the order within a phase is the order of adding.
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 10, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 1, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 20, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 2, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 10,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 1,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 20,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 2,
+                                   numbers, deltaTimes);
 
     world.Update(ezse::SystemPhase::Simulation, 0.25f);
     Check(numbers == std::vector<int>{1, 2},
-          "World Update phases: only the systems of the simulation phase run, in the order they were added");
-    Check(deltaTimes == std::vector<float>{0.25f, 0.25f}, "World Update phases: the systems get the delta time");
+          "World Update phases: only the systems of the simulation phase run, in the order they "
+          "were added");
+    Check(deltaTimes == std::vector<float>{0.25f, 0.25f},
+          "World Update phases: the systems get the delta time");
 
     numbers.clear();
     world.Update(ezse::SystemPhase::Presentation, 0.5f);
     Check(numbers == std::vector<int>{10, 20},
-          "World Update phases: only the systems of the presentation phase run, in the order they were added");
+          "World Update phases: only the systems of the presentation phase run, in the order "
+          "they were added");
 
     numbers.clear();
     world.Update(ezse::SystemPhase::Simulation, 0.25f);
@@ -646,16 +728,25 @@ void TestWorldUpdateGroups() {
     std::vector<int> numbers;
     std::vector<float> deltaTimes;
     // Added mixed on purpose: the group sets the order, then the order of adding within a group.
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 3, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::PreUpdate, ezse::MakeSignature<>(), 1, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 4, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::PreUpdate, ezse::MakeSignature<>(), 2, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 3,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::PreUpdate, ezse::MakeSignature<>(), 1,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::Update, ezse::MakeSignature<>(), 4,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::SimulationGroup::PreUpdate, ezse::MakeSignature<>(), 2,
+                                   numbers, deltaTimes);
 
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Render, ezse::MakeSignature<>(), 30, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::PostUpdate, ezse::MakeSignature<>(), 20, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 10, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Render, ezse::MakeSignature<>(), 31, numbers, deltaTimes);
-    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 11, numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Render, ezse::MakeSignature<>(), 30,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::PostUpdate, ezse::MakeSignature<>(), 20,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 10,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Render, ezse::MakeSignature<>(), 31,
+                                   numbers, deltaTimes);
+    world.AddSystem<LoggingSystem>(ezse::PresentationGroup::Update, ezse::MakeSignature<>(), 11,
+                                   numbers, deltaTimes);
 
     world.Update(ezse::SystemPhase::Simulation, 0.25f);
     Check(numbers == std::vector<int>{1, 2, 3, 4},
@@ -664,7 +755,8 @@ void TestWorldUpdateGroups() {
     numbers.clear();
     world.Update(ezse::SystemPhase::Presentation, 0.5f);
     Check(numbers == std::vector<int>{10, 11, 20, 30, 31},
-          "World Update groups: Update, then PostUpdate, then Render; within a group in the order of adding");
+          "World Update groups: Update, then PostUpdate, then Render; within a group in the "
+          "order of adding");
 }
 
 } // namespace

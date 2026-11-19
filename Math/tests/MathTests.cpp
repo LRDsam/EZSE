@@ -45,10 +45,10 @@ bool NearlyEqual(const ezse::Vec4& a, const ezse::Vec4& b) {
 
 // What the graphics card does after the vertex shader: divide by w.
 ezse::Vec4 PerspectiveDivide(const ezse::Vec4& clip) {
-    return ezse::Vec4{ clip.x / clip.w, clip.y / clip.w, clip.z / clip.w, 1.0f };
+    return ezse::Vec4{clip.x / clip.w, clip.y / clip.w, clip.z / clip.w, 1.0f};
 }
 
-// Built by hand so the tests do not depend on the Math 
+// Built by hand so the tests do not depend on the Math
 // functions they are checking.
 ezse::Mat4 MakeTranslation(float x, float y, float z) {
     ezse::Mat4 result;
@@ -67,7 +67,7 @@ ezse::Mat4 MakeScale(const ezse::Vec3& factor) {
 }
 
 ezse::Mat4 MakeScale(float factor) {
-    return MakeScale(ezse::Vec3{ factor, factor, factor });
+    return MakeScale(ezse::Vec3{factor, factor, factor});
 }
 
 void TestDefaultValue() {
@@ -78,120 +78,121 @@ void TestDefaultValue() {
           "a default Mat4 has ones on the diagonal");
     Check(identity.m[3][0] == 0.0f && identity.m[0][3] == 0.0f,
           "a default Mat4 has zeros off the diagonal");
-    Check(NearlyEqual(identity, ezse::Mat4{}), 
-        "two default Mat4s are nearly equal");
+    Check(NearlyEqual(identity, ezse::Mat4{}),
+          "two default Mat4s are nearly equal");
 }
 
 void TestVec3Add() {
-    const ezse::Vec3 first{ 1.0f, 2.0f, 3.0f };
-    const ezse::Vec3 second{ 4.0f, 5.0f, 6.0f };
+    const ezse::Vec3 first{1.0f, 2.0f, 3.0f};
+    const ezse::Vec3 second{4.0f, 5.0f, 6.0f};
 
-    Check(NearlyEqual(first + second, ezse::Vec3{ 5.0f, 7.0f, 9.0f }),
-        "Vec3 + Vec3 adds each coordinate");
+    Check(NearlyEqual(first + second, ezse::Vec3{5.0f, 7.0f, 9.0f}),
+          "Vec3 + Vec3 adds each coordinate");
     Check(NearlyEqual(first + ezse::Vec3{}, first),
-        "adding a zero Vec3 changes nothing");
+          "adding a zero Vec3 changes nothing");
     Check(NearlyEqual(first + second, second + first),
-        "the order of a Vec3 addition does not matter");
+          "the order of a Vec3 addition does not matter");
 }
 
 void TestVec3Negate() {
-    const ezse::Vec3 vec{ 1.0f, -2.0f, 3.0f };
+    const ezse::Vec3 vec{1.0f, -2.0f, 3.0f};
 
-    Check(NearlyEqual(-vec, ezse::Vec3{ -1.0f, 2.0f, -3.0f }),
-        "-Vec3 flips the sign of each coordinate");
+    Check(NearlyEqual(-vec, ezse::Vec3{-1.0f, 2.0f, -3.0f}),
+          "-Vec3 flips the sign of each coordinate");
     Check(NearlyEqual(-(-vec), vec),
-        "negating a Vec3 twice gives the original");
+          "negating a Vec3 twice gives the original");
     Check(NearlyEqual(vec + (-vec), ezse::Vec3{}),
-        "a Vec3 plus its negation is zero");
+          "a Vec3 plus its negation is zero");
 }
 
 void TestVec3Scale() {
-    const ezse::Vec3 vec{ 1.0f, -2.0f, 3.0f };
+    const ezse::Vec3 vec{1.0f, -2.0f, 3.0f};
 
-    Check(NearlyEqual(vec * 2.0f, ezse::Vec3{ 2.0f, -4.0f, 6.0f }),
-        "Vec3 * 2 doubles each coordinate");
+    Check(NearlyEqual(vec * 2.0f, ezse::Vec3{2.0f, -4.0f, 6.0f}),
+          "Vec3 * 2 doubles each coordinate");
     Check(NearlyEqual(vec * 0.0f, ezse::Vec3{}),
-        "Vec3 * 0 is zero");
+          "Vec3 * 0 is zero");
     Check(NearlyEqual(vec * -1.0f, -vec),
-        "Vec3 * -1 is the same as negating");
-    Check(NearlyEqual(vec * 0.5f, ezse::Vec3{ 0.5f, -1.0f, 1.5f }),
-        "Vec3 * 0.5 halves each coordinate");
-    Check(NearlyEqual(vec, ezse::Vec3{ 1.0f, -2.0f, 3.0f }),
-        "Vec3 * float leaves the original Vec3 unchanged");
+          "Vec3 * -1 is the same as negating");
+    Check(NearlyEqual(vec * 0.5f, ezse::Vec3{0.5f, -1.0f, 1.5f}),
+          "Vec3 * 0.5 halves each coordinate");
+    Check(NearlyEqual(vec, ezse::Vec3{1.0f, -2.0f, 3.0f}),
+          "Vec3 * float leaves the original Vec3 unchanged");
 }
 
 void TestVec3Length() {
-    Check(std::abs(ezse::Length(ezse::Vec3{ 3.0f, 4.0f, 0.0f }) - 5.0f) < 0.0001f,
-        "Length of (3, 4, 0) is 5");
-    Check(std::abs(ezse::Length(ezse::Vec3{ 1.0f, 0.0f, -1.0f }) - std::sqrt(2.0f)) < 0.0001f,
-        "Length of (1, 0, -1) is the square root of 2");
+    Check(std::abs(ezse::Length(ezse::Vec3{3.0f, 4.0f, 0.0f}) - 5.0f) < 0.0001f,
+          "Length of (3, 4, 0) is 5");
+    Check(std::abs(ezse::Length(ezse::Vec3{1.0f, 0.0f, -1.0f}) - std::sqrt(2.0f)) < 0.0001f,
+          "Length of (1, 0, -1) is the square root of 2");
     Check(ezse::Length(ezse::Vec3{}) == 0.0f,
-        "Length of the zero vector is 0");
+          "Length of the zero vector is 0");
 }
 
 void TestVec3Normalize() {
-    const ezse::Vec3 diagonal{ 1.0f, 0.0f, -1.0f };
+    const ezse::Vec3 diagonal{1.0f, 0.0f, -1.0f};
     const ezse::Vec3 normalized = ezse::Normalize(diagonal);
     const float half = std::sqrt(0.5f);
 
     Check(std::abs(ezse::Length(normalized) - 1.0f) < 0.0001f,
-        "Normalize gives length 1");
-    Check(NearlyEqual(normalized, ezse::Vec3{ half, 0.0f, -half }),
-        "Normalize keeps the direction");
-    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{ 0.0f, 0.0f, -5.0f }), ezse::Vec3{ 0.0f, 0.0f, -1.0f }),
-        "Normalize of a vector along an axis gives the unit vector of that axis");
+          "Normalize gives length 1");
+    Check(NearlyEqual(normalized, ezse::Vec3{half, 0.0f, -half}),
+          "Normalize keeps the direction");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{0.0f, 0.0f, -5.0f}),
+                      ezse::Vec3{0.0f, 0.0f, -1.0f}),
+          "Normalize of a vector along an axis gives the unit vector of that axis");
     Check(NearlyEqual(ezse::Normalize(ezse::Vec3{}), ezse::Vec3{}),
-        "Normalize of the zero vector gives the zero vector");
-    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{ 1e-8f, 0.0f, 0.0f }), ezse::Vec3{}),
-        "Normalize of a nearly zero vector gives the zero vector");
+          "Normalize of the zero vector gives the zero vector");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec3{1e-8f, 0.0f, 0.0f}), ezse::Vec3{}),
+          "Normalize of a nearly zero vector gives the zero vector");
 }
 
 void TestVec3Subtract() {
-    const ezse::Vec3 first{ 5.0f, 7.0f, 9.0f };
-    const ezse::Vec3 second{ 1.0f, 2.0f, 3.0f };
+    const ezse::Vec3 first{5.0f, 7.0f, 9.0f};
+    const ezse::Vec3 second{1.0f, 2.0f, 3.0f};
 
-    Check(NearlyEqual(first - second, ezse::Vec3{ 4.0f, 5.0f, 6.0f }),
-        "Vec3 - Vec3 subtracts each coordinate");
+    Check(NearlyEqual(first - second, ezse::Vec3{4.0f, 5.0f, 6.0f}),
+          "Vec3 - Vec3 subtracts each coordinate");
     Check(NearlyEqual(first - first, ezse::Vec3{}),
-        "a Vec3 minus itself is the zero vector");
+          "a Vec3 minus itself is the zero vector");
     Check(NearlyEqual(first - second, first + -second),
-        "a - b is the same as a + (-b)");
+          "a - b is the same as a + (-b)");
 }
 
 void TestVec3Dot() {
-    const ezse::Vec3 x{ 1.0f, 0.0f, 0.0f };
-    const ezse::Vec3 y{ 0.0f, 1.0f, 0.0f };
-    const ezse::Vec3 vec{ 1.0f, 2.0f, 3.0f };
+    const ezse::Vec3 x{1.0f, 0.0f, 0.0f};
+    const ezse::Vec3 y{0.0f, 1.0f, 0.0f};
+    const ezse::Vec3 vec{1.0f, 2.0f, 3.0f};
 
-    Check(NearlyEqual(ezse::Dot(vec, ezse::Vec3{ 4.0f, -5.0f, 6.0f }), 12.0f),
-        "Dot of (1, 2, 3) and (4, -5, 6) is 4 - 10 + 18 = 12");
+    Check(NearlyEqual(ezse::Dot(vec, ezse::Vec3{4.0f, -5.0f, 6.0f}), 12.0f),
+          "Dot of (1, 2, 3) and (4, -5, 6) is 4 - 10 + 18 = 12");
     Check(NearlyEqual(ezse::Dot(x, y), 0.0f),
-        "Dot of two perpendicular vectors is 0");
+          "Dot of two perpendicular vectors is 0");
     Check(NearlyEqual(ezse::Dot(x, -x), -1.0f),
-        "Dot of two opposite unit vectors is -1");
+          "Dot of two opposite unit vectors is -1");
     Check(NearlyEqual(ezse::Dot(vec, vec), ezse::Length(vec) * ezse::Length(vec)),
-        "Dot of a vector with itself is its length squared");
+          "Dot of a vector with itself is its length squared");
 }
 
 void TestVec3Cross() {
-    const ezse::Vec3 x{ 1.0f, 0.0f, 0.0f };
-    const ezse::Vec3 y{ 0.0f, 1.0f, 0.0f };
-    const ezse::Vec3 z{ 0.0f, 0.0f, 1.0f };
+    const ezse::Vec3 x{1.0f, 0.0f, 0.0f};
+    const ezse::Vec3 y{0.0f, 1.0f, 0.0f};
+    const ezse::Vec3 z{0.0f, 0.0f, 1.0f};
 
     Check(NearlyEqual(ezse::Cross(x, y), z), "Cross(X, Y) is Z (right-handed)");
     Check(NearlyEqual(ezse::Cross(y, z), x), "Cross(Y, Z) is X");
     Check(NearlyEqual(ezse::Cross(z, x), y), "Cross(Z, X) is Y");
     Check(NearlyEqual(ezse::Cross(y, x), -z), "Cross(Y, X) is -Z: the order matters");
 
-    const ezse::Vec3 first{ 1.0f, 2.0f, 3.0f };
-    const ezse::Vec3 second{ -2.0f, 0.5f, 4.0f };
+    const ezse::Vec3 first{1.0f, 2.0f, 3.0f};
+    const ezse::Vec3 second{-2.0f, 0.5f, 4.0f};
     const ezse::Vec3 cross = ezse::Cross(first, second);
-    Check(NearlyEqual(cross, ezse::Vec3{ 6.5f, -10.0f, 4.5f }),
-        "Cross of (1, 2, 3) and (-2, 0.5, 4) is (6.5, -10, 4.5)");
+    Check(NearlyEqual(cross, ezse::Vec3{6.5f, -10.0f, 4.5f}),
+          "Cross of (1, 2, 3) and (-2, 0.5, 4) is (6.5, -10, 4.5)");
     Check(NearlyEqual(ezse::Dot(cross, first), 0.0f) && NearlyEqual(ezse::Dot(cross, second), 0.0f),
-        "Cross is perpendicular to both vectors");
+          "Cross is perpendicular to both vectors");
     Check(NearlyEqual(ezse::Cross(first, first * 2.0f), ezse::Vec3{}),
-        "Cross of two parallel vectors is the zero vector");
+          "Cross of two parallel vectors is the zero vector");
 }
 
 void TestMultiply() {
@@ -203,19 +204,19 @@ void TestMultiply() {
         {13.0f, 14.0f, 15.0f, 16.0f},
     }};
 
-    Check(NearlyEqual(identity * identity, identity), 
-        "identity * identity is the identity");
-    Check(NearlyEqual(distinct * identity, distinct), 
-        "A * identity is A");
-    Check(NearlyEqual(identity * distinct, distinct), 
-        "identity * A is A");
+    Check(NearlyEqual(identity * identity, identity),
+          "identity * identity is the identity");
+    Check(NearlyEqual(distinct * identity, distinct),
+          "A * identity is A");
+    Check(NearlyEqual(identity * distinct, distinct),
+          "identity * A is A");
 
     Check(NearlyEqual(
         MakeTranslation(4.0f, 5.0f, 6.0f) * MakeTranslation(1.0f, 2.0f, 3.0f),
                       MakeTranslation(5.0f, 7.0f, 9.0f)),
           "two translations add up");
 
-    // A * B applies B first. 
+    // A * B applies B first.
     // The two orders below only differ in the translation.
     const ezse::Mat4 translation = MakeTranslation(1.0f, 0.0f, 0.0f);
     const ezse::Mat4 scale = MakeScale(2.0f);
@@ -245,16 +246,16 @@ void TestTranslation() {
 }
 
 void TestScale() {
-    const ezse::Vec3 first{ 2.0f, 3.0f, 4.0f };
+    const ezse::Vec3 first{2.0f, 3.0f, 4.0f};
     Check(NearlyEqual(ezse::Scale(first), MakeScale(first)),
-        "Scale puts the factors on the diagonal");
-    Check(NearlyEqual(ezse::Scale(ezse::Vec3{ 1.0f, 1.0f, 1.0f }), ezse::Mat4{}),
-        "Scale by factors of one is the identity");
+          "Scale puts the factors on the diagonal");
+    Check(NearlyEqual(ezse::Scale(ezse::Vec3{1.0f, 1.0f, 1.0f}), ezse::Mat4{}),
+          "Scale by factors of one is the identity");
 
-    const ezse::Vec3 second{ 5.0f, 6.0f, 7.0f };
+    const ezse::Vec3 second{5.0f, 6.0f, 7.0f};
     Check(NearlyEqual(ezse::Scale(first) * ezse::Scale(second),
-                      MakeScale(ezse::Vec3{ 10.0f, 18.0f, 28.0f })),
-        "two Scales multiply into the product of their factors");
+                      MakeScale(ezse::Vec3{10.0f, 18.0f, 28.0f})),
+          "two Scales multiply into the product of their factors");
 }
 
 // A quarter turn only contains zeros, ones and a minus one, so the expected
@@ -270,13 +271,13 @@ void TestRotationX() {
     expected.m[2][2] = 0.0f;
 
     Check(NearlyEqual(ezse::RotationX(0.0f), ezse::Mat4{}),
-        "RotationX by zero is the identity");
+          "RotationX by zero is the identity");
     Check(NearlyEqual(ezse::RotationX(c_quarterTurn), expected),
-        "RotationX by a quarter turn moves Y onto Z");
+          "RotationX by a quarter turn moves Y onto Z");
     Check(NearlyEqual(ezse::RotationX(0.3f) * ezse::RotationX(0.5f), ezse::RotationX(0.8f)),
-        "two RotationX multiply into the sum of their angles");
+          "two RotationX multiply into the sum of their angles");
     Check(NearlyEqual(ezse::RotationX(0.7f) * ezse::RotationX(-0.7f), ezse::Mat4{}),
-        "RotationX by an angle and its opposite is the identity");
+          "RotationX by an angle and its opposite is the identity");
 }
 
 void TestRotationY() {
@@ -288,13 +289,13 @@ void TestRotationY() {
     expected.m[0][0] = 0.0f;
 
     Check(NearlyEqual(ezse::RotationY(0.0f), ezse::Mat4{}),
-        "RotationY by zero is the identity");
+          "RotationY by zero is the identity");
     Check(NearlyEqual(ezse::RotationY(c_quarterTurn), expected),
-        "RotationY by a quarter turn moves Z onto X");
+          "RotationY by a quarter turn moves Z onto X");
     Check(NearlyEqual(ezse::RotationY(0.3f) * ezse::RotationY(0.5f), ezse::RotationY(0.8f)),
-        "two RotationY multiply into the sum of their angles");
+          "two RotationY multiply into the sum of their angles");
     Check(NearlyEqual(ezse::RotationY(0.7f) * ezse::RotationY(-0.7f), ezse::Mat4{}),
-        "RotationY by an angle and its opposite is the identity");
+          "RotationY by an angle and its opposite is the identity");
 }
 
 void TestRotationZ() {
@@ -306,90 +307,102 @@ void TestRotationZ() {
     expected.m[1][1] = 0.0f;
 
     Check(NearlyEqual(ezse::RotationZ(0.0f), ezse::Mat4{}),
-        "RotationZ by zero is the identity");
+          "RotationZ by zero is the identity");
     Check(NearlyEqual(ezse::RotationZ(c_quarterTurn), expected),
-        "RotationZ by a quarter turn moves X onto Y");
+          "RotationZ by a quarter turn moves X onto Y");
     Check(NearlyEqual(ezse::RotationZ(0.3f) * ezse::RotationZ(0.5f), ezse::RotationZ(0.8f)),
-        "two RotationZ multiply into the sum of their angles");
+          "two RotationZ multiply into the sum of their angles");
     Check(NearlyEqual(ezse::RotationZ(0.7f) * ezse::RotationZ(-0.7f), ezse::Mat4{}),
-        "RotationZ by an angle and its opposite is the identity");
+          "RotationZ by an angle and its opposite is the identity");
 }
 
 void TestTransformDirection() {
-    const ezse::Vec3 forward{ 0.0f, 0.0f, -1.0f };
+    const ezse::Vec3 forward{0.0f, 0.0f, -1.0f};
     const float quarterTurn = std::numbers::pi_v<float> / 2.0f;
 
     Check(NearlyEqual(ezse::TransformDirection(ezse::Mat4{}, forward), forward),
-        "TransformDirection: the identity matrix leaves a direction unchanged");
-    Check(NearlyEqual(ezse::TransformDirection(MakeTranslation(5.0f, 6.0f, 7.0f), forward), forward),
-        "TransformDirection: a translation does not move a direction");
+          "TransformDirection: the identity matrix leaves a direction unchanged");
+    Check(NearlyEqual(ezse::TransformDirection(MakeTranslation(5.0f, 6.0f, 7.0f), forward),
+                      forward),
+          "TransformDirection: a translation does not move a direction");
     // A quarter turn to the left around Y takes forward (-Z) to -X.
     Check(NearlyEqual(ezse::TransformDirection(ezse::RotationY(quarterTurn), forward),
-                      ezse::Vec3{ -1.0f, 0.0f, 0.0f }),
-        "TransformDirection: a quarter turn around Y takes -Z to -X");
-    Check(NearlyEqual(ezse::TransformDirection(MakeScale(ezse::Vec3{ 2.0f, 2.0f, 2.0f }), forward),
-                      ezse::Vec3{ 0.0f, 0.0f, -2.0f }),
-        "TransformDirection: a scale changes the length of a direction");
-    Check(NearlyEqual(ezse::TransformDirection(MakeTranslation(1.0f, 0.0f, 0.0f) * ezse::RotationY(quarterTurn), forward),
-                      ezse::Vec3{ -1.0f, 0.0f, 0.0f }),
-        "TransformDirection: rotation and translation together only rotate");
+                      ezse::Vec3{-1.0f, 0.0f, 0.0f}),
+          "TransformDirection: a quarter turn around Y takes -Z to -X");
+    Check(NearlyEqual(ezse::TransformDirection(MakeScale(ezse::Vec3{2.0f, 2.0f, 2.0f}), forward),
+                      ezse::Vec3{0.0f, 0.0f, -2.0f}),
+          "TransformDirection: a scale changes the length of a direction");
+    const ezse::Mat4 movedAndTurned =
+        MakeTranslation(1.0f, 0.0f, 0.0f) * ezse::RotationY(quarterTurn);
+    Check(NearlyEqual(ezse::TransformDirection(movedAndTurned, forward),
+                      ezse::Vec3{-1.0f, 0.0f, 0.0f}),
+          "TransformDirection: rotation and translation together only rotate");
 }
 
 void TestRotationOrder() {
     Check(!NearlyEqual(ezse::RotationX(c_quarterTurn) * ezse::RotationY(c_quarterTurn),
                        ezse::RotationY(c_quarterTurn) * ezse::RotationX(c_quarterTurn)),
-        "RotationX * RotationY differs from RotationY * RotationX");
+          "RotationX * RotationY differs from RotationY * RotationX");
 }
 
 void TestTransformVector() {
-    const ezse::Vec4 point{ 4.0f, 5.0f, 6.0f, 1.0f };
-    const ezse::Vec4 direction{ 4.0f, 5.0f, 6.0f, 0.0f };
+    const ezse::Vec4 point{4.0f, 5.0f, 6.0f, 1.0f};
+    const ezse::Vec4 direction{4.0f, 5.0f, 6.0f, 0.0f};
     const ezse::Mat4 translation = MakeTranslation(1.0f, 2.0f, 3.0f);
 
     Check(NearlyEqual(ezse::Mat4{} * point, point),
-        "the identity leaves a vector unchanged");
-    Check(NearlyEqual(translation * point, ezse::Vec4{ 5.0f, 7.0f, 9.0f, 1.0f }),
-        "a translation moves a point (w = 1)");
+          "the identity leaves a vector unchanged");
+    Check(NearlyEqual(translation * point, ezse::Vec4{5.0f, 7.0f, 9.0f, 1.0f}),
+          "a translation moves a point (w = 1)");
     Check(NearlyEqual(translation * direction, direction),
-        "a translation leaves a direction alone (w = 0)");
-    Check(NearlyEqual(MakeScale(ezse::Vec3{ 2.0f, 3.0f, 4.0f }) * ezse::Vec4{ 1.0f, 1.0f, 1.0f, 1.0f },
-                      ezse::Vec4{ 2.0f, 3.0f, 4.0f, 1.0f }),
-        "a scale multiplies each coordinate by its factor");
-    Check(NearlyEqual(ezse::RotationZ(c_quarterTurn) * ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f },
-                      ezse::Vec4{ 0.0f, 1.0f, 0.0f, 1.0f }),
-        "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
+          "a translation leaves a direction alone (w = 0)");
+    Check(NearlyEqual(MakeScale(ezse::Vec3{2.0f, 3.0f, 4.0f}) * ezse::Vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                      ezse::Vec4{2.0f, 3.0f, 4.0f, 1.0f}),
+          "a scale multiplies each coordinate by its factor");
+    Check(NearlyEqual(ezse::RotationZ(c_quarterTurn) * ezse::Vec4{1.0f, 0.0f, 0.0f, 1.0f},
+                      ezse::Vec4{0.0f, 1.0f, 0.0f, 1.0f}),
+          "RotationZ by a quarter turn moves the point (1, 0, 0) to (0, 1, 0)");
 }
 
 void TestLookAt() {
-    const ezse::Vec3 up{ 0.0f, 1.0f, 0.0f };
+    const ezse::Vec3 up{0.0f, 1.0f, 0.0f};
 
     // The default camera of the Sandbox: the view is only a translation.
-    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{ 0.0f, 0.0f, 3.0f }, ezse::Vec3{}, up),
+    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{0.0f, 0.0f, 3.0f}, ezse::Vec3{}, up),
                       MakeTranslation(0.0f, 0.0f, -3.0f)),
-        "LookAt from (0, 0, 3) to the origin is a translation by (0, 0, -3)");
+          "LookAt from (0, 0, 3) to the origin is a translation by (0, 0, -3)");
 
     // A camera at (1, 2, 3) looking along +X: its right is +Z in the world, its up is +Y.
-    const ezse::Mat4 alongX = ezse::LookAt(ezse::Vec3{ 1.0f, 2.0f, 3.0f }, ezse::Vec3{ 5.0f, 2.0f, 3.0f }, up);
-    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 2.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
-        "LookAt moves the eye to the origin");
-    Check(NearlyEqual(alongX * ezse::Vec4{ 5.0f, 2.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, -4.0f, 1.0f }),
-        "LookAt puts the target on the negative Z axis, at its distance");
-    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 2.0f, 4.0f, 1.0f }, ezse::Vec4{ 1.0f, 0.0f, 0.0f, 1.0f }),
-        "LookAt puts a point to the right of the camera on +X");
-    Check(NearlyEqual(alongX * ezse::Vec4{ 1.0f, 3.0f, 3.0f, 1.0f }, ezse::Vec4{ 0.0f, 1.0f, 0.0f, 1.0f }),
-        "LookAt puts a point above the camera on +Y");
+    const ezse::Mat4 alongX = ezse::LookAt(ezse::Vec3{1.0f, 2.0f, 3.0f},
+                                           ezse::Vec3{5.0f, 2.0f, 3.0f}, up);
+    Check(NearlyEqual(alongX * ezse::Vec4{1.0f, 2.0f, 3.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
+          "LookAt moves the eye to the origin");
+    Check(NearlyEqual(alongX * ezse::Vec4{5.0f, 2.0f, 3.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, -4.0f, 1.0f}),
+          "LookAt puts the target on the negative Z axis, at its distance");
+    Check(NearlyEqual(alongX * ezse::Vec4{1.0f, 2.0f, 4.0f, 1.0f},
+                      ezse::Vec4{1.0f, 0.0f, 0.0f, 1.0f}),
+          "LookAt puts a point to the right of the camera on +X");
+    Check(NearlyEqual(alongX * ezse::Vec4{1.0f, 3.0f, 3.0f, 1.0f},
+                      ezse::Vec4{0.0f, 1.0f, 0.0f, 1.0f}),
+          "LookAt puts a point above the camera on +Y");
 
     // up does not have to be perpendicular to the view direction, or have length 1.
-    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{}, ezse::Vec3{ 0.0f, 0.0f, -1.0f }, ezse::Vec3{ 0.0f, 2.0f, 2.0f }),
+    Check(NearlyEqual(ezse::LookAt(ezse::Vec3{}, ezse::Vec3{0.0f, 0.0f, -1.0f},
+                                   ezse::Vec3{0.0f, 2.0f, 2.0f}),
                       ezse::Mat4{}),
-        "LookAt straightens an up that is not perpendicular and not of length 1");
+          "LookAt straightens an up that is not perpendicular and not of length 1");
 
     // An arbitrary camera: the eye goes to the origin, the target to (0, 0, -distance).
-    const ezse::Mat4 tilted = ezse::LookAt(ezse::Vec3{ 2.0f, 1.0f, 5.0f }, ezse::Vec3{ -1.0f, 0.0f, -2.0f }, up);
-    Check(NearlyEqual(tilted * ezse::Vec4{ 2.0f, 1.0f, 5.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
-        "LookAt with a tilted view moves the eye to the origin");
-    Check(NearlyEqual(tilted * ezse::Vec4{ -1.0f, 0.0f, -2.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, -std::sqrt(59.0f), 1.0f }),
-        "LookAt with a tilted view puts the target at (0, 0, -sqrt(59))");
+    const ezse::Mat4 tilted = ezse::LookAt(ezse::Vec3{2.0f, 1.0f, 5.0f},
+                                           ezse::Vec3{-1.0f, 0.0f, -2.0f}, up);
+    Check(NearlyEqual(tilted * ezse::Vec4{2.0f, 1.0f, 5.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
+          "LookAt with a tilted view moves the eye to the origin");
+    Check(NearlyEqual(tilted * ezse::Vec4{-1.0f, 0.0f, -2.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, -std::sqrt(59.0f), 1.0f}),
+          "LookAt with a tilted view puts the target at (0, 0, -sqrt(59))");
 }
 
 void TestOrthographic() {
@@ -402,20 +415,24 @@ void TestOrthographic() {
     const float farPlane = 11.0f;
     const ezse::Mat4 projection = ezse::Orthographic(left, right, bottom, top, nearPlane, farPlane);
 
-    Check(NearlyEqual(projection * ezse::Vec4{ left, bottom, -nearPlane, 1.0f }, ezse::Vec4{ -1.0f, -1.0f, -1.0f, 1.0f }),
-        "Orthographic maps the near bottom left corner to (-1, -1, -1)");
-    Check(NearlyEqual(projection * ezse::Vec4{ right, top, -farPlane, 1.0f }, ezse::Vec4{ 1.0f, 1.0f, 1.0f, 1.0f }),
-        "Orthographic maps the far top right corner to (1, 1, 1)");
-    Check(NearlyEqual(projection * ezse::Vec4{ right, bottom, -farPlane, 1.0f }, ezse::Vec4{ 1.0f, -1.0f, 1.0f, 1.0f }),
-        "Orthographic maps the far bottom right corner to (1, -1, 1)");
-    Check(NearlyEqual(projection * ezse::Vec4{ 2.0f, 3.0f, -6.0f, 1.0f }, ezse::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f }),
-        "Orthographic maps the center of the box to the origin");
+    Check(NearlyEqual(projection * ezse::Vec4{left, bottom, -nearPlane, 1.0f},
+                      ezse::Vec4{-1.0f, -1.0f, -1.0f, 1.0f}),
+          "Orthographic maps the near bottom left corner to (-1, -1, -1)");
+    Check(NearlyEqual(projection * ezse::Vec4{right, top, -farPlane, 1.0f},
+                      ezse::Vec4{1.0f, 1.0f, 1.0f, 1.0f}),
+          "Orthographic maps the far top right corner to (1, 1, 1)");
+    Check(NearlyEqual(projection * ezse::Vec4{right, bottom, -farPlane, 1.0f},
+                      ezse::Vec4{1.0f, -1.0f, 1.0f, 1.0f}),
+          "Orthographic maps the far bottom right corner to (1, -1, 1)");
+    Check(NearlyEqual(projection * ezse::Vec4{2.0f, 3.0f, -6.0f, 1.0f},
+                      ezse::Vec4{0.0f, 0.0f, 0.0f, 1.0f}),
+          "Orthographic maps the center of the box to the origin");
 
     // No perspective: the same x and y give the same result at any depth, and w stays 1.
-    const ezse::Vec4 nearPoint = projection * ezse::Vec4{ 4.0f, 2.0f, -2.0f, 1.0f };
-    const ezse::Vec4 farPoint = projection * ezse::Vec4{ 4.0f, 2.0f, -9.0f, 1.0f };
+    const ezse::Vec4 nearPoint = projection * ezse::Vec4{4.0f, 2.0f, -2.0f, 1.0f};
+    const ezse::Vec4 farPoint = projection * ezse::Vec4{4.0f, 2.0f, -9.0f, 1.0f};
     Check(NearlyEqual(nearPoint.x, farPoint.x) && NearlyEqual(nearPoint.y, farPoint.y),
-        "Orthographic does not make things smaller further away");
+          "Orthographic does not make things smaller further away");
     Check(NearlyEqual(farPoint.w, 1.0f), "Orthographic keeps w at 1");
 }
 
@@ -430,25 +447,29 @@ void TestPerspective() {
     const float halfHeight = nearPlane * std::tan(fovY / 2.0f);
     const float halfWidth = halfHeight * aspect;
 
-    const ezse::Vec4 nearCenter = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, 0.0f, -nearPlane, 1.0f });
-    Check(NearlyEqual(nearCenter, ezse::Vec4{ 0.0f, 0.0f, -1.0f, 1.0f }),
-        "Perspective maps the center of the near plane to depth -1");
+    const ezse::Vec4 nearCenter = PerspectiveDivide(
+        projection * ezse::Vec4{0.0f, 0.0f, -nearPlane, 1.0f});
+    Check(NearlyEqual(nearCenter, ezse::Vec4{0.0f, 0.0f, -1.0f, 1.0f}),
+          "Perspective maps the center of the near plane to depth -1");
 
-    const ezse::Vec4 farCenter = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, 0.0f, -farPlane, 1.0f });
-    Check(NearlyEqual(farCenter, ezse::Vec4{ 0.0f, 0.0f, 1.0f, 1.0f }),
-        "Perspective maps the center of the far plane to depth 1");
+    const ezse::Vec4 farCenter = PerspectiveDivide(
+        projection * ezse::Vec4{0.0f, 0.0f, -farPlane, 1.0f});
+    Check(NearlyEqual(farCenter, ezse::Vec4{0.0f, 0.0f, 1.0f, 1.0f}),
+          "Perspective maps the center of the far plane to depth 1");
 
-    const ezse::Vec4 nearTop = PerspectiveDivide(projection * ezse::Vec4{ 0.0f, halfHeight, -nearPlane, 1.0f });
-    Check(NearlyEqual(nearTop, ezse::Vec4{ 0.0f, 1.0f, -1.0f, 1.0f }),
-        "Perspective maps the top edge of the near plane to y = 1");
+    const ezse::Vec4 nearTop = PerspectiveDivide(
+        projection * ezse::Vec4{0.0f, halfHeight, -nearPlane, 1.0f});
+    Check(NearlyEqual(nearTop, ezse::Vec4{0.0f, 1.0f, -1.0f, 1.0f}),
+          "Perspective maps the top edge of the near plane to y = 1");
 
-    const ezse::Vec4 nearRight = PerspectiveDivide(projection * ezse::Vec4{ halfWidth, 0.0f, -nearPlane, 1.0f });
-    Check(NearlyEqual(nearRight, ezse::Vec4{ 1.0f, 0.0f, -1.0f, 1.0f }),
-        "Perspective maps the right edge of the near plane to x = 1");
+    const ezse::Vec4 nearRight = PerspectiveDivide(
+        projection * ezse::Vec4{halfWidth, 0.0f, -nearPlane, 1.0f});
+    Check(NearlyEqual(nearRight, ezse::Vec4{1.0f, 0.0f, -1.0f, 1.0f}),
+          "Perspective maps the right edge of the near plane to x = 1");
 
-    const ezse::Vec4 clip = projection * ezse::Vec4{ 3.0f, 4.0f, -5.0f, 1.0f };
+    const ezse::Vec4 clip = projection * ezse::Vec4{3.0f, 4.0f, -5.0f, 1.0f};
     Check(std::abs(clip.w - 5.0f) <= 0.0001f,
-        "Perspective puts the distance to the camera (-z) in w");
+          "Perspective puts the distance to the camera (-z) in w");
 }
 
 bool NearlyEqual(const ezse::Quat& a, const ezse::Quat& b) {
@@ -456,45 +477,51 @@ bool NearlyEqual(const ezse::Quat& a, const ezse::Quat& b) {
            std::abs(a.z - b.z) <= 0.0001f && std::abs(a.w - b.w) <= 0.0001f;
 }
 
-const ezse::Vec3 c_axisX{ 1.0f, 0.0f, 0.0f };
-const ezse::Vec3 c_axisY{ 0.0f, 1.0f, 0.0f };
-const ezse::Vec3 c_axisZ{ 0.0f, 0.0f, 1.0f };
+const ezse::Vec3 c_axisX{1.0f, 0.0f, 0.0f};
+const ezse::Vec3 c_axisY{0.0f, 1.0f, 0.0f};
+const ezse::Vec3 c_axisZ{0.0f, 0.0f, 1.0f};
 
 void TestMat4Inverse() {
     const ezse::Mat4 identity;
-    Check(NearlyEqual(ezse::Inverse(identity), identity), "Inverse of the identity is the identity");
+    Check(NearlyEqual(ezse::Inverse(identity), identity),
+          "Inverse of the identity is the identity");
 
-    const ezse::Vec3 offset{ 1.0f, -2.0f, 3.0f };
+    const ezse::Vec3 offset{1.0f, -2.0f, 3.0f};
     Check(NearlyEqual(ezse::Inverse(ezse::Translation(offset)), ezse::Translation(-offset)),
-        "Inverse of Translation(v) is Translation(-v)");
+          "Inverse of Translation(v) is Translation(-v)");
 
-    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{ 2.0f, 4.0f, 0.5f })),
-                      ezse::Scale(ezse::Vec3{ 0.5f, 0.25f, 2.0f })),
-        "Inverse of Scale(s) is Scale(1 / s)");
+    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{2.0f, 4.0f, 0.5f})),
+                      ezse::Scale(ezse::Vec3{0.5f, 0.25f, 2.0f})),
+          "Inverse of Scale(s) is Scale(1 / s)");
 
-    const ezse::Quat rotation = ezse::AxisAngle(ezse::Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.7f);
-    Check(NearlyEqual(ezse::Inverse(ezse::Rotation(rotation)), ezse::Rotation(ezse::Conjugate(rotation))),
-        "Inverse of a rotation is the rotation of the conjugate");
+    const ezse::Quat rotation = ezse::AxisAngle(ezse::Normalize(ezse::Vec3{1.0f, 2.0f, 3.0f}),
+                                                0.7f);
+    Check(NearlyEqual(ezse::Inverse(ezse::Rotation(rotation)),
+                      ezse::Rotation(ezse::Conjugate(rotation))),
+          "Inverse of a rotation is the rotation of the conjugate");
 
     // A model matrix as the Engine builds it: translation * rotation * scale.
-    const ezse::Vec3 scale{ 2.0f, 0.5f, 3.0f };
-    const ezse::Mat4 model = ezse::Translation(offset) * ezse::Rotation(rotation) * ezse::Scale(scale);
+    const ezse::Vec3 scale{2.0f, 0.5f, 3.0f};
+    const ezse::Mat4 model = ezse::Translation(offset) * ezse::Rotation(rotation) * ezse::Scale(
+        scale);
     const ezse::Mat4 inverse = ezse::Inverse(model);
-    Check(NearlyEqual(model * inverse, identity), "M * Inverse(M) is the identity for a model matrix");
-    Check(NearlyEqual(inverse * model, identity), "Inverse(M) * M is the identity for a model matrix");
+    Check(NearlyEqual(model * inverse, identity),
+          "M * Inverse(M) is the identity for a model matrix");
+    Check(NearlyEqual(inverse * model, identity),
+          "Inverse(M) * M is the identity for a model matrix");
     Check(NearlyEqual(inverse,
-                      ezse::Scale(ezse::Vec3{ 0.5f, 2.0f, 1.0f / 3.0f }) *
+                      ezse::Scale(ezse::Vec3{0.5f, 2.0f, 1.0f / 3.0f}) *
                           ezse::Rotation(ezse::Conjugate(rotation)) * ezse::Translation(-offset)),
-        "Inverse of T * R * S is S^-1 * R^-1 * T^-1: the order turns around");
+          "Inverse of T * R * S is S^-1 * R^-1 * T^-1: the order turns around");
     Check(NearlyEqual(ezse::Inverse(inverse), model), "Inverse(Inverse(M)) is M");
 
     const ezse::Mat4 projection =
         ezse::Perspective(std::numbers::pi_v<float> / 3.0f, 2.0f, 0.5f, 10.0f);
     Check(NearlyEqual(projection * ezse::Inverse(projection), identity),
-        "P * Inverse(P) is the identity for a perspective projection");
+          "P * Inverse(P) is the identity for a perspective projection");
 
-    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{ 1.0f, 0.0f, 1.0f })), identity),
-        "Inverse of a matrix with a scale of 0 returns the identity");
+    Check(NearlyEqual(ezse::Inverse(ezse::Scale(ezse::Vec3{1.0f, 0.0f, 1.0f})), identity),
+          "Inverse of a matrix with a scale of 0 returns the identity");
     const ezse::Mat4 dependentRows{{
         { 1.0f,  2.0f,  3.0f,  4.0f},
         { 5.0f,  6.0f,  7.0f,  8.0f},
@@ -502,111 +529,122 @@ void TestMat4Inverse() {
         {13.0f, 14.0f, 15.0f, 16.0f},
     }};
     Check(NearlyEqual(ezse::Inverse(dependentRows), identity),
-        "Inverse of a matrix with dependent columns (determinant 0) returns the identity");
+          "Inverse of a matrix with dependent columns (determinant 0) returns the identity");
 }
 
 void TestVec3Lerp() {
-    const ezse::Vec3 a{ 1.0f, 2.0f, 3.0f };
-    const ezse::Vec3 b{ 3.0f, -2.0f, 7.0f };
+    const ezse::Vec3 a{1.0f, 2.0f, 3.0f};
+    const ezse::Vec3 b{3.0f, -2.0f, 7.0f};
     Check(NearlyEqual(ezse::Lerp(a, b, 0.0f), a), "Lerp at 0 gives the first vector");
     Check(NearlyEqual(ezse::Lerp(a, b, 1.0f), b), "Lerp at 1 gives the second vector");
-    Check(NearlyEqual(ezse::Lerp(a, b, 0.5f), ezse::Vec3{ 2.0f, 0.0f, 5.0f }),
-        "Lerp at 0.5 gives the point halfway");
+    Check(NearlyEqual(ezse::Lerp(a, b, 0.5f), ezse::Vec3{2.0f, 0.0f, 5.0f}),
+          "Lerp at 0.5 gives the point halfway");
 }
 
 void TestQuatDefault() {
     const ezse::Quat identity;
     Check(identity.x == 0.0f && identity.y == 0.0f && identity.z == 0.0f && identity.w == 1.0f,
-        "a default Quat is (0, 0, 0, 1)");
+          "a default Quat is (0, 0, 0, 1)");
     Check(NearlyEqual(ezse::Rotation(identity), ezse::Mat4{}),
-        "the matrix of a default Quat is the identity: it does not turn");
+          "the matrix of a default Quat is the identity: it does not turn");
 }
 
 void TestQuatAxisAngle() {
     const float half = std::sqrt(0.5f);
-    Check(NearlyEqual(ezse::AxisAngle(c_axisY, c_quarterTurn), ezse::Quat{ 0.0f, half, 0.0f, half }),
-        "AxisAngle by a quarter turn around Y is (0, sin 45, 0, cos 45)");
+    Check(NearlyEqual(ezse::AxisAngle(c_axisY, c_quarterTurn), ezse::Quat{0.0f, half, 0.0f, half}),
+          "AxisAngle by a quarter turn around Y is (0, sin 45, 0, cos 45)");
     Check(NearlyEqual(ezse::AxisAngle(c_axisX, 0.0f), ezse::Quat{}),
-        "AxisAngle by zero is the default Quat");
-    Check(NearlyEqual(ezse::Length(ezse::AxisAngle(Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.8f)), 1.0f),
-        "AxisAngle with an axis of length 1 gives a Quat of length 1");
+          "AxisAngle by zero is the default Quat");
+    Check(NearlyEqual(ezse::Length(ezse::AxisAngle(Normalize(ezse::Vec3{1.0f, 2.0f, 3.0f}), 0.8f)),
+                      1.0f),
+          "AxisAngle with an axis of length 1 gives a Quat of length 1");
 }
 
 void TestQuatRotation() {
     // The matrix tests above check RotationX, Y and Z, so they can be used as the expected value.
     // A mistake with columns and rows in Rotation shows up here as the opposite turn.
-    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisX, c_quarterTurn)), ezse::RotationX(c_quarterTurn)),
-        "Rotation of a quarter turn around X equals RotationX");
-    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisY, c_quarterTurn)), ezse::RotationY(c_quarterTurn)),
-        "Rotation of a quarter turn around Y equals RotationY");
-    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisZ, c_quarterTurn)), ezse::RotationZ(c_quarterTurn)),
-        "Rotation of a quarter turn around Z equals RotationZ");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisX, c_quarterTurn)),
+                      ezse::RotationX(c_quarterTurn)),
+          "Rotation of a quarter turn around X equals RotationX");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisY, c_quarterTurn)),
+                      ezse::RotationY(c_quarterTurn)),
+          "Rotation of a quarter turn around Y equals RotationY");
+    Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisZ, c_quarterTurn)),
+                      ezse::RotationZ(c_quarterTurn)),
+          "Rotation of a quarter turn around Z equals RotationZ");
     Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisY, 0.3f)), ezse::RotationY(0.3f)),
-        "Rotation of a small angle around Y equals RotationY");
+          "Rotation of a small angle around Y equals RotationY");
     Check(NearlyEqual(ezse::Rotation(ezse::AxisAngle(c_axisX, -1.2f)), ezse::RotationX(-1.2f)),
-        "Rotation of a negative angle around X equals RotationX");
+          "Rotation of a negative angle around X equals RotationX");
 }
 
 void TestQuatMultiply() {
     const ezse::Quat eighthY = ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f);
     Check(NearlyEqual(eighthY * eighthY, ezse::AxisAngle(c_axisY, c_quarterTurn)),
-        "two eighth turns around Y multiply into a quarter turn");
+          "two eighth turns around Y multiply into a quarter turn");
 
     const ezse::Quat aroundX = ezse::AxisAngle(c_axisX, 0.4f);
     const ezse::Quat aroundY = ezse::AxisAngle(c_axisY, 0.9f);
-    Check(NearlyEqual(ezse::Rotation(aroundY * aroundX), ezse::RotationY(0.9f) * ezse::RotationX(0.4f)),
-        "a * b turns like the matrices: first b, then a");
+    Check(NearlyEqual(ezse::Rotation(aroundY * aroundX),
+                      ezse::RotationY(0.9f) * ezse::RotationX(0.4f)),
+          "a * b turns like the matrices: first b, then a");
     Check(!NearlyEqual(aroundY * aroundX, aroundX * aroundY),
-        "the order of multiplying matters: a * b is not b * a");
-    Check(NearlyEqual(ezse::Quat{} * aroundX, aroundX) && NearlyEqual(aroundX * ezse::Quat{}, aroundX),
-        "multiplying with the default Quat changes nothing");
+          "the order of multiplying matters: a * b is not b * a");
+    Check(NearlyEqual(ezse::Quat{} * aroundX, aroundX) && NearlyEqual(aroundX * ezse::Quat{},
+                                                                      aroundX),
+          "multiplying with the default Quat changes nothing");
 }
 
 void TestQuatDotLengthNormalize() {
-    Check(NearlyEqual(ezse::Dot(ezse::Quat{ 1.0f, 2.0f, 3.0f, 4.0f }, ezse::Quat{ 5.0f, 6.0f, 7.0f, 8.0f }), 70.0f),
-        "Dot multiplies the four parts and adds them up");
-    Check(NearlyEqual(ezse::Length(ezse::Quat{ 1.0f, 2.0f, 2.0f, 4.0f }), 5.0f),
-        "Length is the square root of the sum of the squares");
-    Check(NearlyEqual(ezse::Length(ezse::Normalize(ezse::Quat{ 1.0f, 2.0f, 3.0f, 4.0f })), 1.0f),
-        "Normalize gives a Quat of length 1");
-    Check(NearlyEqual(ezse::Normalize(ezse::Quat{ 0.0f, 0.0f, 0.0f, 0.0f }), ezse::Quat{}),
-        "Normalize of a zero Quat gives the default Quat");
+    Check(NearlyEqual(
+        ezse::Dot(ezse::Quat{1.0f, 2.0f, 3.0f, 4.0f}, ezse::Quat{5.0f, 6.0f, 7.0f, 8.0f}), 70.0f),
+          "Dot multiplies the four parts and adds them up");
+    Check(NearlyEqual(ezse::Length(ezse::Quat{1.0f, 2.0f, 2.0f, 4.0f}), 5.0f),
+          "Length is the square root of the sum of the squares");
+    Check(NearlyEqual(ezse::Length(ezse::Normalize(ezse::Quat{1.0f, 2.0f, 3.0f, 4.0f})), 1.0f),
+          "Normalize gives a Quat of length 1");
+    Check(NearlyEqual(ezse::Normalize(ezse::Quat{0.0f, 0.0f, 0.0f, 0.0f}), ezse::Quat{}),
+          "Normalize of a zero Quat gives the default Quat");
 }
 
 void TestQuatConjugate() {
-    const ezse::Quat q = ezse::AxisAngle(Normalize(ezse::Vec3{ 1.0f, 2.0f, 3.0f }), 0.8f);
-    Check(NearlyEqual(ezse::Conjugate(q), ezse::Quat{ -q.x, -q.y, -q.z, q.w }),
-        "Conjugate flips x, y and z and keeps w");
+    const ezse::Quat q = ezse::AxisAngle(Normalize(ezse::Vec3{1.0f, 2.0f, 3.0f}), 0.8f);
+    Check(NearlyEqual(ezse::Conjugate(q), ezse::Quat{-q.x, -q.y, -q.z, q.w}),
+          "Conjugate flips x, y and z and keeps w");
     Check(NearlyEqual(q * ezse::Conjugate(q), ezse::Quat{}),
-        "a Quat times its Conjugate does not turn: the Conjugate turns it back");
+          "a Quat times its Conjugate does not turn: the Conjugate turns it back");
     Check(NearlyEqual(ezse::Rotation(ezse::Conjugate(q)) * ezse::Rotation(q), ezse::Mat4{}),
-        "the matrix of the Conjugate undoes the matrix of the Quat");
+          "the matrix of the Conjugate undoes the matrix of the Quat");
 }
 
 void TestQuatSlerp() {
     const ezse::Quat start;
     const ezse::Quat quarterY = ezse::AxisAngle(c_axisY, c_quarterTurn);
-    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.0f), start), "Slerp at 0 gives the first Quat");
-    Check(NearlyEqual(ezse::Slerp(start, quarterY, 1.0f), quarterY), "Slerp at 1 gives the second Quat");
-    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.5f), ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f)),
-        "Slerp at 0.5 between zero and a quarter turn is an eighth turn");
-    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.25f), ezse::AxisAngle(c_axisY, c_quarterTurn * 0.25f)),
-        "Slerp turns at a constant speed: at 0.25 a quarter of the angle");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.0f), start),
+          "Slerp at 0 gives the first Quat");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 1.0f), quarterY),
+          "Slerp at 1 gives the second Quat");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.5f),
+                      ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f)),
+          "Slerp at 0.5 between zero and a quarter turn is an eighth turn");
+    Check(NearlyEqual(ezse::Slerp(start, quarterY, 0.25f),
+                      ezse::AxisAngle(c_axisY, c_quarterTurn * 0.25f)),
+          "Slerp turns at a constant speed: at 0.25 a quarter of the angle");
     Check(NearlyEqual(ezse::Length(ezse::Slerp(start, quarterY, 0.3f)), 1.0f),
-        "Slerp keeps the length at 1");
+          "Slerp keeps the length at 1");
 
     // q and -q are the same orientation; Slerp must take the short way to either of them.
     const ezse::Quat negativeQuarterY = quarterY * -1.0f;
     Check(NearlyEqual(ezse::Rotation(ezse::Slerp(start, negativeQuarterY, 0.5f)),
                       ezse::Rotation(ezse::AxisAngle(c_axisY, c_quarterTurn * 0.5f))),
-        "Slerp to -q takes the short way, the same as to q");
+          "Slerp to -q takes the short way, the same as to q");
 
     // Almost the same orientation: the branch that mixes and normalizes.
     const ezse::Quat almostStart = ezse::AxisAngle(c_axisY, 0.001f);
     Check(NearlyEqual(ezse::Slerp(start, almostStart, 0.5f), ezse::AxisAngle(c_axisY, 0.0005f)),
-        "Slerp between two nearly equal Quats lands halfway");
+          "Slerp between two nearly equal Quats lands halfway");
     Check(NearlyEqual(ezse::Slerp(quarterY, quarterY, 0.7f), quarterY),
-        "Slerp between a Quat and itself gives that Quat");
+          "Slerp between a Quat and itself gives that Quat");
 }
 
 // The matrix the Transform used before it had a Quat: Z, then X, then Y.
@@ -616,41 +654,44 @@ ezse::Mat4 EulerMatrix(const ezse::Vec3& angles) {
 
 void TestQuatFromEuler() {
     Check(NearlyEqual(ezse::FromEuler(ezse::Vec3{}), ezse::Quat{}),
-        "FromEuler of zero angles does not turn");
-    Check(NearlyEqual(ezse::FromEuler(ezse::Vec3{ 0.0f, 0.6f, 0.0f }), ezse::AxisAngle(c_axisY, 0.6f)),
-        "FromEuler with only yaw is a turn around Y");
+          "FromEuler of zero angles does not turn");
+    Check(NearlyEqual(ezse::FromEuler(ezse::Vec3{0.0f, 0.6f, 0.0f}),
+                      ezse::AxisAngle(c_axisY, 0.6f)),
+          "FromEuler with only yaw is a turn around Y");
 
-    const ezse::Vec3 angles{ 0.4f, -1.1f, 0.25f };
+    const ezse::Vec3 angles{0.4f, -1.1f, 0.25f};
     Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(angles)), EulerMatrix(angles)),
-        "FromEuler turns like RotationY * RotationX * RotationZ: roll first, yaw last");
-    const ezse::Vec3 sun{ -0.883f, 0.620f, 0.0f };
+          "FromEuler turns like RotationY * RotationX * RotationZ: roll first, yaw last");
+    const ezse::Vec3 sun{-0.883f, 0.620f, 0.0f};
     Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(sun)), EulerMatrix(sun)),
-        "FromEuler gives the same orientation as before for angles like the sun in the Sandbox");
-    Check(NearlyEqual(ezse::Length(ezse::FromEuler(angles)), 1.0f), "FromEuler gives a Quat of length 1");
+          "FromEuler gives the same orientation as before for angles like the sun in the Sandbox");
+    Check(NearlyEqual(ezse::Length(ezse::FromEuler(angles)), 1.0f),
+          "FromEuler gives a Quat of length 1");
 }
 
 void TestQuatToEuler() {
-    const ezse::Vec3 angles{ 0.4f, -1.1f, 0.25f };
+    const ezse::Vec3 angles{0.4f, -1.1f, 0.25f};
     Check(NearlyEqual(ezse::ToEuler(ezse::FromEuler(angles)), angles),
-        "ToEuler gives back the angles of FromEuler");
-    const ezse::Vec3 large{ -1.2f, 2.8f, -2.5f };
+          "ToEuler gives back the angles of FromEuler");
+    const ezse::Vec3 large{-1.2f, 2.8f, -2.5f};
     Check(NearlyEqual(ezse::ToEuler(ezse::FromEuler(large)), large),
-        "ToEuler gives back large angles (yaw and roll beyond 90 degrees)");
+          "ToEuler gives back large angles (yaw and roll beyond 90 degrees)");
     Check(NearlyEqual(ezse::ToEuler(ezse::Quat{}), ezse::Vec3{}),
-        "ToEuler of the default Quat is zero");
-    Check(NearlyEqual(ezse::ToEuler(ezse::AxisAngle(c_axisX, 0.7f)), ezse::Vec3{ 0.7f, 0.0f, 0.0f }),
-        "ToEuler of a turn around X is only pitch");
+          "ToEuler of the default Quat is zero");
+    Check(NearlyEqual(ezse::ToEuler(ezse::AxisAngle(c_axisX, 0.7f)), ezse::Vec3{0.7f, 0.0f, 0.0f}),
+          "ToEuler of a turn around X is only pitch");
 
     // Gimbal lock: at a pitch of 90 degrees yaw and roll turn around the same axis.
-    const ezse::Quat locked = ezse::FromEuler(ezse::Vec3{ c_quarterTurn, 0.5f, 0.3f });
+    const ezse::Quat locked = ezse::FromEuler(ezse::Vec3{c_quarterTurn, 0.5f, 0.3f});
     const ezse::Vec3 lockedAngles = ezse::ToEuler(locked);
     Check(NearlyEqual(lockedAngles.x, c_quarterTurn) && NearlyEqual(lockedAngles.z, 0.0f),
-        "ToEuler at a pitch of 90 degrees gives that pitch and a roll of 0");
+          "ToEuler at a pitch of 90 degrees gives that pitch and a roll of 0");
     Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(lockedAngles)), ezse::Rotation(locked)),
-        "ToEuler at a pitch of 90 degrees still gives the same orientation");
-    const ezse::Quat lockedDown = ezse::FromEuler(ezse::Vec3{ -c_quarterTurn, -0.4f, 0.9f });
-    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(ezse::ToEuler(lockedDown))), ezse::Rotation(lockedDown)),
-        "ToEuler at a pitch of -90 degrees still gives the same orientation");
+          "ToEuler at a pitch of 90 degrees still gives the same orientation");
+    const ezse::Quat lockedDown = ezse::FromEuler(ezse::Vec3{-c_quarterTurn, -0.4f, 0.9f});
+    Check(NearlyEqual(ezse::Rotation(ezse::FromEuler(ezse::ToEuler(lockedDown))),
+                      ezse::Rotation(lockedDown)),
+          "ToEuler at a pitch of -90 degrees still gives the same orientation");
 }
 
 } // namespace
