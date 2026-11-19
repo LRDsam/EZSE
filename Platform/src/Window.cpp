@@ -53,6 +53,15 @@ Key ToKey(int glfwKey) {
     }
 }
 
+MouseButton ToMouseButton(int glfwMouseButton) {
+    switch (glfwMouseButton) {
+        case GLFW_MOUSE_BUTTON_LEFT:    return MouseButton::Left;
+        case GLFW_MOUSE_BUTTON_RIGHT:   return MouseButton::Right;
+        case GLFW_MOUSE_BUTTON_MIDDLE:  return MouseButton::Middle;
+        default:                        return MouseButton::Unknown;
+    }
+}
+
 } // namespace
 
 std::unique_ptr<Window> Window::Create(const WindowDesc& desc) {
@@ -95,6 +104,8 @@ Window::Window(GLFWwindow* handle) : m_handle(handle) {
     glfwSetWindowUserPointer(m_handle, this);
     glfwSetFramebufferSizeCallback(m_handle, OnFramebufferResized);
     glfwSetKeyCallback(m_handle, OnKey);
+    glfwSetMouseButtonCallback(m_handle, OnMouseButton);
+    glfwSetScrollCallback(m_handle, OnScroll);
 
     // Setting the start position of the mouse.
     glfwGetCursorPos(m_handle, &m_lastCursorX, &m_lastCursorY);
@@ -146,6 +157,11 @@ MouseDelta Window::GetMouseDelta() const {
     return m_mouseDelta;
 }
 
+bool Window::IsMouseButtonDown(MouseButton button) const {
+    EZSE_ASSERT(button < MouseButton::Count, "IsMouseButtonDown needs a real Button");
+    return m_buttonsDown[static_cast<std::size_t>(button)];
+}
+
 void Window::SetCursorCaptured(bool captured) {
     glfwSetInputMode(m_handle, GLFW_CURSOR,
         captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
@@ -193,6 +209,29 @@ void Window::OnKey(GLFWwindow* handle, int glfwKey, int, int action, int) {
     } else {
         window->m_events.push_back(KeyReleased{key});
     }
+}
+
+void Window::OnMouseButton(GLFWwindow* handle, int glfwButton, int action, int) {
+    const MouseButton button = ToMouseButton(glfwButton);
+    if (button == MouseButton::Unknown) {
+        return;
+    }
+
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    const bool pressed = action == GLFW_PRESS;
+    window->m_buttonsDown[static_cast<std::size_t>(button)] = pressed;
+
+    if (pressed) {
+        window->m_events.push_back(MouseButtonPressed{button});
+    } else {
+        window->m_events.push_back(MouseButtonReleased{button});
+    }
+}
+
+void Window::OnScroll(GLFWwindow* handle, double xOffset, double yOffset) {
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    window->m_events.push_back(
+        MouseScrolled{static_cast<float>(xOffset), static_cast<float>(yOffset)});
 }
 
 } // namespace ezse

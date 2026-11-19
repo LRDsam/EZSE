@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EZSE/Platform/Key.h"
+#include "EZSE/Platform/MouseButton.h"
 #include "EZSE/Platform/WindowEvent.h"
 
 #include <array>
@@ -71,6 +72,9 @@ public:
     // How far the mouse moved during last PollEvents.
     MouseDelta GetMouseDelta() const;
 
+    // Whether the mouse button is held down right now.
+    bool IsMouseButtonDown(MouseButton button) const;
+
     // Hides the cursor and keeps it in the window,
     // so the mouse can turn without limits.
     void SetCursorCaptured(bool captured);
@@ -88,10 +92,13 @@ private:
 
     static void OnFramebufferResized(GLFWwindow* handle, int width, int height);
     static void OnKey(GLFWwindow* handle, int glfwKey, int scancode, int action, int mods);
+    static void OnMouseButton(GLFWwindow* handle, int glfwButton, int action, int mods);
+    static void OnScroll(GLFWwindow* handle, double xOffset, double yOffset);
 
     GLFWwindow* m_handle = nullptr;
     std::vector<WindowEvent> m_events;
     std::array<bool, static_cast<std::size_t>(Key::Count)> m_keysDown{};
+    std::array<bool, static_cast<std::size_t>(MouseButton::Count)> m_buttonsDown{};
     double m_lastCursorX = 0.0;
     double m_lastCursorY = 0.0;
     MouseDelta m_mouseDelta;
