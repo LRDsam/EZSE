@@ -5,6 +5,7 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
 #include "EZSE/Engine/Engine.h"
+#include "EZSE/Engine/InputState.h"
 #include "EZSE/Engine/Resources/Image.h"
 #include "EZSE/Engine/Resources/Obj.h"
 #include "EZSE/Engine/Resources/ResourceCache.h"
@@ -19,6 +20,11 @@
 #include "EZSE/Math/Mat4.h"
 #include "EZSE/Math/Vec3.h"
 #include "EZSE/Math/Vec4.h"
+
+#include "EZSE/Platform/Key.h"
+#include "EZSE/Platform/MouseButton.h"
+#include "EZSE/Platform/Window.h"
+#include "EZSE/Platform/WindowEvent.h"
 
 #include <chrono>
 #include <cmath>
@@ -603,6 +609,113 @@ void TestHeadlessRun() {
 
 } // namespace
 
+void TestInputState() {
+    ezse::InputState input;
+    Check(!input.IsDown(ezse::Key::W) && !input.WasPressed(ezse::Key::W) &&
+              !input.WasReleased(ezse::Key::W) && input.GetPressCount(ezse::Key::W) == 0,
+          "InputState: starts with nothing held or pressed");
+    Check(NearlyEqual(input.GetMouseDelta().x, 0.0f) && NearlyEqual(input.GetScrollDelta().y, 0.0f),
+          "InputState: starts without mouse movement or scrolling");
+
+    input.Apply(ezse::KeyPressed{ezse::Key::W});
+    Check(input.IsDown(ezse::Key::W) && input.WasPressed(ezse::Key::W) &&
+              !input.WasReleased(ezse::Key::W),
+          "InputState: a press makes the key held and pressed");
+    Check(!input.IsDown(ezse::Key::S), "InputState: a press changes only its own key");
+
+    input.ClearChanges();
+    Check(input.IsDown(ezse::Key::W) && !input.WasPressed(ezse::Key::W) &&
+              input.GetPressCount(ezse::Key::W) == 0,
+          "InputState: ClearChanges keeps a held key held, but not pressed again");
+
+    input.Apply(ezse::KeyReleased{ezse::Key::W});
+    Check(!input.IsDown(ezse::Key::W) && input.WasReleased(ezse::Key::W) &&
+              input.GetReleaseCount(ezse::Key::W) == 1,
+          "InputState: a release lets go of the key");
+
+    // A tap: down and up again within one stretch.
+    input.ClearChanges();
+    input.Apply(ezse::KeyPressed{ezse::Key::Space});
+    input.Apply(ezse::KeyReleased{ezse::Key::Space});
+    Check(input.WasPressed(ezse::Key::Space) && input.WasReleased(ezse::Key::Space) &&
+              !input.IsDown(ezse::Key::Space),
+          "InputState: a tap within one stretch is pressed and released, but not held");
+
+    // Two clicks within one stretch.
+    input.Apply(ezse::MouseButtonPressed{ezse::MouseButton::Left});
+    input.Apply(ezse::MouseButtonReleased{ezse::MouseButton::Left});
+    input.Apply(ezse::MouseButtonPressed{ezse::MouseButton::Left});
+    Check(input.GetPressCount(ezse::MouseButton::Left) == 2 &&
+              input.GetReleaseCount(ezse::MouseButton::Left) == 1 &&
+              input.IsDown(ezse::MouseButton::Left),
+          "InputState: two clicks count as two presses; the second is still held");
+    Check(!input.IsDown(ezse::MouseButton::Right) && !input.WasPressed(ezse::Key::A),
+          "InputState: a mouse button does not change another button or a key");
+
+    input.AddMouseDelta(ezse::MouseDelta{3.0f, -1.0f});
+    input.AddMouseDelta(ezse::MouseDelta{2.0f, 4.0f});
+    input.Apply(ezse::MouseScrolled{0.0f, 1.0f});
+    input.Apply(ezse::MouseScrolled{0.5f, 1.0f});
+    Check(NearlyEqual(input.GetMouseDelta().x, 5.0f) && NearlyEqual(input.GetMouseDelta().y, 3.0f),
+          "InputState: mouse movement is summed");
+    Check(NearlyEqual(input.GetScrollDelta().x, 0.5f) &&
+              NearlyEqual(input.GetScrollDelta().y, 2.0f),
+          "InputState: scrolling is summed");
+
+    input.Apply(ezse::FramebufferResized{800, 600});
+    Check(input.GetPressCount(ezse::MouseButton::Left) == 2,
+          "InputState: other events are ignored");
+
+    input.ClearChanges();
+    Check(NearlyEqual(input.GetMouseDelta().x, 0.0f) &&
+              NearlyEqual(input.GetScrollDelta().y, 0.0f) &&
+              input.GetPressCount(ezse::MouseButton::Left) == 0 &&
+              input.IsDown(ezse::MouseButton::Left),
+          "InputState: ClearChanges clears movement, scrolling and counts, not what is held");
+}
+
+// What the Engine does with frames and ticks, done by hand: pending collects every frame, each
+// tick takes it and clears the changes.
+void TestTickInput() {
+    ezse::InputState pending;
+    ezse::InputState tick;
+    const auto runTick = [&] {
+        tick = pending;
+        pending.ClearChanges();
+    };
+
+    // A frame without a tick: the press waits for the next tick.
+    pending.Apply(ezse::KeyPressed{ezse::Key::Space});
+    pending.Apply(ezse::KeyReleased{ezse::Key::Space});
+    runTick();
+    Check(tick.WasPressed(ezse::Key::Space),
+          "Tick input: a tap in a frame without a tick reaches the next tick");
+
+    // A frame with two ticks: only the first sees the press.
+    pending.Apply(ezse::MouseButtonPressed{ezse::MouseButton::Left});
+    runTick();
+    const bool firstSees = tick.WasPressed(ezse::MouseButton::Left);
+    runTick();
+    Check(firstSees && !tick.WasPressed(ezse::MouseButton::Left),
+          "Tick input: with two ticks in one frame only the first sees a press");
+    Check(tick.IsDown(ezse::MouseButton::Left),
+          "Tick input: a held button stays held over ticks");
+}
+
+void TestEngineInputHeadless() {
+    std::unique_ptr<ezse::Engine> engine =
+        ezse::Engine::Create({.window = std::nullopt, .ticksPerSecond = 30});
+    if (!engine) {
+        Check(false, "Engine input: a headless Engine is created");
+        return;
+    }
+    engine->Step();
+    Check(!engine->GetTickInput().WasPressed(ezse::Key::W) &&
+              !engine->GetFrameInput().IsDown(ezse::MouseButton::Left) &&
+              NearlyEqual(engine->GetTickInput().GetMouseDelta().x, 0.0f),
+          "Engine input: headless, the frame and tick input are empty");
+}
+
 int main() {
     TestModelMatrix();
     TestCameraView();
@@ -617,6 +730,9 @@ int main() {
     TestHeadlessEngine();
     TestEngineStep();
     TestHeadlessRun();
+    TestInputState();
+    TestTickInput();
+    TestEngineInputHeadless();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

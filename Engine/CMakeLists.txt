@@ -46,6 +46,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Debug/DebugUI.h
     include/EZSE/Engine/Debug/DebugWidgets.h
     include/EZSE/Engine/Engine.h
+    include/EZSE/Engine/InputState.h
     include/EZSE/Engine/Resources/Image.h
     include/EZSE/Engine/Resources/MeshData.h
     include/EZSE/Engine/Resources/Obj.h
@@ -64,6 +65,7 @@ add_library(EZSEEngine STATIC
     src/Debug/DebugUI.cpp
     src/Debug/DebugWidgets.cpp
     src/Engine.cpp
+    src/InputState.cpp
     src/Resources/Image.cpp
     src/Resources/Obj.cpp
     src/Resources/ResourceManager.cpp

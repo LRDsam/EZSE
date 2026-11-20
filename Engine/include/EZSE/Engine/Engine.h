@@ -3,6 +3,7 @@
 #include "EZSE/Core/VirtualFileSystem.h"
 
 #include "EZSE/Engine/Debug/DebugUI.h"
+#include "EZSE/Engine/InputState.h"
 #include "EZSE/Engine/Resources/ResourceManager.h"
 #include "EZSE/Engine/SimulationTime.h"
 
@@ -46,8 +47,10 @@ public:
     // Runs the game loop until Quit, or until the window is closed: with a window the screen sets
     // the pace, headless the ticks do.
     void Run();
+
     // Stops Run after the current tick or frame. Can be called from a system.
     void Quit();
+
     // Runs exactly one tick of SystemPhase::Simulation and counts it, without looking at real time.
     // Run calls it for every tick; tests (and later bots and a server inside the client) call it
     // directly. Not from inside a system: the tick would run within itself.
@@ -58,6 +61,13 @@ public:
 
     // The tick number, the length of a tick and the blend between ticks.
     const SimulationTime& GetSimulationTime() const;
+    // The input of this frame: for systems in SystemPhase::Presentation, such as looking around.
+    // Empty when headless. Presses the debug UI wants (a click on a panel) are left out.
+    const InputState& GetFrameInput() const;
+    // The input since the previous tick: for systems in SystemPhase::Simulation, such as walking.
+    // A press between two ticks is kept for the next one, and with two ticks in one frame only the
+    // first sees it. Empty when headless.
+    const InputState& GetTickInput() const;
 
     World& GetWorld();
     // The tree of virtual paths: mount at startup, before loading. Also there when running
@@ -65,8 +75,11 @@ public:
     VirtualFileSystem& GetFileSystem();
     // Only with a window: these assert when running headless.
     Window& GetWindow();
+
     Renderer& GetRenderer();
+
     ResourceManager& GetResources();
+
     DebugUI& GetDebugUI();
 
 private:
@@ -93,6 +106,11 @@ private:
     bool m_quitRequested = false;
     std::chrono::steady_clock::duration m_tickDuration;
     SimulationTime m_simulationTime;
+    // Filled each frame from the events of the window; see GetFrameInput and GetTickInput.
+    InputState m_frameInput;
+    // What happened since the previous tick; Step turns it into m_tickInput.
+    InputState m_pendingTickInput;
+    InputState m_tickInput;
 };
 
 } // namespace ezse

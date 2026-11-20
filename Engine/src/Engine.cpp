@@ -33,6 +33,20 @@ namespace {
 // The same type as the frame time, so std::min can compare them.
 constexpr std::chrono::steady_clock::duration c_maxFrameTime = std::chrono::milliseconds{250};
 
+// Whether an event goes to the input of the game. Presses and scrolling that the debug UI wants
+// (the mouse over a panel, typing in a text field) stay with the debug UI; releases always go
+// through, so nothing stays held in the game.
+bool IsForGame(const WindowEvent& event, const ImGuiIO& io) {
+    if (std::holds_alternative<MouseButtonPressed>(event) ||
+        std::holds_alternative<MouseScrolled>(event)) {
+        return !io.WantCaptureMouse;
+    }
+    if (std::holds_alternative<KeyPressed>(event)) {
+        return !io.WantCaptureKeyboard;
+    }
+    return true;
+}
+
 // What the headless loop measures; logged and cleared once per second.
 struct TickStats {
     int ticks = 0;
@@ -144,6 +158,10 @@ void Engine::Quit() {
 }
 
 void Engine::Step() {
+    // The input since the previous tick goes to this tick; the next one starts with only what is
+    // still held, so a press is seen once even when one frame runs two ticks.
+    m_tickInput = m_pendingTickInput;
+    m_pendingTickInput.ClearChanges();
     m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
     ++m_simulationTime.tick;
 }
@@ -155,6 +173,14 @@ bool Engine::IsHeadless() const {
 
 const SimulationTime& Engine::GetSimulationTime() const {
     return m_simulationTime;
+}
+
+const InputState& Engine::GetFrameInput() const {
+    return m_frameInput;
+}
+
+const InputState& Engine::GetTickInput() const {
+    return m_tickInput;
 }
 
 World& Engine::GetWorld() {
@@ -250,17 +276,28 @@ void Engine::RunWithWindow() {
 
     while (!m_quitRequested && !m_window->ShouldClose()) {
         m_window->PollEvents();
+        m_frameInput.ClearChanges();
         m_window->BeginDebugUIFrame();
         m_renderer->BeginDebugUIFrame();
+        // After NewFrame: ImGui has seen this frame's input, so WantCaptureMouse is up to date.
         ImGui::NewFrame();
+        const ImGuiIO& io = ImGui::GetIO();
         for (const WindowEvent& event : m_window->GetEvents()) {
             if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
                 if (resized->width == 0 || resized->height == 0) {
                     continue;
                 }
                 m_renderer->SetViewport(resized->width, resized->height);
+                continue;
+            }
+            if (IsForGame(event, io)) {
+                m_frameInput.Apply(event);
+                m_pendingTickInput.Apply(event);
             }
         }
+        const MouseDelta frameMouseDelta = m_window->GetMouseDelta();
+        m_frameInput.AddMouseDelta(frameMouseDelta);
+        m_pendingTickInput.AddMouseDelta(frameMouseDelta);
 
         const auto now = std::chrono::steady_clock::now();
         const std::chrono::steady_clock::duration frameTime =
