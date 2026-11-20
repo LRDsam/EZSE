@@ -279,9 +279,16 @@ void Engine::RunWithWindow() {
         m_frameInput.ClearChanges();
         m_window->BeginDebugUIFrame();
         m_renderer->BeginDebugUIFrame();
+        // A captured cursor is hidden but still moves: without this, ImGui would follow it, take
+        // the game's clicks when it is over a panel, and act on them unseen.
+        ImGuiIO& io = ImGui::GetIO();
+        if (m_window->IsCursorCaptured()) {
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        } else {
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+        }
         // After NewFrame: ImGui has seen this frame's input, so WantCaptureMouse is up to date.
         ImGui::NewFrame();
-        const ImGuiIO& io = ImGui::GetIO();
         for (const WindowEvent& event : m_window->GetEvents()) {
             if (const auto* resized = std::get_if<FramebufferResized>(&event)) {
                 if (resized->width == 0 || resized->height == 0) {

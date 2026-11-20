@@ -79,6 +79,9 @@ public:
     // so the mouse can turn without limits.
     void SetCursorCaptured(bool captured);
 
+    // Whether the cursor is captured right now (see SetCursorCaptured).
+    bool IsCursorCaptured() const;
+
     // Debug UI (Dear ImGui). InitDebugUI connects ImGui to the input of this window; call it once,
     // after ImGui::CreateContext. BeginDebugUIFrame passes input and size to ImGui, every frame.
     void InitDebugUI();

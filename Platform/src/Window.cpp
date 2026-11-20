@@ -172,6 +172,10 @@ void Window::SetCursorCaptured(bool captured) {
     glfwGetCursorPos(m_handle, &m_lastCursorX, &m_lastCursorY);
 }
 
+bool Window::IsCursorCaptured() const {
+    return glfwGetInputMode(m_handle, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+}
+
 void Window::InitDebugUI() {
     // true: ImGui installs its own GLFW callbacks and calls ours after them.
     ImGui_ImplGlfw_InitForOpenGL(m_handle, true);
