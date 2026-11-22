@@ -1,5 +1,6 @@
 #include "EZSE/Math/Quat.h"
 #include "EZSE/Math/Transform.h"
+#include "EZSE/Math/Vec2.h"
 
 #include <cmath>
 #include <iostream>
@@ -31,6 +32,10 @@ bool NearlyEqual(const ezse::Mat4& a, const ezse::Mat4& b) {
 
 bool NearlyEqual(float a, float b) {
     return std::abs(a - b) <= 0.0001f;
+}
+
+bool NearlyEqual(const ezse::Vec2& a, const ezse::Vec2& b) {
+    return std::abs(a.x - b.x) <= 0.0001f && std::abs(a.y - b.y) <= 0.0001f;
 }
 
 bool NearlyEqual(const ezse::Vec3& a, const ezse::Vec3& b) {
@@ -80,6 +85,50 @@ void TestDefaultValue() {
           "a default Mat4 has zeros off the diagonal");
     Check(NearlyEqual(identity, ezse::Mat4{}),
           "two default Mat4s are nearly equal");
+}
+
+void TestVec2Arithmetic() {
+    const ezse::Vec2 first{1.0f, 2.0f};
+    const ezse::Vec2 second{4.0f, -6.0f};
+
+    Check(NearlyEqual(first + second, ezse::Vec2{5.0f, -4.0f}),
+          "Vec2 + Vec2 adds each coordinate");
+    Check(NearlyEqual(first - second, ezse::Vec2{-3.0f, 8.0f}),
+          "Vec2 - Vec2 subtracts each coordinate");
+    Check(NearlyEqual(-first, ezse::Vec2{-1.0f, -2.0f}),
+          "-Vec2 flips the sign of each coordinate");
+    Check(NearlyEqual(first * 3.0f, ezse::Vec2{3.0f, 6.0f}),
+          "Vec2 * 3 triples each coordinate");
+    Check(NearlyEqual(first - second, first + -second),
+          "subtracting a Vec2 is adding its negation");
+}
+
+void TestVec2Dot() {
+    Check(NearlyEqual(ezse::Dot(ezse::Vec2{1.0f, 2.0f}, ezse::Vec2{4.0f, -6.0f}), -8.0f),
+          "Dot of (1, 2) and (4, -6) is -8");
+    Check(NearlyEqual(ezse::Dot(ezse::Vec2{1.0f, 0.0f}, ezse::Vec2{0.0f, 1.0f}), 0.0f),
+          "Dot of two perpendicular Vec2 is 0");
+}
+
+void TestVec2LengthAndNormalize() {
+    const float half = std::sqrt(0.5f);
+
+    Check(NearlyEqual(ezse::Length(ezse::Vec2{3.0f, 4.0f}), 5.0f),
+          "Length of (3, 4) is 5");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec2{1.0f, 1.0f}), ezse::Vec2{half, half}),
+          "Normalize of a diagonal Vec2 gives length 1 in the same direction");
+    Check(NearlyEqual(ezse::Normalize(ezse::Vec2{}), ezse::Vec2{}),
+          "Normalize of the zero Vec2 gives the zero Vec2");
+}
+
+void TestVec2Lerp() {
+    const ezse::Vec2 a{0.0f, 2.0f};
+    const ezse::Vec2 b{4.0f, -2.0f};
+
+    Check(NearlyEqual(ezse::Lerp(a, b, 0.0f), a), "Lerp of a Vec2 at 0 gives a");
+    Check(NearlyEqual(ezse::Lerp(a, b, 1.0f), b), "Lerp of a Vec2 at 1 gives b");
+    Check(NearlyEqual(ezse::Lerp(a, b, 0.25f), ezse::Vec2{1.0f, 1.0f}),
+          "Lerp of a Vec2 at 0.25 is a quarter of the way");
 }
 
 void TestVec3Add() {
@@ -698,6 +747,10 @@ void TestQuatToEuler() {
 
 int main() {
     TestDefaultValue();
+    TestVec2Arithmetic();
+    TestVec2Dot();
+    TestVec2LengthAndNormalize();
+    TestVec2Lerp();
     TestVec3Add();
     TestVec3Negate();
     TestVec3Scale();
