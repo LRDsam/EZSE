@@ -898,12 +898,15 @@ De review na fase 1 (besluiten 306 tot en met 312, zes commits R1 tot en met R6)
 branches van stap 32 tot en met 34 en van de review zijn opgeruimd, lokaal en op GitHub; alleen
 `main` is er nog.
 
-Stap 35 (invoer en de speler, fase 2 van de game) op branch `step-35-input-player`; het ontwerp
-staat in `docs/input.md` van de game. In delen: 35a muisknoppen en scroll in `Window` (af, besluit
+Stap 35 (invoer en de speler, fase 2 van de game); het ontwerp staat in `docs/input.md` van de
+game. In delen: 35a muisknoppen en scroll in `Window` (af, besluit
 313); 35b een `InputState` per frame en per tick in de `Engine` (down, pressed en released met
 tellers, opgeteld sinds de vorige tick; het vroegere 32d), met tests (af, besluiten 314 tot en met
 316); 35c Escape en de cursor (af, besluiten 317 en 318; het `CursorSystem` zelf staat in de
-game); 35d de first-person speler (in de game; `Vec2` in `Math`, besluit 319).
+game); 35d de first-person speler (af, in de game: kijken per frame, lopen per tick met een
+`PlayerCommand`; `Vec2` in `Math`, besluit 319). Stap 35 is op 22 november 2026 in `main` gemerged
+(fast-forward). Het volgende engine-werk is stap 36 (debug-draw: lijnen en boxen); eerst onderzoek
+en een voorstel, dan een branch `step-36-...` vanaf `main`.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
