@@ -4,6 +4,7 @@
 #include "EZSE/Renderer/Shader.h"
 #include "EZSE/Renderer/Texture.h"
 #include "EZSE/Renderer/Material.h"
+#include "EZSE/Renderer/LineVertex.h"
 #include "EZSE/Renderer/PointLight.h"
 #include "EZSE/Renderer/SpotLight.h"
 
@@ -89,6 +90,11 @@ public:
     void DrawShadowCaster(MeshHandle mesh, const Mat4& model);
     void EndShadowPass();
 
+    // Draws lines in the world with the camera of SetCamera, 1 pixel wide, with the depth test:
+    // vertices 0 and 1 are the first line, 2 and 3 the second, and so on. The vertices are copied,
+    // so the span may change after the call. An empty span draws nothing.
+    void DrawLines(std::span<const LineVertex> vertices);
+
     // Debug UI (Dear ImGui), drawn over the image. InitDebugUI once after ImGui::CreateContext;
     // BeginDebugUIFrame at the start of a frame; DrawDebugUI after ImGui::Render.
     void InitDebugUI();
@@ -151,6 +157,12 @@ private:
 
     // The shader of the shadow pass: only positions, writes depth
     ShaderHandle m_shadowMapShader;
+
+    // DrawLines: its shader (positions and colors, no model matrix), and one vertex buffer that is
+    // refilled every frame with the vertex array that reads it.
+    ShaderHandle m_lineShader;
+    unsigned int m_lineVertexBuffer = 0;
+    unsigned int m_lineVertexArray = 0;
 
     std::vector<GPUMesh> m_gpuMeshes;
     std::vector<GPUShader> m_gpuShaders;

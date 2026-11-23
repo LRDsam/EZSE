@@ -52,6 +52,33 @@ constexpr std::string_view c_shadowFragmentSource = R"(
 
 void main() {}
 )";
+// The lines of DrawLines are already in world space: no model matrix, only the camera.
+constexpr std::string_view c_lineVertexSource = R"(
+#version 460 core
+
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+
+layout(std140, binding = 0) uniform Camera { mat4 u_viewProjection; };
+
+out vec3 color;
+
+void main() {
+    gl_Position = u_viewProjection * vec4(a_position, 1.0);
+    color = a_color;
+}
+)";
+constexpr std::string_view c_lineFragmentSource = R"(
+#version 460 core
+
+in vec3 color;
+
+out vec4 fragColor;
+
+void main() {
+    fragColor = vec4(color, 1.0);
+}
+)";
 
 const char* GetString(GLenum name) {
     return reinterpret_cast<const char*>(glGetString(name));
@@ -234,6 +261,32 @@ std::unique_ptr<Renderer> Renderer::Create(GLLoadFunction loadFunction) {
     renderer->m_shadowMapShader = renderer->CreateShader(c_shadowVertexSource, c_shadowFragmentSource);
     if (renderer->m_shadowMapShader.id == 0) {
         LogError("Failed to create the shadow map shader");
+        return nullptr;
+    }
+
+    // The lines of DrawLines: one buffer, refilled every frame. Made with glNamedBufferData and not
+    // glNamedBufferStorage, whose size is fixed: the number of lines changes every frame.
+    glCreateBuffers(1, &renderer->m_lineVertexBuffer);
+    glNamedBufferData(renderer->m_lineVertexBuffer, 0, nullptr, GL_STREAM_DRAW);
+
+    // How the shader reads a LineVertex: position on location 0, color on location 1. No index
+    // buffer: every two vertices are one line, nothing is shared.
+    glCreateVertexArrays(1, &renderer->m_lineVertexArray);
+    glVertexArrayVertexBuffer(renderer->m_lineVertexArray, 0, renderer->m_lineVertexBuffer, 0,
+                              sizeof(LineVertex));
+    glVertexArrayAttribFormat(renderer->m_lineVertexArray, 0, 3, GL_FLOAT, GL_FALSE,
+                              offsetof(LineVertex, position));
+    glVertexArrayAttribFormat(renderer->m_lineVertexArray, 1, 3, GL_FLOAT, GL_FALSE,
+                              offsetof(LineVertex, color));
+    glEnableVertexArrayAttrib(renderer->m_lineVertexArray, 0);
+    glEnableVertexArrayAttrib(renderer->m_lineVertexArray, 1);
+    glVertexArrayAttribBinding(renderer->m_lineVertexArray, 0, 0);
+    glVertexArrayAttribBinding(renderer->m_lineVertexArray, 1, 0);
+
+    // The shader of DrawLines.
+    renderer->m_lineShader = renderer->CreateShader(c_lineVertexSource, c_lineFragmentSource);
+    if (renderer->m_lineShader.id == 0) {
+        LogError("Failed to create the line shader");
         return nullptr;
     }
 
@@ -565,6 +618,21 @@ void Renderer::EndShadowPass() {
     glEnable(GL_CULL_FACE);
 }
 
+void Renderer::DrawLines(std::span<const LineVertex> vertices) {
+    if (vertices.empty()) {
+        return;
+    }
+    EZSE_ASSERT(vertices.size() % 2 == 0, "DrawLines needs two vertices per line");
+
+    // A new size each frame; the driver may give fresh memory while the GPU still draws the old.
+    glNamedBufferData(m_lineVertexBuffer, static_cast<GLsizeiptr>(vertices.size_bytes()),
+                      vertices.data(), GL_STREAM_DRAW);
+    // The camera is in the uniform buffer of SetCamera and the depth test is on since Create.
+    glUseProgram(GetGPUShader(m_lineShader).shaderProgram);
+    glBindVertexArray(m_lineVertexArray);
+    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(vertices.size()));
+}
+
 void Renderer::InitDebugUI() {
     ImGui_ImplOpenGL3_Init("#version 460");
 }
@@ -612,6 +680,8 @@ Renderer::~Renderer() {
     glDeleteFramebuffers(1, &m_shadowFramebuffer);
     glDeleteTextures(1, &m_shadowMap);
     glDeleteSamplers(1, &m_shadowSampler);
+    glDeleteBuffers(1, &m_lineVertexBuffer);
+    glDeleteVertexArrays(1, &m_lineVertexArray);
 }
 
 } // namespace ezse

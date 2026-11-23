@@ -1,4 +1,5 @@
 add_library(EZSERenderer STATIC
+    include/EZSE/Renderer/LineVertex.h
     include/EZSE/Renderer/Mesh.h
     include/EZSE/Renderer/Material.h
     include/EZSE/Renderer/PointLight.h
