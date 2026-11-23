@@ -915,8 +915,10 @@ game); 35d de first-person speler (af, in de game: kijken per frame, lopen per t
 (fast-forward).
 
 Stap 36 (debug-draw, fase 2 van de game) op branch `step-36-debug-draw`; onderzoek en aanpak in
-besluiten 320 tot en met 326, en in `docs/physics.md` van de game. In delen: **36a**
-`Renderer::DrawLines`; 36b `DebugDraw` met lijnen, de levensduur en de `Engine`; 36c box en bol;
+besluiten 320 tot en met 326, en in `docs/physics.md` van de game. In delen: 36a
+`Renderer::DrawLines` (af); 36b `DebugDraw` met lijnen, de levensduur en de `Engine` (af: drie
+lijsten voor frame, tick en tijd, `BeginTick`/`EndTick` om de tick, `EndFrame` na `Presentation`,
+het `DebugDrawSystem` na het `RenderSystem`, `TestDebugDraw` met 10 checks); **36c** box en bol;
 36d Sandbox laat alles zien.
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen

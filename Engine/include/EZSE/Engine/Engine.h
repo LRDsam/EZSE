@@ -2,6 +2,7 @@
 
 #include "EZSE/Core/VirtualFileSystem.h"
 
+#include "EZSE/Engine/Debug/DebugDraw.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/InputState.h"
 #include "EZSE/Engine/Resources/ResourceManager.h"
@@ -73,6 +74,9 @@ public:
     // The tree of virtual paths: mount at startup, before loading. Also there when running
     // headless, because the server reads data too.
     VirtualFileSystem& GetFileSystem();
+    // Lines to see what the game does. Also there when running headless, where it draws nothing,
+    // so the simulation can call it on a server too (decision 322).
+    DebugDraw& GetDebugDraw();
     // Only with a window: these assert when running headless.
     Window& GetWindow();
 
@@ -102,6 +106,8 @@ private:
     // Empty when running headless: it uploads to the GPU through the Renderer.
     std::optional<ResourceManager> m_resources;
     DebugUI m_debugUI;
+    // Enabled only with a window; declared after m_window, which the constructor reads for it.
+    DebugDraw m_debugDraw;
     World m_world;
     bool m_quitRequested = false;
     std::chrono::steady_clock::duration m_tickDuration;

@@ -7,6 +7,7 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
 #include "EZSE/Engine/Systems/CameraSystem.h"
+#include "EZSE/Engine/Systems/DebugDrawSystem.h"
 #include "EZSE/Engine/Systems/LightSystem.h"
 #include "EZSE/Engine/Systems/RenderSystem.h"
 #include "EZSE/Engine/Systems/TransformHistorySystem.h"
@@ -112,6 +113,9 @@ Engine::Engine(std::unique_ptr<Window> window, std::unique_ptr<Renderer> rendere
                const EngineDesc& desc)
     : m_window(std::move(window)),
       m_renderer(std::move(renderer)),
+      // m_window is declared before m_debugDraw, so it is already set here; the parameter window
+      // is not: it was moved into m_window.
+      m_debugDraw(m_window != nullptr),
       // Create has checked that ticksPerSecond is higher than 0.
       m_tickDuration(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                          std::chrono::seconds{1}) / desc.ticksPerSecond),
@@ -162,7 +166,10 @@ void Engine::Step() {
     // still held, so a press is seen once even when one frame runs two ticks.
     m_tickInput = m_pendingTickInput;
     m_pendingTickInput.ClearChanges();
+    // Lines drawn during the tick stay until the next tick (decision 321).
+    m_debugDraw.BeginTick();
     m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
+    m_debugDraw.EndTick();
     ++m_simulationTime.tick;
 }
 
@@ -211,6 +218,10 @@ DebugUI& Engine::GetDebugUI() {
     return m_debugUI;
 }
 
+DebugDraw& Engine::GetDebugDraw() {
+    return m_debugDraw;
+}
+
 void Engine::InitPresentation(const EngineDesc& desc) {
     // PostUpdate computes the WorldMatrix after the game changed this frame, before drawing.
     m_world.AddSystem<WorldMatrixSystem>(PresentationGroup::PostUpdate,
@@ -218,7 +229,8 @@ void Engine::InitPresentation(const EngineDesc& desc) {
                                          m_simulationTime);
     // Render, in the order of adding: the camera and the lights first, because the RenderSystem
     // draws with what they hand to the Renderer in the same frame (the view, the lights and the
-    // shadow matrix).
+    // shadow matrix). The debug lines last, over the meshes, so the depth test can hide a line
+    // behind a wall.
     m_world.AddSystem<CameraSystem>(PresentationGroup::Render,
                                     MakeSignature<WorldMatrix, Camera>(),
                                     *m_window,
@@ -231,6 +243,10 @@ void Engine::InitPresentation(const EngineDesc& desc) {
                                     MakeSignature<WorldMatrix, MeshRenderer>(),
                                     *m_renderer,
                                     desc.clearColor);
+    m_world.AddSystem<DebugDrawSystem>(PresentationGroup::Render,
+                                       MakeSignature<>(),
+                                       *m_renderer,
+                                       m_debugDraw);
 
     ImGui::CreateContext();
     // No imgui.ini with window positions in the working folder.
@@ -322,7 +338,10 @@ void Engine::RunWithWindow() {
         m_simulationTime.alpha = std::chrono::duration<float>(accumulator) /
                                  std::chrono::duration<float>(m_tickDuration);
 
-        m_world.Update(SystemPhase::Presentation, std::chrono::duration<float>(frameTime).count());
+        const float frameSeconds = std::chrono::duration<float>(frameTime).count();
+        m_world.Update(SystemPhase::Presentation, frameSeconds);
+        // After the DebugDrawSystem has drawn: the lines of this frame go, timed lines count down.
+        m_debugDraw.EndFrame(frameSeconds);
 
         m_debugUI.Draw(m_world);
         ImGui::Render();

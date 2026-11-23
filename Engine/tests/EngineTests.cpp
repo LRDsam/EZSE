@@ -4,6 +4,7 @@
 #include "EZSE/Engine/Components/PreviousTransform.h"
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
+#include "EZSE/Engine/Debug/DebugDraw.h"
 #include "EZSE/Engine/Engine.h"
 #include "EZSE/Engine/InputState.h"
 #include "EZSE/Engine/Resources/Image.h"
@@ -716,6 +717,89 @@ void TestEngineInputHeadless() {
           "Engine input: headless, the frame and tick input are empty");
 }
 
+// The lifetime of debug lines (decision 321), without an Engine or a Renderer.
+void TestDebugDraw() {
+    const auto countVertices = [](const ezse::DebugDraw& debugDraw) {
+        std::vector<ezse::LineVertex> vertices;
+        debugDraw.CollectVertices(vertices);
+        return vertices.size();
+    };
+    const ezse::Vec3 from{0.0f, 0.0f, 0.0f};
+    const ezse::Vec3 to{0.0f, 1.0f, 0.0f};
+    const ezse::Vec3 green{0.0f, 1.0f, 0.0f};
+
+    // A line from a tick stays until the next tick, also over frames without a tick.
+    {
+        ezse::DebugDraw debugDraw{true};
+        debugDraw.BeginTick();
+        debugDraw.DrawLine(from, to, green);
+        debugDraw.EndTick();
+        Check(countVertices(debugDraw) == 2, "DebugDraw: a line from a tick has two vertices");
+        debugDraw.EndFrame(0.016f);
+        Check(countVertices(debugDraw) == 2,
+              "DebugDraw: a line from a tick stays after the end of the frame");
+        debugDraw.BeginTick();
+        debugDraw.EndTick();
+        Check(countVertices(debugDraw) == 0,
+              "DebugDraw: a line from a tick is gone after the next tick");
+    }
+
+    // A line from a frame stays only that frame.
+    {
+        ezse::DebugDraw debugDraw{true};
+        debugDraw.DrawLine(from, to, green);
+        Check(countVertices(debugDraw) == 2, "DebugDraw: a line from a frame has two vertices");
+        debugDraw.EndFrame(0.016f);
+        Check(countVertices(debugDraw) == 0, "DebugDraw: a line from a frame is gone after it");
+    }
+
+    // A timed line counts down with the frame time, also across ticks.
+    {
+        ezse::DebugDraw debugDraw{true};
+        debugDraw.BeginTick();
+        debugDraw.DrawLine(from, to, green, 0.5f);
+        debugDraw.EndTick();
+        debugDraw.EndFrame(0.3f);
+        debugDraw.BeginTick();
+        debugDraw.EndTick();
+        Check(countVertices(debugDraw) == 2,
+              "DebugDraw: a line of 0.5 s stays after 0.3 s and a new tick");
+        debugDraw.EndFrame(0.3f);
+        Check(countVertices(debugDraw) == 0, "DebugDraw: a line of 0.5 s is gone after 0.6 s");
+    }
+
+    // All three kinds at once are collected together.
+    {
+        ezse::DebugDraw debugDraw{true};
+        debugDraw.DrawLine(from, to, green);
+        debugDraw.DrawLine(from, to, green, 1.0f);
+        debugDraw.BeginTick();
+        debugDraw.DrawLine(from, to, green);
+        debugDraw.EndTick();
+        Check(countVertices(debugDraw) == 6, "DebugDraw: lines of all three kinds are collected");
+    }
+
+    // Disabled (headless): nothing is kept.
+    {
+        ezse::DebugDraw debugDraw{false};
+        debugDraw.DrawLine(from, to, green);
+        debugDraw.DrawLine(from, to, green, 1.0f);
+        Check(countVertices(debugDraw) == 0, "DebugDraw: a disabled DebugDraw keeps nothing");
+    }
+
+    // A headless Engine has one, disabled, so the simulation can draw without checking.
+    {
+        std::unique_ptr<ezse::Engine> engine = ezse::Engine::Create({.window = std::nullopt});
+        if (engine) {
+            engine->GetDebugDraw().DrawLine(from, to, green);
+            Check(countVertices(engine->GetDebugDraw()) == 0,
+                  "DebugDraw: the DebugDraw of a headless Engine draws nothing");
+        } else {
+            Check(false, "DebugDraw: a headless Engine can be created");
+        }
+    }
+}
+
 int main() {
     TestModelMatrix();
     TestCameraView();
@@ -733,6 +817,7 @@ int main() {
     TestInputState();
     TestTickInput();
     TestEngineInputHeadless();
+    TestDebugDraw();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

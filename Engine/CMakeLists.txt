@@ -43,6 +43,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Components/Transform.h
     include/EZSE/Engine/Components/WorldMatrix.h
     include/EZSE/Engine/Debug/ComponentEditors.h
+    include/EZSE/Engine/Debug/DebugDraw.h
     include/EZSE/Engine/Debug/DebugUI.h
     include/EZSE/Engine/Debug/DebugWidgets.h
     include/EZSE/Engine/Engine.h
@@ -54,6 +55,7 @@ add_library(EZSEEngine STATIC
     include/EZSE/Engine/Resources/ResourceManager.h
     include/EZSE/Engine/SimulationTime.h
     include/EZSE/Engine/Systems/CameraSystem.h
+    include/EZSE/Engine/Systems/DebugDrawSystem.h
     include/EZSE/Engine/Systems/LightSystem.h
     include/EZSE/Engine/Systems/RenderSystem.h
     include/EZSE/Engine/Systems/TransformHistorySystem.h
@@ -62,6 +64,7 @@ add_library(EZSEEngine STATIC
     src/Components/Transform.cpp
     src/Components/WorldMatrix.cpp
     src/Debug/ComponentEditors.cpp
+    src/Debug/DebugDraw.cpp
     src/Debug/DebugUI.cpp
     src/Debug/DebugWidgets.cpp
     src/Engine.cpp
@@ -70,6 +73,7 @@ add_library(EZSEEngine STATIC
     src/Resources/Obj.cpp
     src/Resources/ResourceManager.cpp
     src/Systems/CameraSystem.cpp
+    src/Systems/DebugDrawSystem.cpp
     src/Systems/LightSystem.cpp
     src/Systems/RenderSystem.cpp
     src/Systems/TransformHistorySystem.cpp
