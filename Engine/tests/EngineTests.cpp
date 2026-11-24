@@ -779,11 +779,81 @@ void TestDebugDraw() {
         Check(countVertices(debugDraw) == 6, "DebugDraw: lines of all three kinds are collected");
     }
 
+    // A box is 12 edges along the axes: every end is a corner, every corner has three edges, and
+    // every edge changes only one coordinate (a diagonal would change two or three).
+    {
+        ezse::DebugDraw debugDraw{true};
+        const ezse::Vec3 center{1.0f, 2.0f, 3.0f};
+        const ezse::Vec3 halfExtents{0.5f, 1.0f, 2.0f};
+        debugDraw.DrawBox(center, halfExtents, green);
+        std::vector<ezse::LineVertex> vertices;
+        debugDraw.CollectVertices(vertices);
+        Check(vertices.size() == 24, "DebugDraw: a box has 12 lines");
+
+        const auto isCorner = [&](const ezse::Vec3& p) {
+            return NearlyEqual(std::abs(p.x - center.x), halfExtents.x) &&
+                   NearlyEqual(std::abs(p.y - center.y), halfExtents.y) &&
+                   NearlyEqual(std::abs(p.z - center.z), halfExtents.z);
+        };
+        // The corner as a number from 0 to 7: one bit per axis, set on the positive side.
+        const auto cornerIndex = [&](const ezse::Vec3& p) {
+            return (p.x > center.x ? 1 : 0) | (p.y > center.y ? 2 : 0) | (p.z > center.z ? 4 : 0);
+        };
+        bool allCorners = true;
+        bool allAlongAnAxis = true;
+        int edgesPerCorner[8] = {};
+        for (std::size_t i = 0; i + 1 < vertices.size(); i += 2) {
+            const ezse::Vec3& start = vertices[i].position;
+            const ezse::Vec3& end = vertices[i + 1].position;
+            allCorners = allCorners && isCorner(start) && isCorner(end);
+            const int changed = (NearlyEqual(start.x, end.x) ? 0 : 1) +
+                                (NearlyEqual(start.y, end.y) ? 0 : 1) +
+                                (NearlyEqual(start.z, end.z) ? 0 : 1);
+            allAlongAnAxis = allAlongAnAxis && changed == 1;
+            ++edgesPerCorner[cornerIndex(start)];
+            ++edgesPerCorner[cornerIndex(end)];
+        }
+        bool threePerCorner = true;
+        for (int edges : edgesPerCorner) {
+            threePerCorner = threePerCorner && edges == 3;
+        }
+        Check(allCorners, "DebugDraw: every end of a box line is a corner");
+        Check(allAlongAnAxis, "DebugDraw: every box line runs along one axis");
+        Check(threePerCorner, "DebugDraw: every corner of a box has three lines");
+    }
+
+    // A sphere is three rings: every end lies at the radius from the center, in one of the
+    // planes XY, XZ or YZ through it.
+    {
+        ezse::DebugDraw debugDraw{true};
+        const ezse::Vec3 center{1.0f, 2.0f, 3.0f};
+        const float radius = 1.5f;
+        debugDraw.DrawSphere(center, radius, green);
+        std::vector<ezse::LineVertex> vertices;
+        debugDraw.CollectVertices(vertices);
+        Check(vertices.size() == 3 * ezse::DebugDraw::c_sphereSegments * 2,
+              "DebugDraw: a sphere has three rings of c_sphereSegments lines");
+
+        bool allOnTheSphere = true;
+        bool allInARing = true;
+        for (const ezse::LineVertex& vertex : vertices) {
+            const ezse::Vec3 offset = vertex.position - center;
+            allOnTheSphere = allOnTheSphere && NearlyEqual(ezse::Length(offset), radius);
+            allInARing = allInARing && (NearlyEqual(offset.x, 0.0f) ||
+                                        NearlyEqual(offset.y, 0.0f) ||
+                                        NearlyEqual(offset.z, 0.0f));
+        }
+        Check(allOnTheSphere, "DebugDraw: every end of a sphere line lies at the radius");
+        Check(allInARing, "DebugDraw: every end of a sphere line lies in the plane of a ring");
+    }
+
     // Disabled (headless): nothing is kept.
     {
         ezse::DebugDraw debugDraw{false};
         debugDraw.DrawLine(from, to, green);
         debugDraw.DrawLine(from, to, green, 1.0f);
+        debugDraw.DrawBox(from, to, green);
+        debugDraw.DrawSphere(from, 1.0f, green);
         Check(countVertices(debugDraw) == 0, "DebugDraw: a disabled DebugDraw keeps nothing");
     }
 

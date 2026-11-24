@@ -13,12 +13,24 @@ namespace ezse {
 // nothing, so the same code runs on a server.
 class DebugDraw {
 public:
+    // The number of pieces in each ring of DrawSphere.
+    static constexpr int c_sphereSegments = 24;
+
     // enabled: false when running headless; then every Draw call returns at once.
     explicit DebugDraw(bool enabled);
 
     // duration 0: from a tick it stays until the next tick, from a frame only this frame.
     // A longer duration is in seconds of real time.
     void DrawLine(const Vec3& from, const Vec3& to, const Vec3& color, float duration = 0.0f);
+
+    // A box along the axes: 12 lines around center, reaching halfExtents from it on each axis
+    // (so the box is twice as large). Rotated boxes come when step 37 needs them.
+    void DrawBox(const Vec3& center, const Vec3& halfExtents, const Vec3& color,
+                 float duration = 0.0f);
+
+    // A sphere as a wire model: three rings of c_sphereSegments pieces each, in the planes XY, XZ
+    // and YZ through center.
+    void DrawSphere(const Vec3& center, float radius, const Vec3& color, float duration = 0.0f);
 
     // For the Engine: around each tick, and once at the end of each frame.
     void BeginTick();
