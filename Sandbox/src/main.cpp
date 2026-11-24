@@ -5,6 +5,7 @@
 #include "EZSE/Engine/Components/Transform.h"
 #include "EZSE/Engine/Components/WorldMatrix.h"
 #include "EZSE/Engine/Engine.h"
+#include "EZSE/Engine/Debug/DebugDraw.h"
 #include "EZSE/Engine/Debug/DebugUI.h"
 #include "EZSE/Engine/Debug/DebugWidgets.h"
 #include "EZSE/Engine/Debug/ComponentEditors.h"
@@ -194,6 +195,46 @@ void TickLogSystem::Update(ezse::World& world, float) {
     }
 }
 
+// Shows what DebugDraw can do (step 36d): the axes on the floor, a box around one entity and a
+// sphere at a lamp, which has no mesh of its own. Drawn every frame with duration 0, from the
+// Transforms of this frame, so the shapes follow when an entity is moved in the debug UI.
+class DebugShapesSystem : public ezse::System {
+public:
+    DebugShapesSystem(ezse::DebugDraw& debugDraw, ezse::Entity boxed, ezse::Entity lamp);
+
+protected:
+    void Update(ezse::World& world, float deltaTime) override;
+
+private:
+    ezse::DebugDraw& m_debugDraw;
+    ezse::Entity m_boxed;
+    ezse::Entity m_lamp;
+};
+
+DebugShapesSystem::DebugShapesSystem(ezse::DebugDraw& debugDraw, ezse::Entity boxed,
+                                     ezse::Entity lamp) :
+    m_debugDraw(debugDraw), m_boxed(boxed), m_lamp(lamp) {}
+
+void DebugShapesSystem::Update(ezse::World& world, float) {
+    // The directions of the world axes, one meter each, in the usual colors: X red, Y green,
+    // Z blue. On the floor between the monkey and the middle cube instead of at the origin, which
+    // is at the height of the camera. Just above the floor (at y = -2.5), so the X and Z lines do
+    // not fight with it for the depth.
+    const ezse::Vec3 origin{-1.0f, -2.49f, 1.5f};
+    m_debugDraw.DrawLine(origin, origin + ezse::Vec3{1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f});
+    m_debugDraw.DrawLine(origin, origin + ezse::Vec3{0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
+    m_debugDraw.DrawLine(origin, origin + ezse::Vec3{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f});
+
+    // A little larger than the cube of 1 meter: lines exactly on its faces would fight with them
+    // for the depth (decision 325) and flicker.
+    const ezse::Vec3& boxedPosition = world.GetComponent<ezse::Transform>(m_boxed).position;
+    m_debugDraw.DrawBox(boxedPosition, {0.51f, 0.51f, 0.51f}, {1.0f, 1.0f, 1.0f});
+
+    // A small sphere in the color of the light marks where the lamp is.
+    const ezse::Vec3& lampPosition = world.GetComponent<ezse::Transform>(m_lamp).position;
+    m_debugDraw.DrawSphere(lampPosition, 0.2f, world.GetComponent<ezse::Light>(m_lamp).color);
+}
+
 // Draws the Transform (not for ambient light, which has no place or direction) and the Light of
 // one entity in the debug UI, under a heading.
 void DebugLight(const char* label, ezse::Entity entity, ezse::World& world) {
@@ -354,6 +395,12 @@ void CreatePresentation(ezse::Engine& engine, ezse::Entity monkey) {
     world.AddSystem<CameraControlSystem>(ezse::PresentationGroup::Update,
                                          ezse::MakeSignature<ezse::Transform, CameraController>(),
                                          engine.GetWindow(), engine);
+    // Shows the shapes of DebugDraw; the DebugDrawSystem of the Engine draws them.
+    world.AddSystem<DebugShapesSystem>(ezse::PresentationGroup::Update,
+                                       ezse::MakeSignature<>(),
+                                       engine.GetDebugDraw(),
+                                       orangeCube,
+                                       lamp);
     // The camera, the lights and drawing are added by the Engine itself
     // (PresentationGroup::Render).
 

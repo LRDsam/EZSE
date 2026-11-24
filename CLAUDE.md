@@ -494,6 +494,7 @@ Regels die de Renderer herbruikbaar houden:
 | 325 | Diepte (stap 36) | met de dieptetest, zodat een lijn achter een muur verborgen is en je ziet waar hij in de wereld ligt. Een keuze per aanroep (zoals `depthTest` in Unity) pas bij aanleiding |
 | 326 | Opdeling en controle van stap 36 | 36a `Renderer::DrawLines`; 36b `DebugDraw` met lijnen, de levensduur en de `Engine` (getter, headless niets, `DebugDrawSystem`); 36c box en bol; 36d Sandbox: de assen op de oorsprong in rood, groen en blauw, een box om de oranje kubus en een bol om een lamp. De game gebruikt het pas in stap 37 (waar een raycast raakt). Tests in `EngineTests` met een `DebugDraw` los van de `Engine`, zonder Renderer: de levensduur en het aantal lijnen per vorm |
 | 327 | Box en bol (stap 36c) | `DrawBox` en `DrawSphere` bouwen op `DrawLine` en stoppen meteen als `DebugDraw` uit staat (headless). De box rekent een laagste en hoogste hoek (`center ∓ halfExtents`) en neemt elke hoek daaruit. De bol tekent zijn drie ringen in één lus: elk punt is `center + a·cos + b·sin` voor twee assen ter grootte van de straal, zodat cos en sin per hoek één keer berekend worden (24 keer in plaats van 72). `c_sphereSegments = 24` is een public `static constexpr` member van `DebugDraw`, zodat tests het aantal lijnen ermee kunnen uitrekenen. Tests: de box geeft 12 lijnen, elk einde is een hoek, elke lijn verandert één coördinaat (geen diagonaal) en elke hoek heeft er drie; de bol geeft `3 * c_sphereSegments` lijnen met elk einde op de straal en in het vlak van een ring; uitgeschakeld geven beide niets |
+| 328 | Debug-draw in Sandbox (stap 36d, door Claude geschreven: Sandbox is het testprogramma) | een `DebugShapesSystem` in `PresentationGroup::Update` met een lege signature, dat elk frame met duration 0 tekent: de richtingen van de assen (1 meter, X rood, Y groen, Z blauw) op de vloer tussen de aap en de middelste kubus, net boven de vloer tegen z-fighting; niet op de oorsprong, want die ligt op de hoogte van de camera, een witte box om de oranje kubus en een bol van 0,2 meter in de kleur van het licht om de warme lamp. De posities komen elk frame uit de `Transform`, zodat de vormen meeschuiven als je ze in het debug-paneel verplaatst. De box is 0,51 in plaats van 0,5: lijnen precies op de vlakken van de kubus vechten om de diepte (besluit 325). Afgewezen: één keer tekenen met een heel lange duration (een verplaatste vorm laat zijn oude lijnen staan) en een bol ter grootte van de `range` (vult bijna de kamer) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -916,12 +917,12 @@ game); 35d de first-person speler (af, in de game: kijken per frame, lopen per t
 (fast-forward).
 
 Stap 36 (debug-draw, fase 2 van de game) op branch `step-36-debug-draw`; onderzoek en aanpak in
-besluiten 320 tot en met 327, en in `docs/physics.md` van de game. In delen: 36a
+besluiten 320 tot en met 328, en in `docs/physics.md` van de game. In delen: 36a
 `Renderer::DrawLines` (af); 36b `DebugDraw` met lijnen, de levensduur en de `Engine` (af: drie
 lijsten voor frame, tick en tijd, `BeginTick`/`EndTick` om de tick, `EndFrame` na `Presentation`,
 het `DebugDrawSystem` na het `RenderSystem`, `TestDebugDraw` met 10 checks); 36c box en
-bol (af, besluit 327: `DrawBox` en `DrawSphere` op `DrawLine`, 7 checks erbij); **36d** Sandbox
-laat alles zien.
+bol (af, besluit 327: `DrawBox` en `DrawSphere` op `DrawLine`, 7 checks erbij); 36d Sandbox
+laat alles zien (af, besluit 328: een `DebugShapesSystem`).
 
 Het render-werk (de schaduwen verbeteren en andere punten uit Daarna) loopt parallel door op eigen
 branches `render-...`, met stapnummers vanaf 40; zie "Branches" onder Werkwijze.
