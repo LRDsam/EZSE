@@ -5,6 +5,7 @@ add_library(EZSEECS STATIC
     include/EZSE/ECS/Entity.h
     include/EZSE/ECS/EntityManager.h
     include/EZSE/ECS/EntitySet.h
+    include/EZSE/ECS/Resource.h
     include/EZSE/ECS/Signature.h
     include/EZSE/ECS/System.h
     include/EZSE/ECS/SystemManager.h

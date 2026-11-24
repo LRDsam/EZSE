@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -759,6 +760,106 @@ void TestWorldUpdateGroups() {
           "order of adding");
 }
 
+// A resource with constructor arguments that cannot be copied, as the PhysicsScene will be: it
+// must be built in place from the arguments of AddResource.
+class NamedScene {
+public:
+    NamedScene(float cellSize, std::string name) : cellSize(cellSize), name(std::move(name)) {}
+    NamedScene(const NamedScene&) = delete;
+    NamedScene& operator=(const NamedScene&) = delete;
+
+    float cellSize;
+    std::string name;
+};
+
+// Writes "resource" to a log when it is destroyed.
+struct LoggedResource {
+    explicit LoggedResource(std::vector<std::string>& log) : log(log) {}
+    ~LoggedResource() { log.push_back("resource"); }
+    LoggedResource(const LoggedResource&) = delete;
+    LoggedResource& operator=(const LoggedResource&) = delete;
+
+    std::vector<std::string>& log;
+};
+
+// Keeps a reference to a resource, as systems will, and writes "system" to the log when it is
+// destroyed; the resource must still be there then.
+class ResourceUsingSystem : public ezse::System {
+public:
+    ResourceUsingSystem(LoggedResource& resource, std::vector<std::string>& log)
+        : m_resource(resource), m_log(log) {}
+    ~ResourceUsingSystem() override { m_log.push_back("system"); }
+
+protected:
+    void Update(ezse::World&, float) override {}
+
+private:
+    LoggedResource& m_resource;
+    std::vector<std::string>& m_log;
+};
+
+void TestWorldResources() {
+    // One object per type: what AddResource returns is what GetResource gives, and a change
+    // through the reference stays.
+    {
+        ezse::World world;
+        int& added = world.AddResource<int>(5);
+        Check(world.GetResource<int>() == 5, "World resources: GetResource gives the added value");
+        added = 7;
+        Check(world.GetResource<int>() == 7,
+              "World resources: a change through the reference stays");
+        Check(&world.GetResource<int>() == &added,
+              "World resources: GetResource gives the same object as AddResource");
+    }
+
+    // HasResource, and a second type with its own object.
+    {
+        ezse::World world;
+        Check(!world.HasResource<int>(), "World resources: HasResource is false before adding");
+        world.AddResource<int>(3);
+        Check(world.HasResource<int>(), "World resources: HasResource is true after adding");
+        Check(!world.HasResource<float>(), "World resources: another type is not there yet");
+        world.AddResource<float>(1.5f);
+        Check(world.GetResource<int>() == 3 && world.GetResource<float>() == 1.5f,
+              "World resources: two types each keep their own object");
+    }
+
+    // The arguments are passed on to the constructor, also for a type that cannot be copied, and
+    // a reference stays valid when more resources are added after it.
+    {
+        ezse::World world;
+        NamedScene& scene = world.AddResource<NamedScene>(4.0f, std::string("physics"));
+        Check(scene.cellSize == 4.0f && scene.name == "physics",
+              "World resources: AddResource builds the object from its arguments");
+        world.AddResource<int>(1);
+        world.AddResource<float>(2.0f);
+        world.AddResource<std::string>("more");
+        Check(&world.GetResource<NamedScene>() == &scene && scene.name == "physics",
+              "World resources: a reference stays valid when more resources are added");
+    }
+
+    // Each World has its own resources.
+    {
+        ezse::World first;
+        ezse::World second;
+        first.AddResource<int>(1);
+        Check(!second.HasResource<int>(), "World resources: another World has its own resources");
+    }
+
+    // The systems are destroyed before the resources they keep references to.
+    std::vector<std::string> log;
+    {
+        ezse::World world;
+        LoggedResource& resource = world.AddResource<LoggedResource>(log);
+        world.AddSystem<ResourceUsingSystem>(ezse::SimulationGroup::Update,
+                                             ezse::MakeSignature<>(),
+                                             resource,
+                                             log);
+    }
+    Check(log == std::vector<std::string>{"system", "resource"},
+          "World resources: the systems are destroyed before the resources");
+}
+
 } // namespace
 
 int main() {
@@ -797,6 +898,7 @@ int main() {
     TestWorldUpdatePhases();
     TestSystemManagerGroupsEntities();
     TestWorldUpdateGroups();
+    TestWorldResources();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

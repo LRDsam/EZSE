@@ -3,6 +3,7 @@
 #include "EZSE/ECS/ComponentManager.h"
 #include "EZSE/ECS/Entity.h"
 #include "EZSE/ECS/EntityManager.h"
+#include "EZSE/ECS/Resource.h"
 #include "EZSE/ECS/Signature.h"
 #include "EZSE/ECS/SystemManager.h"
 #include "EZSE/ECS/SystemPhase.h"
@@ -10,7 +11,9 @@
 #include "EZSE/Core/Assert.h"
 
 #include <cstdint>
+#include <memory>
 #include <utility>
+#include <vector>
 
 namespace ezse {
 
@@ -46,6 +49,13 @@ public:
     template <typename T, typename... Args>
     T& AddSystem(PresentationGroup group, Signature signature, Args&&... args);
 
+    // Makes the one object of type T from args; the World owns it and destroys it after all
+    // systems. Once per type (asserts). The reference stays valid as long as the World.
+    template <typename T, typename... Args> T& AddResource(Args&&... args);
+    // The resource must exist (asserts). Look it up once, when adding a system.
+    template <typename T> T& GetResource();
+    template <typename T> bool HasResource() const;
+
     // Runs the systems of one phase, group after group. The Engine calls it: Simulation once per
     // tick, Presentation once per frame.
     void Update(SystemPhase systemPhase, float deltaTime);
@@ -54,6 +64,9 @@ private:
     // Gives a system that was just added every living entity that matches its signature.
     void AddExistingEntities(System& system);
 
+    // Declared before the systems, so it is destroyed after them: systems keep references to
+    // resources (decision 332).
+    std::vector<std::unique_ptr<IResource>> m_resources; // index: ResourceType<T>(), may hold nulls
     EntityManager m_entities;
     ComponentManager m_components;
     SystemManager m_systems;
@@ -107,6 +120,33 @@ T& World::AddSystem(PresentationGroup group, Signature signature, Args&&... args
                                  std::forward<Args>(args)...);
     AddExistingEntities(system);
     return system;
+}
+
+template <typename T, typename... Args>
+T& World::AddResource(Args&&... args) {
+    const std::uint32_t type = ResourceType<T>();
+    if (type >= m_resources.size()) {
+        m_resources.resize(type + 1);
+    }
+    EZSE_ASSERT(m_resources[type] == nullptr, "Cannot add the same resource type twice");
+    auto resource = std::make_unique<Resource<T>>(std::forward<Args>(args)...);
+    // The object stays where it is when the unique_ptr moves into the vector.
+    T& value = resource->value;
+    m_resources[type] = std::move(resource);
+    return value;
+}
+
+template <typename T>
+T& World::GetResource() {
+    EZSE_ASSERT(HasResource<T>(), "Cannot get a resource that was not added");
+    // Safe: the slot of ResourceType<T>() only ever holds a Resource<T>.
+    return static_cast<Resource<T>&>(*m_resources[ResourceType<T>()]).value;
+}
+
+template <typename T>
+bool World::HasResource() const {
+    const std::uint32_t type = ResourceType<T>();
+    return type < m_resources.size() && m_resources[type] != nullptr;
 }
 
 } // namespace ezse

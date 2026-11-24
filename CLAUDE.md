@@ -502,6 +502,7 @@ Regels die de Renderer herbruikbaar houden:
 | 333 | Module `Physics` (stap 37) | een eigen module `EZSE::Physics` met de `PhysicsScene`, de vormen, de `SpatialHash` en de raycasts, en eigen `PhysicsTests`. Hangt af van `Math`, en van `ECS` alleen voor `Entity`; `Engine` hangt af van `Physics`. De publieke API gebruikt alleen eigen types, zodat de binnenkant vervangbaar blijft (besluit 329). Het component `Collider` en het system dat de scene bijhoudt horen in `Engine`, omdat ze de `Transform` lezen. Afgewezen: in de module `Engine` (niet los te testen zonder GLFW, ImGui en de Renderer), en een getal van de gebruiker in plaats van `Entity` (geen typecontrole) |
 | 334 | De scene in de `World` van de `Engine` (stap 37) | `Engine::Create` voegt de `PhysicsScene` als resource toe aan zijn `World` (ook headless), met de vakgrootte in `EngineDesc`, en het system dat hem bijhoudt, zoals zijn andere eigen systems. Afgewezen: de game doet het zelf (pas nuttig als een game geen physics wil; dan kan `EngineDesc` het later uitzetten) |
 | 335 | Opdeling van stap 37 | 37a resources in de `World` (tests in `ECSTests`); 37b de module `Physics` (Claude), de vormen en een straal tegen elke vorm; 37c de `SpatialHash` met DDA voor stralen; 37d de `PhysicsScene` met `Raycast`; 37e `Collider`, het sync-system en de scene in de `Engine`, Sandbox laat het zien (Claude); 37f de game. Keuzes bij hun deel: de normaal als een straal binnen een vorm begint (37b), hoe de vorm in een `Collider` staat (37d), wanneer het sync-system draait (37e) |
+| 336 | Hoe de `World` resources opslaat (stap 37a) | in een eigen header `ECS/Resource.h`. Een type krijgt zijn nummer van `ResourceType<T>()`, met een eigen teller naast die van `ComponentType`, zodat de nummers zonder gaten een index zijn in `std::vector<std::unique_ptr<IResource>>` (lege plekken voor types zonder resource). `IResource` heeft alleen een virtual destructor; `Resource<T>` erft ervan en bevat `T value`, zoals `IComponentArray` en `ComponentArray<T>`. De `unique_ptr` houdt het adres vast, zodat een reference geldig blijft als er resources bijkomen. API: `AddResource<T>(args...)` (één keer per type, asserts), `GetResource<T>()` (moet bestaan, asserts) en `HasResource<T>()`; geen `RemoveResource` (geen aanleiding, en systems houden references vast). Afgewezen: `std::type_index` met een `unordered_map` (een tweede manier naast `ComponentType`), `std::any` (alleen kopieerbare types) en `unique_ptr<void>` met een eigen deleter (moeilijker te lezen) |
 | – | Shaderbron | als `std::string_view`, voorlopig als tekst in Sandbox |
 
 ## Huidige stand
@@ -934,7 +935,8 @@ laat alles zien (af, besluit 328: een `DebugShapesSystem`). Stap 36 is op 24 nov
 
 Stap 37 (vormen, raycasts en de spatial hash, fase 2 van de game) op branch
 `step-37-physics`; het ontwerp staat in besluiten 329 tot en met 335 en in `docs/physics.md` van de
-game (hoofdstuk 5). In delen: **37a** resources in de `World`; 37b de module `Physics` met vormen
+game (hoofdstuk 5). In delen: 37a resources in de `World` (af, besluit 336: `Resource.h`,
+`AddResource`/`GetResource`/`HasResource`, `TestWorldResources` met 11 checks); **37b** de module `Physics` met vormen
 en raycasts; 37c de `SpatialHash`; 37d de `PhysicsScene`; 37e `Collider` en het sync-system; 37f
 de game.
 
