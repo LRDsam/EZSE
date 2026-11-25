@@ -75,7 +75,7 @@ public:
     // headless, because the server reads data too.
     VirtualFileSystem& GetFileSystem();
     // Lines to see what the game does. Also there when running headless, where it draws nothing,
-    // so the simulation can call it on a server too (decision 322).
+    // so the simulation can call it on a server too.
     DebugDraw& GetDebugDraw();
     // Only with a window: these assert when running headless.
     Window& GetWindow();

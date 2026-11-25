@@ -18,7 +18,7 @@ void DebugDraw::DrawLine(const Vec3& from, const Vec3& to, const Vec3& color, fl
         return;
     }
     // Duration 0: a line from a tick must outlive the frame, or it flickers when a frame runs no
-    // tick (decision 321).
+    // tick.
     if (m_inTick) {
         m_tickVertices.push_back(LineVertex{from, color});
         m_tickVertices.push_back(LineVertex{to, color});

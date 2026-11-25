@@ -4,7 +4,7 @@
 
 namespace ezse {
 
-// The shapes things collide with (decision 330), in world space.
+// The shapes things collide with, in world space.
 
 // A ball around center.
 struct Sphere {
@@ -13,7 +13,7 @@ struct Sphere {
 };
 
 // Along the axes: center and half its size on each axis, as DebugDraw::DrawBox. Rotated boxes
-// come when a level has walls at an angle (decision 330).
+// come when a level has walls at an angle.
 struct Box {
     Vec3 center;
     Vec3 halfExtents;

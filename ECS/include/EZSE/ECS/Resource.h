@@ -5,7 +5,7 @@
 
 namespace ezse {
 
-// Resources: one object per type, owned by a World (EZSE decision 332). The World stores them
+// Resources: one object per type, owned by a World. The World stores them
 // without knowing their types, like components, so the ECS depends on nobody: not on Physics and
 // not on the game.
 

@@ -42,7 +42,7 @@ std::optional<RaycastHit> RaycastSphere(const Ray& ray, float maxDistance, const
     const Vec3 centerToOrigin = ray.origin - sphere.center;
     const float c = Dot(centerToOrigin, centerToOrigin) - sphere.radius * sphere.radius;
     if (c <= 0.0f) {
-        // The origin is inside the sphere (or on it): a hit at distance 0 (decision 337).
+        // The origin is inside the sphere (or on it): a hit at distance 0.
         return RaycastHit{.point = ray.origin, .normal = -ray.direction, .distance = 0.0f};
     }
     const float b = Dot(centerToOrigin, ray.direction);
@@ -81,7 +81,7 @@ std::optional<RaycastHit> RaycastBox(const Ray& ray, float maxDistance, const Bo
         return std::nullopt;
     }
 
-    // No slab entered after the origin: the ray starts inside the box (decision 337).
+    // No slab entered after the origin: the ray starts inside the box.
     if (enterAxis == -1) {
         return RaycastHit{.point = ray.origin, .normal = -ray.direction, .distance = 0.0f};
     }

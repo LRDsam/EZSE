@@ -180,7 +180,7 @@ void TestComponentDefaults() {
               meshRenderer.material.texture.id == 0,
           "MeshRenderer: a default MeshRenderer has no mesh, shader or texture");
 
-    // The defaults are the constants lit.frag had before materials (decision 177).
+    // The defaults are the constants lit.frag had before materials.
     const ezse::Material material;
     Check(material.tint.x == 1.0f && material.tint.y == 1.0f && material.tint.z == 1.0f,
           "Material: the default tint is white");
@@ -717,7 +717,7 @@ void TestEngineInputHeadless() {
           "Engine input: headless, the frame and tick input are empty");
 }
 
-// The lifetime of debug lines (decision 321), without an Engine or a Renderer.
+// The lifetime of debug lines, without an Engine or a Renderer.
 void TestDebugDraw() {
     const auto countVertices = [](const ezse::DebugDraw& debugDraw) {
         std::vector<ezse::LineVertex> vertices;

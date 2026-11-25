@@ -22,7 +22,7 @@ using GLProc = void (*)();
 using GLLoadFunction = GLProc (*)(const char* name);
 
 // Everything that talks to OpenGL. It knows no files, entities or windows: it gets data and gives
-// handles back (rules 1 to 4 under Architectuur in CLAUDE.md). The Engine drives it each frame:
+// handles back. The Engine drives it each frame:
 // SetCamera and the lights, BeginShadowPass, DrawShadowCaster per mesh, EndShadowPass, Clear,
 // DrawMesh per mesh, then the debug UI.
 class Renderer {

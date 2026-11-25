@@ -7,7 +7,7 @@
 
 namespace ezse {
 
-// How a mesh is drawn. Colors are linear (decision 249).
+// How a mesh is drawn. Colors are linear.
 struct Material {
     ShaderHandle shader;
     TextureHandle texture; // id 0 equals a white texture.

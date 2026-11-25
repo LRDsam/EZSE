@@ -69,7 +69,7 @@ void TestRaycastSphere() {
     Check(ezse::RaycastSphere(ray, 4.5f, sphere).has_value(),
           "RaycastSphere: a sphere within maxDistance is hit");
 
-    // Starting inside, also when pointing away from the center: a hit at 0 (decision 337).
+    // Starting inside, also when pointing away from the center: a hit at 0.
     const ezse::Ray inside{.origin = {0.0f, 0.0f, -5.5f}, .direction = c_forward};
     const std::optional<ezse::RaycastHit> insideHit = ezse::RaycastSphere(inside, 100.0f, sphere);
     Check(insideHit && NearlyEqual(insideHit->distance, 0.0f) &&

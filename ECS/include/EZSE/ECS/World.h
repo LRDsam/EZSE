@@ -65,7 +65,7 @@ private:
     void AddExistingEntities(System& system);
 
     // Declared before the systems, so it is destroyed after them: systems keep references to
-    // resources (decision 332).
+    // resources.
     std::vector<std::unique_ptr<IResource>> m_resources; // index: ResourceType<T>(), may hold nulls
     EntityManager m_entities;
     ComponentManager m_components;

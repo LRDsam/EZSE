@@ -2,8 +2,7 @@
 
 #include "EZSE/Core/Log.h"
 
-// Stops in the debugger at this line. MSVC only for now; the Linux server (phase 4 of the game)
-// needs another way.
+// Stops in the debugger at this line. MSVC only for now; a Linux build needs another way.
 #define EZSE_DEBUG_BREAK() __debugbreak()
 
 // EZSE_ASSERT(condition, message): for programmer errors only (a handle of 0, an index out of

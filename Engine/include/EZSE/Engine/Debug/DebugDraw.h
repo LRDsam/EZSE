@@ -8,7 +8,7 @@
 
 namespace ezse {
 
-// Lines to see what the game does, such as where a raycast hits (decisions 320 to 326). Call it
+// Lines to see what the game does, such as where a raycast hits. Call it
 // from anywhere; the Engine draws everything at the end of the frame. Without a window it does
 // nothing, so the same code runs on a server.
 class DebugDraw {
@@ -24,7 +24,7 @@ public:
     void DrawLine(const Vec3& from, const Vec3& to, const Vec3& color, float duration = 0.0f);
 
     // A box along the axes: 12 lines around center, reaching halfExtents from it on each axis
-    // (so the box is twice as large). Rotated boxes come when step 37 needs them.
+    // (so the box is twice as large). Only along the axes for now.
     void DrawBox(const Vec3& center, const Vec3& halfExtents, const Vec3& color,
                  float duration = 0.0f);
 

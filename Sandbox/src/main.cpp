@@ -195,7 +195,7 @@ void TickLogSystem::Update(ezse::World& world, float) {
     }
 }
 
-// Shows what DebugDraw can do (step 36d): the axes on the floor, a box around one entity and a
+// Shows what DebugDraw can do: the axes on the floor, a box around one entity and a
 // sphere at a lamp, which has no mesh of its own. Drawn every frame with duration 0, from the
 // Transforms of this frame, so the shapes follow when an entity is moved in the debug UI.
 class DebugShapesSystem : public ezse::System {
@@ -226,7 +226,7 @@ void DebugShapesSystem::Update(ezse::World& world, float) {
     m_debugDraw.DrawLine(origin, origin + ezse::Vec3{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f});
 
     // A little larger than the cube of 1 meter: lines exactly on its faces would fight with them
-    // for the depth (decision 325) and flicker.
+    // for the depth and flicker.
     const ezse::Vec3& boxedPosition = world.GetComponent<ezse::Transform>(m_boxed).position;
     m_debugDraw.DrawBox(boxedPosition, {0.51f, 0.51f, 0.51f}, {1.0f, 1.0f, 1.0f});
 

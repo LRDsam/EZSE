@@ -166,7 +166,7 @@ void Engine::Step() {
     // still held, so a press is seen once even when one frame runs two ticks.
     m_tickInput = m_pendingTickInput;
     m_pendingTickInput.ClearChanges();
-    // Lines drawn during the tick stay until the next tick (decision 321).
+    // Lines drawn during the tick stay until the next tick.
     m_debugDraw.BeginTick();
     m_world.Update(SystemPhase::Simulation, m_simulationTime.tickSeconds);
     m_debugDraw.EndTick();

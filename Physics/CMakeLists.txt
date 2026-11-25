@@ -8,7 +8,7 @@ add_library(EZSE::Physics ALIAS EZSEPhysics)
 
 target_include_directories(EZSEPhysics PUBLIC include)
 ezse_set_warnings(EZSEPhysics)
-# Math for the vectors; ECS only for Entity, so a hit can say what it hit (decision 333).
+# Math for the vectors; ECS only for Entity, so a hit can say what it hit.
 target_link_libraries(EZSEPhysics PUBLIC EZSE::Math EZSE::ECS)
 
 if(EZSE_BUILD_TESTS)

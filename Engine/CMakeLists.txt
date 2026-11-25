@@ -6,7 +6,7 @@
 function(ezse_copy_assets target namespace directory)
     set(assetsTarget ${target}Assets_${namespace})
     # Not $<TARGET_FILE_DIR:target>: that makes this target depend on the executable, which itself
-    # depends on this target, a cycle (decision 150). The folder of the target plus the config is
+    # depends on this target, a cycle. The folder of the target plus the config is
     # where Visual Studio puts the executable.
     get_target_property(binaryDir ${target} BINARY_DIR)
     add_custom_target(${assetsTarget} ALL
