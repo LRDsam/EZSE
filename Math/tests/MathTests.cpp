@@ -1,3 +1,4 @@
+#include "EZSE/Math/Aabb.h"
 #include "EZSE/Math/Quat.h"
 #include "EZSE/Math/Transform.h"
 #include "EZSE/Math/Vec2.h"
@@ -743,6 +744,30 @@ void TestQuatToEuler() {
           "ToEuler at a pitch of -90 degrees still gives the same orientation");
 }
 
+void TestAabbOverlaps() {
+    const ezse::Aabb box{.min = {0.0f, 0.0f, 0.0f}, .max = {2.0f, 2.0f, 2.0f}};
+
+    Check(ezse::Overlaps(box, ezse::Aabb{.min = {1.0f, 1.0f, 1.0f}, .max = {3.0f, 3.0f, 3.0f}}),
+          "Overlaps: boxes that share a corner region overlap");
+    Check(ezse::Overlaps(box, ezse::Aabb{.min = {0.5f, 0.5f, 0.5f}, .max = {1.0f, 1.0f, 1.0f}}),
+          "Overlaps: a box inside another overlaps");
+    Check(ezse::Overlaps(box, ezse::Aabb{.min = {2.0f, 0.0f, 0.0f}, .max = {3.0f, 2.0f, 2.0f}}),
+          "Overlaps: boxes that only touch with a face overlap");
+    Check(ezse::Overlaps(box, box), "Overlaps: a box overlaps itself");
+
+    // Apart on one axis is enough to miss, whichever axis it is.
+    Check(!ezse::Overlaps(box, ezse::Aabb{.min = {2.1f, 0.0f, 0.0f}, .max = {3.0f, 2.0f, 2.0f}}),
+          "Overlaps: boxes apart on X do not overlap");
+    Check(!ezse::Overlaps(box, ezse::Aabb{.min = {0.0f, -3.0f, 0.0f}, .max = {2.0f, -0.1f, 2.0f}}),
+          "Overlaps: boxes apart on Y do not overlap");
+    Check(!ezse::Overlaps(box, ezse::Aabb{.min = {0.0f, 0.0f, 2.5f}, .max = {2.0f, 2.0f, 3.0f}}),
+          "Overlaps: boxes apart on Z do not overlap");
+
+    const ezse::Aabb other{.min = {1.0f, 3.0f, 1.0f}, .max = {4.0f, 4.0f, 4.0f}};
+    Check(ezse::Overlaps(box, other) == ezse::Overlaps(other, box),
+          "Overlaps: the order of the two boxes does not matter");
+}
+
 } // namespace
 
 int main() {
@@ -782,6 +807,7 @@ int main() {
     TestQuatSlerp();
     TestQuatFromEuler();
     TestQuatToEuler();
+    TestAabbOverlaps();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

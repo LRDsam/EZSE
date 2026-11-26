@@ -1,12 +1,17 @@
 #include "EZSE/Physics/Ray.h"
 #include "EZSE/Physics/Raycast.h"
 #include "EZSE/Physics/Shapes.h"
+#include "EZSE/Physics/SpatialHash.h"
 
+#include "EZSE/Math/Aabb.h"
 #include "EZSE/Math/Vec3.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <optional>
+#include <vector>
 
 namespace {
 
@@ -135,11 +140,142 @@ void TestRaycastBox() {
           "RaycastBox: from inside, a hit at distance 0 with the normal against the ray");
 }
 
+using Ids = std::vector<std::uint32_t>;
+
+// A box around center, reaching half on each axis.
+ezse::Aabb BoxAround(const ezse::Vec3& center, float half) {
+    const ezse::Vec3 extent{half, half, half};
+    return ezse::Aabb{.min = center - extent, .max = center + extent};
+}
+
+// The ids of a query, sorted: a test compares them without caring in which order the hash finds
+// them.
+Ids SortedQuery(ezse::SpatialHash& hash, const ezse::Aabb& bounds) {
+    Ids ids;
+    hash.Query(bounds, ids);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+void TestSpatialHashQuery() {
+    ezse::SpatialHash hash(4.0f);
+    hash.Insert(0, BoxAround({1.0f, 1.0f, 1.0f}, 0.5f));
+    hash.Insert(1, BoxAround({50.0f, 1.0f, 1.0f}, 0.5f));
+
+    Check(SortedQuery(hash, BoxAround({1.0f, 1.0f, 1.0f}, 1.0f)) == Ids{0},
+          "SpatialHash: a query finds what lies there, and not what lies far away");
+    Check(SortedQuery(hash, BoxAround({20.0f, 20.0f, 20.0f}, 1.0f)).empty(),
+          "SpatialHash: a query where nothing lies finds nothing");
+    Check(SortedQuery(hash, ezse::Aabb{.min = {0.0f, 0.0f, 0.0f}, .max = {60.0f, 2.0f, 2.0f}}) ==
+              Ids{0, 1},
+          "SpatialHash: a query over many cells finds everything in them");
+
+    // The same cell (0, 0, 0), but the boxes do not meet: the hash itself leaves it out.
+    Check(SortedQuery(hash, BoxAround({3.0f, 3.0f, 3.0f}, 0.5f)).empty(),
+          "SpatialHash: an id in the same cell whose box does not overlap is left out");
+    Check(SortedQuery(hash, ezse::Aabb{.min = {1.5f, 0.0f, 0.0f}, .max = {2.0f, 1.0f, 1.0f}}) ==
+              Ids{0},
+          "SpatialHash: boxes that only touch count as overlapping");
+
+    Ids out{7, 8, 9};
+    hash.Query(BoxAround({20.0f, 20.0f, 20.0f}, 1.0f), out);
+    Check(out.empty(), "SpatialHash: Query clears out first");
+}
+
+void TestSpatialHashManyCells() {
+    ezse::SpatialHash hash(4.0f);
+    // A wall of 20 meters along X lies in six cells (x from -2 to 3).
+    hash.Insert(3, ezse::Aabb{.min = {-6.0f, 0.0f, 0.0f}, .max = {14.0f, 3.0f, 0.2f}});
+
+    Check(SortedQuery(hash, ezse::Aabb{.min = {-10.0f, -1.0f, -1.0f},
+                                       .max = {20.0f, 4.0f, 1.0f}}) == Ids{3},
+          "SpatialHash: an id in several cells is found once");
+    Check(SortedQuery(hash, BoxAround({13.0f, 1.0f, 0.0f}, 0.5f)) == Ids{3},
+          "SpatialHash: an id in several cells is found from its far end");
+}
+
+void TestSpatialHashNegative() {
+    ezse::SpatialHash hash(4.0f);
+    // On both sides of 0 on every axis, where floor and a plain cast differ.
+    hash.Insert(0, BoxAround({-0.5f, -0.5f, -0.5f}, 0.25f));
+    hash.Insert(1, BoxAround({0.5f, 0.5f, 0.5f}, 0.25f));
+    hash.Insert(2, BoxAround({-100.0f, -30.0f, -250.0f}, 1.0f));
+
+    Check(SortedQuery(hash, BoxAround({-0.5f, -0.5f, -0.5f}, 0.3f)) == Ids{0},
+          "SpatialHash: an id just below 0 is found there");
+    Check(SortedQuery(hash, BoxAround({0.5f, 0.5f, 0.5f}, 0.3f)) == Ids{1},
+          "SpatialHash: an id just above 0 is found there");
+    Check(SortedQuery(hash, BoxAround({0.0f, 0.0f, 0.0f}, 1.0f)) == Ids{0, 1},
+          "SpatialHash: a query across 0 finds both sides");
+    Check(SortedQuery(hash, BoxAround({-100.0f, -30.0f, -250.0f}, 0.5f)) == Ids{2},
+          "SpatialHash: an id far into the negative is found");
+}
+
+void TestSpatialHashMove() {
+    ezse::SpatialHash hash(4.0f);
+    hash.Insert(0, BoxAround({1.0f, 1.0f, 1.0f}, 0.5f));
+
+    // Within the same cell: only the box changes.
+    hash.Move(0, BoxAround({3.0f, 1.0f, 1.0f}, 0.5f));
+    Check(SortedQuery(hash, BoxAround({1.0f, 1.0f, 1.0f}, 0.3f)).empty(),
+          "SpatialHash: after a Move within its cell, the old place is empty");
+    Check(SortedQuery(hash, BoxAround({3.0f, 1.0f, 1.0f}, 0.3f)) == Ids{0},
+          "SpatialHash: after a Move within its cell, it is found at the new place");
+
+    // To cells far away.
+    hash.Move(0, BoxAround({-40.0f, 1.0f, 20.0f}, 0.5f));
+    Check(SortedQuery(hash, BoxAround({3.0f, 1.0f, 1.0f}, 2.0f)).empty(),
+          "SpatialHash: after a Move to other cells, the old cells are empty");
+    Check(SortedQuery(hash, BoxAround({-40.0f, 1.0f, 20.0f}, 0.3f)) == Ids{0},
+          "SpatialHash: after a Move to other cells, it is found there");
+}
+
+void TestSpatialHashRemove() {
+    ezse::SpatialHash hash(4.0f);
+    // Three ids in one cell; removing the middle one moves the last into its place.
+    hash.Insert(0, BoxAround({1.0f, 1.0f, 1.0f}, 0.5f));
+    hash.Insert(1, BoxAround({2.0f, 1.0f, 1.0f}, 0.5f));
+    hash.Insert(2, BoxAround({3.0f, 1.0f, 1.0f}, 0.5f));
+    const ezse::Aabb cell{.min = {0.0f, 0.0f, 0.0f}, .max = {4.0f, 4.0f, 4.0f}};
+
+    hash.Remove(1);
+    Check(SortedQuery(hash, cell) == Ids{0, 2},
+          "SpatialHash: after Remove, the other ids in its cell stay");
+
+    hash.Remove(0);
+    hash.Remove(2);
+    Check(SortedQuery(hash, cell).empty(),
+          "SpatialHash: after removing everything, nothing is found");
+
+    // An id may come back, also in a cell that was emptied.
+    hash.Insert(1, BoxAround({1.0f, 1.0f, 1.0f}, 0.5f));
+    Check(SortedQuery(hash, cell) == Ids{1}, "SpatialHash: a removed id can be inserted again");
+}
+
+void TestSpatialHashIds() {
+    ezse::SpatialHash hash(4.0f);
+    // The ids do not have to come in order.
+    hash.Insert(10, BoxAround({1.0f, 1.0f, 1.0f}, 0.5f));
+    hash.Insert(2, BoxAround({1.5f, 1.0f, 1.0f}, 0.5f));
+    Check(SortedQuery(hash, BoxAround({1.0f, 1.0f, 1.0f}, 1.0f)) == Ids{2, 10},
+          "SpatialHash: ids inserted out of order are both found");
+
+    // The stamps of one query must not hide ids from the next.
+    Check(SortedQuery(hash, BoxAround({1.0f, 1.0f, 1.0f}, 1.0f)) == Ids{2, 10},
+          "SpatialHash: a second query finds the same ids again");
+}
+
 } // namespace
 
 int main() {
     TestRaycastSphere();
     TestRaycastBox();
+    TestSpatialHashQuery();
+    TestSpatialHashManyCells();
+    TestSpatialHashNegative();
+    TestSpatialHashMove();
+    TestSpatialHashRemove();
+    TestSpatialHashIds();
 
     std::cout << failureCount << " check(s) failed\n";
     return failureCount == 0 ? 0 : 1;

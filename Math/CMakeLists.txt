@@ -1,10 +1,12 @@
 add_library(EZSEMath STATIC
+    include/EZSE/Math/Aabb.h
     include/EZSE/Math/Mat4.h
     include/EZSE/Math/Quat.h
     include/EZSE/Math/Transform.h
     include/EZSE/Math/Vec2.h
     include/EZSE/Math/Vec3.h
     include/EZSE/Math/Vec4.h
+    src/Aabb.cpp
     src/Mat4.cpp
     src/Quat.cpp
     src/Transform.cpp
